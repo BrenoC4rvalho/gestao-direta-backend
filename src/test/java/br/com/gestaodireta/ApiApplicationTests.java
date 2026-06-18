@@ -14,10 +14,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 class ApiApplicationTests {
     @Container
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
-        .withDatabaseName("gestaodireta_test")
-        .withUsername("gestaodireta")
-        .withPassword("secret");
+    static final PostgreSQLContainer<?> POSTGRES =
+            new PostgreSQLContainer<>("postgres:16-alpine")
+                    .withDatabaseName("gestaodireta_test")
+                    .withUsername("gestaodireta")
+                    .withPassword("secret");
 
     @DynamicPropertySource
     static void postgresProperties(DynamicPropertyRegistry registry) {

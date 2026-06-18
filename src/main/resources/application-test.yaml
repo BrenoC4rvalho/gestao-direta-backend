@@ -8,9 +8,17 @@ spring:
   flyway:
     enabled: true
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
 app:
   cors:
     allowed-origins: http://localhost:5173
+    allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+    allowed-headers: Authorization,Content-Type,Accept,Origin
   jwt:
     issuer: gestao-direta-api-test
     secret: test-secret-test-secret-test-secret-test-secret
