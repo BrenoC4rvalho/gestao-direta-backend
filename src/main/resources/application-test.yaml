@@ -1,0 +1,21 @@
+spring:
+  docker:
+    compose:
+      enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+app:
+  cors:
+    allowed-origins: http://localhost:5173
+  jwt:
+    issuer: gestao-direta-api-test
+    secret: test-secret-test-secret-test-secret-test-secret
+    expiration-minutes: 60
+  cookie:
+    name: gd_session
+    secure: false
+    same-site: Lax

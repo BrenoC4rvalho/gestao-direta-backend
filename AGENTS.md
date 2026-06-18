@@ -43,6 +43,20 @@ Usar o pacote base:
 br.com.gestaodireta
 ```
 
+## Regras obrigatórias de qualidade de código
+
+- Não escrever múltiplas instruções Java na mesma linha.
+- Não compactar blocos `if`, `else`, `for`, `while`, `try/catch` em uma linha.
+- Não compactar métodos inteiros em uma linha.
+- Manter indentação padrão Java.
+- Quebrar linhas longas.
+- Preferir métodos pequenos e legíveis.
+- Não criar classes gigantes.
+- Não misturar autenticação, autorização e regra de negócio no mesmo método.
+- Não espalhar autorização em vários `if` dentro dos services.
+- Usar `@PreAuthorize` com classes de acesso para autorização contextual.
+- Antes de finalizar, revisar a formatação do código alterado.
+
 ## Arquitetura
 
 Usar monólito modular + arquitetura em camadas.
@@ -186,6 +200,13 @@ Rodar:
 - Sempre executar `./mvnw test` após implementar ou alterar código.
 - Se não conseguir fazer todos os testes passarem, informar exatamente quais falharam e o motivo provável.
 - Não usar comandos para pular testes, como `-DskipTests`, `-Dmaven.test.skip=true` ou equivalentes.
+- Não considerar tarefa concluída apenas porque compila.
+- Criar testes para regras de negócio principais.
+- Criar testes para cenários de permissão.
+- Criar testes para cenários de erro.
+- Não remover testes para fazer build passar.
+- Não enfraquecer asserts.
+- Sempre executar `./mvnw test`.
 
 ## Restrições
 
