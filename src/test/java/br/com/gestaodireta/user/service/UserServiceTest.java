@@ -1,0 +1,141 @@
+package br.com.gestaodireta.user.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import br.com.gestaodireta.shared.exception.BusinessException;
+import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
+import br.com.gestaodireta.support.PostgresIntegrationTest;
+import br.com.gestaodireta.user.dto.UserCreateRequest;
+import br.com.gestaodireta.user.dto.UserResponse;
+import br.com.gestaodireta.user.dto.UserStatusUpdateRequest;
+import br.com.gestaodireta.user.dto.UserTypeUpdateRequest;
+import br.com.gestaodireta.user.dto.UserUpdateRequest;
+import br.com.gestaodireta.user.entity.User;
+import br.com.gestaodireta.user.enumeration.UserStatus;
+import br.com.gestaodireta.user.enumeration.UserType;
+import br.com.gestaodireta.user.repository.UserRepository;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+@SpringBootTest
+class UserServiceTest extends PostgresIntegrationTest {
+
+    @Autowired private UserService userService;
+
+    @Autowired private UserRepository userRepository;
+
+    @Autowired private PasswordEncoder passwordEncoder;
+
+    @BeforeEach
+    void setUp() {
+        SecurityContextHolder.clearContext();
+        userRepository.deleteAll();
+    }
+
+    @Test
+    void shouldCreateUserWithActiveStatusAndEncryptedPassword() {
+        UserCreateRequest request =
+                new UserCreateRequest(
+                        "Maria Silva",
+                        "maria@example.com",
+                        "Strong1!",
+                        "12345678900",
+                        UserType.USER);
+
+        UserResponse response = userService.create(request);
+        User savedUser = userRepository.findById(response.id()).orElseThrow();
+
+        assertThat(response.status()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(savedUser.getPassword()).isNotEqualTo("Strong1!");
+        assertThat(passwordEncoder.matches("Strong1!", savedUser.getPassword())).isTrue();
+    }
+
+    @Test
+    void shouldRejectDuplicatedEmail() {
+        userService.create(
+                new UserCreateRequest(
+                        "Maria Silva", "maria@example.com", "Strong1!", null, UserType.USER));
+
+        UserCreateRequest duplicatedRequest =
+                new UserCreateRequest(
+                        "Maria Souza", "maria@example.com", "Strong2!", null, UserType.USER);
+
+        assertThatThrownBy(() -> userService.create(duplicatedRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Email is already in use");
+    }
+
+    @Test
+    void shouldFindUserById() {
+        UserResponse createdUser = createUser("admin@example.com", UserType.ADMIN);
+
+        UserResponse foundUser = userService.findById(createdUser.id());
+
+        assertThat(foundUser.id()).isEqualTo(createdUser.id());
+        assertThat(foundUser.email()).isEqualTo("admin@example.com");
+    }
+
+    @Test
+    void shouldThrowResourceNotFoundWhenUserDoesNotExist() {
+        assertThatThrownBy(() -> userService.findById(999L))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("User not found");
+    }
+
+    @Test
+    void shouldUpdateOnlyNameAndDocumentForAuthenticatedUser() {
+        UserResponse createdUser = createUser("user@example.com", UserType.USER);
+        authenticateAs(createdUser.id(), "ROLE_USER");
+
+        UserResponse response =
+                userService.updateMe(new UserUpdateRequest("Updated Name", "98765432100"));
+        User savedUser = userRepository.findById(createdUser.id()).orElseThrow();
+
+        assertThat(response.name()).isEqualTo("Updated Name");
+        assertThat(response.document()).isEqualTo("98765432100");
+        assertThat(savedUser.getEmail()).isEqualTo("user@example.com");
+        assertThat(savedUser.getUserType()).isEqualTo(UserType.USER);
+        assertThat(savedUser.getStatus()).isEqualTo(UserStatus.ACTIVE);
+    }
+
+    @Test
+    void shouldUpdateUserStatus() {
+        UserResponse createdUser = createUser("user@example.com", UserType.USER);
+
+        UserResponse response =
+                userService.updateStatus(
+                        createdUser.id(), new UserStatusUpdateRequest(UserStatus.BLOCKED));
+
+        assertThat(response.status()).isEqualTo(UserStatus.BLOCKED);
+    }
+
+    @Test
+    void shouldUpdateUserType() {
+        UserResponse createdUser = createUser("user@example.com", UserType.USER);
+
+        UserResponse response =
+                userService.updateType(createdUser.id(), new UserTypeUpdateRequest(UserType.ADMIN));
+
+        assertThat(response.userType()).isEqualTo(UserType.ADMIN);
+    }
+
+    private UserResponse createUser(String email, UserType userType) {
+        return userService.create(
+                new UserCreateRequest("Test User", email, "Strong1!", null, userType));
+    }
+
+    private void authenticateAs(Long userId, String role) {
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(
+                        String.valueOf(userId), null, List.of(new SimpleGrantedAuthority(role)));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+    }
+}
