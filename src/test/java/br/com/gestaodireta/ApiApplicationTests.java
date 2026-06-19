@@ -1,7 +1,15 @@
 package br.com.gestaodireta;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import br.com.gestaodireta.user.entity.User;
+import br.com.gestaodireta.user.enumeration.UserStatus;
+import br.com.gestaodireta.user.enumeration.UserType;
+import br.com.gestaodireta.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -20,6 +28,10 @@ class ApiApplicationTests {
                     .withUsername("gestaodireta")
                     .withPassword("secret");
 
+    @Autowired private UserRepository userRepository;
+
+    @Autowired private PasswordEncoder passwordEncoder;
+
     @DynamicPropertySource
     static void postgresProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
@@ -28,5 +40,17 @@ class ApiApplicationTests {
     }
 
     @Test
-    void contextLoads() {}
+    void contextLoadsAndCreatesInitialAdminUser() {
+        User admin = userRepository.findByEmail("admin@gestaodireta.com").orElseThrow();
+
+        assertThat(admin.getName()).isEqualTo("Administrador");
+        assertThat(admin.getEmail()).isEqualTo("admin@gestaodireta.com");
+        assertThat(admin.getPassword()).isNotEqualTo("Admin@123");
+        assertThat(passwordEncoder.matches("Admin@123", admin.getPassword())).isTrue();
+        assertThat(admin.getDocument()).isNull();
+        assertThat(admin.getUserType()).isEqualTo(UserType.ADMIN);
+        assertThat(admin.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(admin.getCreatedAt()).isNotNull();
+        assertThat(admin.getUpdatedAt()).isNull();
+    }
 }
