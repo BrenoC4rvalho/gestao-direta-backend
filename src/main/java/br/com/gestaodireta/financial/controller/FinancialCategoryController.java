@@ -44,13 +44,20 @@ public class FinancialCategoryController {
         return financialCategoryService.findAll(farmId, paginationParams);
     }
 
+    @GetMapping("/global")
+    @PreAuthorize("hasRole('ADMIN')")
+    public PageResponse<FinancialCategoryResponse> findGlobal(
+            @Valid @ModelAttribute PaginationParams paginationParams) {
+        return financialCategoryService.findGlobal(paginationParams);
+    }
+
     @GetMapping("/{id}")
     public FinancialCategoryResponse findById(@PathVariable Long id) {
         return financialCategoryService.findById(id);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("@financialAccess.canManageCategoryByCategoryId(#id)")
+    @PreAuthorize("@financialAccess.canUpdateCategory(#id, #request)")
     public FinancialCategoryResponse update(
             @PathVariable Long id, @Valid @RequestBody FinancialCategoryRequest request) {
         return financialCategoryService.update(id, request);

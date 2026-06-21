@@ -16,12 +16,24 @@ public interface FinancialCategoryRepository extends JpaRepository<FinancialCate
             select category
             from FinancialCategory category
             where category.status = :status
-              and (category.defaultCategory = true or category.farm.id = :farmId)
+              and (
+                    (category.farm is null and category.defaultCategory = true)
+                    or category.farm.id = :farmId
+              )
             """)
     Page<FinancialCategory> findVisibleByFarmId(
             @Param("farmId") Long farmId,
             @Param("status") FinancialCategoryStatus status,
             Pageable pageable);
+
+    @Query(
+            """
+            select category
+            from FinancialCategory category
+            where category.farm is null
+              and category.defaultCategory = true
+            """)
+    Page<FinancialCategory> findGlobal(Pageable pageable);
 
     @Query(
             """

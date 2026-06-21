@@ -12,6 +12,7 @@ import br.com.gestaodireta.shared.security.SecurityUtils;
 import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.enumeration.UserStatus;
 import br.com.gestaodireta.user.repository.UserRepository;
+import java.util.Objects;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
 
@@ -113,6 +114,26 @@ public class FinancialAccess {
         return isCurrentUserActive()
                 && isFarmActive(request.farmId())
                 && role.filter(FarmUserRole.PRODUCER::equals).isPresent();
+    }
+
+    public boolean canUpdateCategory(Long categoryId, FinancialCategoryRequest request) {
+        if (SecurityUtils.isAdmin()) {
+            return true;
+        }
+
+        if (request.isDefault() || request.farmId() == null) {
+            return false;
+        }
+
+        Optional<Long> farmId = financialCategoryRepository.findFarmIdById(categoryId);
+
+        if (farmId.isEmpty() || !Objects.equals(farmId.get(), request.farmId())) {
+            return false;
+        }
+
+        return isCurrentUserActive()
+                && isFarmActive(farmId.get())
+                && currentUserRole(farmId.get()).filter(FarmUserRole.PRODUCER::equals).isPresent();
     }
 
     public boolean canManageCategoryByCategoryId(Long categoryId) {

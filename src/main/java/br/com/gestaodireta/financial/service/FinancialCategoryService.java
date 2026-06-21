@@ -59,6 +59,16 @@ public class FinancialCategoryService {
     }
 
     @Transactional(readOnly = true)
+    public PageResponse<FinancialCategoryResponse> findGlobal(PaginationParams paginationParams) {
+        Page<FinancialCategoryResponse> categories =
+                financialCategoryRepository
+                        .findGlobal(paginationParams.toPageable())
+                        .map(financialCategoryMapper::toResponse);
+
+        return PageResponse.from(categories);
+    }
+
+    @Transactional(readOnly = true)
     public FinancialCategoryResponse findById(Long id) {
         return financialCategoryMapper.toResponse(findEntityById(id));
     }
