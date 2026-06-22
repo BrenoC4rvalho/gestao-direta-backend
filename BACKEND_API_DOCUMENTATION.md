@@ -1,0 +1,2312 @@
+# Documentação da API Backend
+
+## Visão geral
+
+Esta documentação descreve a API backend do Gestão Direta, sistema de gestão financeira voltado ao agronegócio.
+
+A stack encontrada no backend é Java 21, Spring Boot, Spring Security, JWT com Auth0 Java JWT, cookie HttpOnly, Spring Data JPA, PostgreSQL, Flyway, Bean Validation e SpringDoc OpenAPI.
+
+A API é REST, não possui versionamento explícito e usa o context path `/api`. Portanto, as rotas documentadas já aparecem com o prefixo completo, por exemplo `/api/auth/login`.
+
+Respostas paginadas usam o formato:
+
+```json
+{
+  "content": [],
+  "page": 0,
+  "size": 10,
+  "totalElements": 0,
+  "totalPages": 0,
+  "first": true,
+  "last": true
+}
+```
+
+Não há controllers encontrados para Safras, Relatórios, Crédito Rural ou WhatsApp/Webhook no código atual.
+
+## Autenticação
+
+`POST /api/auth/login` é público. Todos os demais endpoints exigem autenticação, exceto Swagger/OpenAPI (`/api/swagger-ui/**`, `/api/swagger-ui.html` e `/api/v3/api-docs/**`).
+
+O JWT é gravado no cookie `gd_session` e não é retornado no body da resposta. O cookie é `HttpOnly`, `path=/`, `SameSite=Lax` por padrão e `Secure=false` por padrão via configuração. Em produção, `Secure` deve ser habilitado por variável de ambiente.
+
+O frontend deve enviar cookies nas chamadas autenticadas usando `credentials: "include"`.
+
+JWT inválido, JWT ausente em rota protegida, JWT expirado ou usuário com status `INACTIVE` ou `BLOCKED` resulta em `401 Unauthorized`.
+
+## Formatos comuns
+
+### Paginação
+
+Endpoints paginados aceitam os query params:
+
+```json
+{
+  "page": 0,
+  "size": 10,
+  "sort": "id",
+  "direction": "ASC"
+}
+```
+
+Defaults:
+
+- `page=0`
+- `size=10`
+- `sort=id`
+- `direction=ASC`
+- tamanho máximo normalizado para `100`
+
+### Erro padrão
+
+```json
+{
+  "timestamp": "2026-06-21T10:30:00",
+  "status": 400,
+  "error": "Bad Request",
+  "message": "Validation failed",
+  "path": "/api/users",
+  "details": ["email: must be a well-formed email address"]
+}
+```
+
+### Enums
+
+- `UserType`: `ADMIN`, `USER`
+- `UserStatus`: `ACTIVE`, `INACTIVE`, `BLOCKED`
+- `FarmStatus`: `ACTIVE`, `INACTIVE`
+- `FarmUserRole`: `PRODUCER`, `EMPLOYEE`, `ACCOUNTANT`, `INACTIVE`
+- `ProductionType`: `AGRICULTURE`, `LIVESTOCK`, `MIXED`, `OTHER`
+- `TransactionType`: `INCOME`, `EXPENSE`
+- `PaymentStatus`: `PENDING`, `PAID`, `OVERDUE`, `CANCELED`
+- `PaymentMethod`: `PIX`, `CASH`, `CREDIT_CARD`, `DEBIT_CARD`, `BANK_TRANSFER`, `BOLETO`, `CHECK`, `OTHER`
+- `FinancialRecordStatus`: `ACTIVE`, `DELETED`
+- `FinancialCategoryStatus`: `ACTIVE`, `INACTIVE`
+
+### Regras importantes
+
+- `ADMIN` administra usuários, fazendas e categorias globais.
+- `USER` depende de vínculo ativo com fazenda.
+- `FarmUserRole.INACTIVE` não permite acesso à fazenda.
+- `PRODUCER` gerencia fazenda, vínculos de usuários e categorias da fazenda.
+- `EMPLOYEE` pode gerenciar movimentações financeiras.
+- `ACCOUNTANT` pode consultar dados financeiros, mas não gerenciar.
+- Categorias default são globais e só `ADMIN` pode criar ou alterar.
+- Categoria não default exige `farmId`.
+- Transações exigem fazenda ativa.
+- Transações registram o usuário autenticado como criador no backend.
+- `createdByUserId` e `updatedByUserId` não são aceitos no request.
+- Exclusão de fazenda é lógica por status `INACTIVE`.
+- Exclusão de transação é lógica por `recordStatus=DELETED`.
+- Exclusão de categoria é lógica por status `INACTIVE`.
+
+## Endpoints
+
+### POST /api/auth/login
+
+**Descrição:**  
+Autentica um usuário ativo e grava o JWT no cookie `gd_session`.
+
+**Autenticação:** Não  
+**Permissão:** Público.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "email": "admin@gestaodireta.com",
+  "password": "Strong@123"
+}
+```
+
+**Campos obrigatórios:**
+- `email`
+- `password`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "user": {
+    "id": 1,
+    "name": "Admin",
+    "email": "admin@gestaodireta.com",
+    "document": "00000000000",
+    "userType": "ADMIN",
+    "status": "ACTIVE"
+  }
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `400 Bad Request` para body inválido.
+- `401 Unauthorized` para credenciais inválidas ou usuário inativo/bloqueado.
+
+**Observações de regra de negócio:**
+- O JWT não é retornado no body.
+- A resposta inclui `Set-Cookie` para `gd_session`.
+
+### POST /api/auth/logout
+
+**Descrição:**  
+Encerra a sessão removendo o cookie de autenticação.
+
+**Autenticação:** Sim  
+**Permissão:** Usuário autenticado.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- Nenhum.
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{}
+```
+
+**Possíveis erros/status HTTP:**
+- `204 No Content` em caso de sucesso.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+
+**Observações de regra de negócio:**
+- A resposta expira o cookie `gd_session`.
+
+### GET /api/auth/session
+
+**Descrição:**  
+Retorna os dados do usuário autenticado.
+
+**Autenticação:** Sim  
+**Permissão:** Usuário autenticado.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- Nenhum.
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "user": {
+    "id": 1,
+    "name": "Admin",
+    "email": "admin@gestaodireta.com",
+    "document": "00000000000",
+    "userType": "ADMIN",
+    "status": "ACTIVE"
+  }
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `401 Unauthorized` para cookie ausente, inválido, expirado ou usuário não ativo.
+
+**Observações de regra de negócio:**
+- A sessão só é válida para usuário com status `ACTIVE`.
+
+### POST /api/auth/change-password
+
+**Descrição:**  
+Altera a senha do usuário autenticado e expira a sessão atual.
+
+**Autenticação:** Sim  
+**Permissão:** Usuário autenticado.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "currentPassword": "Strong@123",
+  "newPassword": "NewStrong@123"
+}
+```
+
+**Campos obrigatórios:**
+- `currentPassword`
+- `newPassword`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{}
+```
+
+**Possíveis erros/status HTTP:**
+- `204 No Content` em caso de sucesso.
+- `400 Bad Request` para senha nova fraca ou igual à atual.
+- `401 Unauthorized` para senha atual inválida, cookie inválido ou usuário não ativo.
+
+**Observações de regra de negócio:**
+- `newPassword` deve ter pelo menos 8 caracteres, letra maiúscula, letra minúscula, número e caractere especial.
+- A resposta expira o cookie `gd_session`; o usuário deve autenticar novamente.
+
+### GET /api/users/me
+
+**Descrição:**  
+Retorna o usuário autenticado.
+
+**Autenticação:** Sim  
+**Permissão:** Usuário autenticado.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- Nenhum.
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "name": "Admin",
+  "email": "admin@gestaodireta.com",
+  "document": "00000000000",
+  "userType": "ADMIN",
+  "status": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `404 Not Found` se o usuário autenticado não existir mais.
+
+**Observações de regra de negócio:**
+- A senha nunca é retornada.
+
+### PUT /api/users/me
+
+**Descrição:**  
+Atualiza nome e documento do usuário autenticado.
+
+**Autenticação:** Sim  
+**Permissão:** Usuário autenticado.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "name": "Admin Updated",
+  "document": "11111111111"
+}
+```
+
+**Campos obrigatórios:**
+- `name`
+
+**Campos opcionais:**
+- `document`
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "name": "Admin Updated",
+  "email": "admin@gestaodireta.com",
+  "document": "11111111111",
+  "userType": "ADMIN",
+  "status": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:30:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `400 Bad Request` para body inválido.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `404 Not Found` se o usuário autenticado não existir mais.
+
+**Observações de regra de negócio:**
+- Não permite alterar email, senha, tipo ou status por este endpoint.
+
+### GET /api/users
+
+**Descrição:**  
+Lista usuários com paginação.
+
+**Autenticação:** Sim  
+**Permissão:** Apenas `ADMIN`.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{
+  "page": 0,
+  "size": 10,
+  "sort": "id",
+  "direction": "ASC"
+}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- Nenhum.
+
+**Campos opcionais:**
+- `page`
+- `size`
+- `sort`
+- `direction`
+
+**Resposta de sucesso:**
+```json
+{
+  "content": [
+    {
+      "id": 2,
+      "name": "User",
+      "email": "user@gestaodireta.com",
+      "document": "22222222222",
+      "userType": "USER",
+      "status": "ACTIVE",
+      "createdAt": "2026-06-21T10:00:00",
+      "updatedAt": "2026-06-21T10:00:00"
+    }
+  ],
+  "page": 0,
+  "size": 10,
+  "totalElements": 1,
+  "totalPages": 1,
+  "first": true,
+  "last": true
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem papel `ADMIN`.
+
+**Observações de regra de negócio:**
+- A senha nunca é retornada.
+
+### GET /api/users/{id}
+
+**Descrição:**  
+Busca um usuário por id.
+
+**Autenticação:** Sim  
+**Permissão:** Apenas `ADMIN`.
+
+**Path params:**
+```json
+{
+  "id": 2
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `id`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 2,
+  "name": "User",
+  "email": "user@gestaodireta.com",
+  "document": "22222222222",
+  "userType": "USER",
+  "status": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem papel `ADMIN`.
+- `404 Not Found` se o usuário não existir.
+
+**Observações de regra de negócio:**
+- A senha nunca é retornada.
+
+### POST /api/users
+
+**Descrição:**  
+Cria usuário. Não existe cadastro público.
+
+**Autenticação:** Sim  
+**Permissão:** Apenas `ADMIN`.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "name": "User",
+  "email": "user@gestaodireta.com",
+  "password": "Strong@123",
+  "document": "22222222222",
+  "userType": "USER"
+}
+```
+
+**Campos obrigatórios:**
+- `name`
+- `email`
+- `password`
+- `userType`
+
+**Campos opcionais:**
+- `document`
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 2,
+  "name": "User",
+  "email": "user@gestaodireta.com",
+  "document": "22222222222",
+  "userType": "USER",
+  "status": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `201 Created` em caso de sucesso.
+- `400 Bad Request` para body inválido ou email já cadastrado.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem papel `ADMIN`.
+
+**Observações de regra de negócio:**
+- Usuários são criados apenas por `ADMIN`.
+- Novo usuário é criado com status `ACTIVE`.
+- A senha é armazenada criptografada e nunca é retornada.
+
+### PATCH /api/users/{id}/status
+
+**Descrição:**  
+Altera o status de um usuário.
+
+**Autenticação:** Sim  
+**Permissão:** Apenas `ADMIN`.
+
+**Path params:**
+```json
+{
+  "id": 2
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "status": "BLOCKED"
+}
+```
+
+**Campos obrigatórios:**
+- `id`
+- `status`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 2,
+  "name": "User",
+  "email": "user@gestaodireta.com",
+  "document": "22222222222",
+  "userType": "USER",
+  "status": "BLOCKED",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:30:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `400 Bad Request` para body inválido.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem papel `ADMIN`.
+- `404 Not Found` se o usuário não existir.
+
+**Observações de regra de negócio:**
+- Usuários `INACTIVE` ou `BLOCKED` não acessam o sistema.
+
+### PATCH /api/users/{id}/type
+
+**Descrição:**  
+Altera o tipo global de um usuário.
+
+**Autenticação:** Sim  
+**Permissão:** Apenas `ADMIN`.
+
+**Path params:**
+```json
+{
+  "id": 2
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "userType": "ADMIN"
+}
+```
+
+**Campos obrigatórios:**
+- `id`
+- `userType`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 2,
+  "name": "User",
+  "email": "user@gestaodireta.com",
+  "document": "22222222222",
+  "userType": "ADMIN",
+  "status": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:30:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `400 Bad Request` para body inválido.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem papel `ADMIN`.
+- `404 Not Found` se o usuário não existir.
+
+**Observações de regra de negócio:**
+- `UserType` é papel global; não substitui `FarmUserRole`.
+
+### POST /api/farms
+
+**Descrição:**  
+Cria uma fazenda.
+
+**Autenticação:** Sim  
+**Permissão:** Apenas `ADMIN`.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "name": "Fazenda Boa Safra",
+  "document": "12345678000199",
+  "city": "Ribeirao Preto",
+  "state": "SP",
+  "totalArea": 1500.50,
+  "productionType": "AGRICULTURE"
+}
+```
+
+**Campos obrigatórios:**
+- `name`
+
+**Campos opcionais:**
+- `document`
+- `city`
+- `state`
+- `totalArea`
+- `productionType`
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "name": "Fazenda Boa Safra",
+  "document": "12345678000199",
+  "city": "Ribeirao Preto",
+  "state": "SP",
+  "totalArea": 1500.50,
+  "productionType": "AGRICULTURE",
+  "status": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `201 Created` em caso de sucesso.
+- `400 Bad Request` para body inválido.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem papel `ADMIN`.
+
+**Observações de regra de negócio:**
+- A fazenda é criada com status `ACTIVE`.
+
+### GET /api/farms
+
+**Descrição:**  
+Lista fazendas com paginação.
+
+**Autenticação:** Sim  
+**Permissão:** `ADMIN` lista todas; `USER` lista fazendas ativas com vínculo ativo.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{
+  "page": 0,
+  "size": 10,
+  "sort": "id",
+  "direction": "ASC"
+}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- Nenhum.
+
+**Campos opcionais:**
+- `page`
+- `size`
+- `sort`
+- `direction`
+
+**Resposta de sucesso:**
+```json
+{
+  "content": [
+    {
+      "id": 1,
+      "name": "Fazenda Boa Safra",
+      "document": "12345678000199",
+      "city": "Ribeirao Preto",
+      "state": "SP",
+      "totalArea": 1500.50,
+      "productionType": "AGRICULTURE",
+      "status": "ACTIVE",
+      "createdAt": "2026-06-21T10:00:00",
+      "updatedAt": "2026-06-21T10:00:00"
+    }
+  ],
+  "page": 0,
+  "size": 10,
+  "totalElements": 1,
+  "totalPages": 1,
+  "first": true,
+  "last": true
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` se o usuário autenticado não estiver ativo.
+
+**Observações de regra de negócio:**
+- `ADMIN` não precisa de vínculo com fazenda.
+- `USER` com vínculo `INACTIVE` não enxerga a fazenda.
+
+### GET /api/farms/{id}
+
+**Descrição:**  
+Busca uma fazenda por id.
+
+**Autenticação:** Sim  
+**Permissão:** `ADMIN` ou usuário com vínculo ativo na fazenda ativa.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `id`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "name": "Fazenda Boa Safra",
+  "document": "12345678000199",
+  "city": "Ribeirao Preto",
+  "state": "SP",
+  "totalArea": 1500.50,
+  "productionType": "AGRICULTURE",
+  "status": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem acesso à fazenda.
+- `404 Not Found` se a fazenda não existir.
+
+**Observações de regra de negócio:**
+- `USER` precisa de fazenda ativa e vínculo diferente de `INACTIVE`.
+
+### PUT /api/farms/{id}
+
+**Descrição:**  
+Atualiza dados cadastrais de uma fazenda.
+
+**Autenticação:** Sim  
+**Permissão:** `ADMIN` ou `PRODUCER` da fazenda ativa.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "name": "Fazenda Boa Safra Atualizada",
+  "document": "12345678000199",
+  "city": "Ribeirao Preto",
+  "state": "SP",
+  "totalArea": 1600.00,
+  "productionType": "MIXED"
+}
+```
+
+**Campos obrigatórios:**
+- `id`
+- `name`
+
+**Campos opcionais:**
+- `document`
+- `city`
+- `state`
+- `totalArea`
+- `productionType`
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "name": "Fazenda Boa Safra Atualizada",
+  "document": "12345678000199",
+  "city": "Ribeirao Preto",
+  "state": "SP",
+  "totalArea": 1600.00,
+  "productionType": "MIXED",
+  "status": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:30:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `400 Bad Request` para body inválido.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão de gestão da fazenda.
+- `404 Not Found` se a fazenda não existir.
+
+**Observações de regra de negócio:**
+- `EMPLOYEE` e `ACCOUNTANT` não gerenciam cadastro de fazenda.
+
+### PATCH /api/farms/{id}/status
+
+**Descrição:**  
+Altera o status de uma fazenda.
+
+**Autenticação:** Sim  
+**Permissão:** Apenas `ADMIN`.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "status": "INACTIVE"
+}
+```
+
+**Campos obrigatórios:**
+- `id`
+- `status`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "name": "Fazenda Boa Safra",
+  "document": "12345678000199",
+  "city": "Ribeirao Preto",
+  "state": "SP",
+  "totalArea": 1500.50,
+  "productionType": "AGRICULTURE",
+  "status": "INACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:30:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `400 Bad Request` para body inválido.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem papel `ADMIN`.
+- `404 Not Found` se a fazenda não existir.
+
+**Observações de regra de negócio:**
+- Fazenda `INACTIVE` não permite acesso operacional de `USER`.
+
+### DELETE /api/farms/{id}
+
+**Descrição:**  
+Inativa uma fazenda.
+
+**Autenticação:** Sim  
+**Permissão:** Apenas `ADMIN`.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `id`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{}
+```
+
+**Possíveis erros/status HTTP:**
+- `204 No Content` em caso de sucesso.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem papel `ADMIN`.
+- `404 Not Found` se a fazenda não existir.
+
+**Observações de regra de negócio:**
+- A exclusão é lógica: o status da fazenda passa para `INACTIVE`.
+
+### POST /api/farms/{farmId}/users
+
+**Descrição:**  
+Cria vínculo entre usuário e fazenda.
+
+**Autenticação:** Sim  
+**Permissão:** `ADMIN` ou `PRODUCER` da fazenda ativa, com restrições para alvo e papel.
+
+**Path params:**
+```json
+{
+  "farmId": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "userId": 2,
+  "role": "EMPLOYEE"
+}
+```
+
+**Campos obrigatórios:**
+- `farmId`
+- `userId`
+- `role`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "userId": 2,
+  "userName": "User",
+  "userEmail": "user@gestaodireta.com",
+  "role": "EMPLOYEE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `201 Created` em caso de sucesso.
+- `400 Bad Request` para body inválido, fazenda inativa, usuário já vinculado ou usuário alvo inválido.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão.
+- `404 Not Found` se fazenda ou usuário não existir.
+
+**Observações de regra de negócio:**
+- Apenas usuários com `UserType.USER` podem ser vinculados.
+- `PRODUCER` só pode vincular usuários ativos como `EMPLOYEE` ou `ACCOUNTANT`.
+- `ADMIN` pode criar vínculos sem estar vinculado à fazenda.
+
+### GET /api/farms/{farmId}/users
+
+**Descrição:**  
+Lista vínculos de usuários de uma fazenda.
+
+**Autenticação:** Sim  
+**Permissão:** `ADMIN` ou `PRODUCER` da fazenda ativa.
+
+**Path params:**
+```json
+{
+  "farmId": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `farmId`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+[
+  {
+    "id": 1,
+    "farmId": 1,
+    "farmName": "Fazenda Boa Safra",
+    "userId": 2,
+    "userName": "User",
+    "userEmail": "user@gestaodireta.com",
+    "role": "EMPLOYEE",
+    "createdAt": "2026-06-21T10:00:00",
+    "updatedAt": "2026-06-21T10:00:00"
+  }
+]
+```
+
+**Possíveis erros/status HTTP:**
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão.
+- `404 Not Found` se a fazenda não existir.
+
+**Observações de regra de negócio:**
+- Gerenciamento de vínculos é permitido a `ADMIN` e `PRODUCER`.
+
+### PATCH /api/farms/{farmId}/users/{userId}/role
+
+**Descrição:**  
+Altera o papel de um usuário dentro da fazenda.
+
+**Autenticação:** Sim  
+**Permissão:** `ADMIN` ou `PRODUCER` da fazenda ativa, com restrições para alvo e novo papel.
+
+**Path params:**
+```json
+{
+  "farmId": 1,
+  "userId": 2
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "role": "ACCOUNTANT"
+}
+```
+
+**Campos obrigatórios:**
+- `farmId`
+- `userId`
+- `role`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "userId": 2,
+  "userName": "User",
+  "userEmail": "user@gestaodireta.com",
+  "role": "ACCOUNTANT",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:30:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `400 Bad Request` para body inválido ou tentativa de remover o último produtor ativo.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão.
+- `404 Not Found` se o vínculo não existir.
+
+**Observações de regra de negócio:**
+- `PRODUCER` não pode promover outro usuário para `PRODUCER`.
+- `PRODUCER` só pode alterar vínculos de `EMPLOYEE` ou `ACCOUNTANT`.
+- A fazenda deve manter pelo menos um produtor ativo.
+
+### DELETE /api/farms/{farmId}/users/{userId}
+
+**Descrição:**  
+Inativa o vínculo de um usuário com uma fazenda.
+
+**Autenticação:** Sim  
+**Permissão:** `ADMIN` ou `PRODUCER` da fazenda ativa, com restrições para alvo.
+
+**Path params:**
+```json
+{
+  "farmId": 1,
+  "userId": 2
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `farmId`
+- `userId`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{}
+```
+
+**Possíveis erros/status HTTP:**
+- `204 No Content` em caso de sucesso.
+- `400 Bad Request` para tentativa de remover o último produtor ativo.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão.
+- `404 Not Found` se o vínculo não existir.
+
+**Observações de regra de negócio:**
+- A exclusão é lógica: o papel do vínculo passa para `INACTIVE`.
+- `PRODUCER` só pode remover vínculos de `EMPLOYEE` ou `ACCOUNTANT`.
+
+### POST /api/financial/categories
+
+**Descrição:**  
+Cria categoria financeira global ou vinculada a uma fazenda.
+
+**Autenticação:** Sim  
+**Permissão:** `ADMIN` para categorias default/globais; `ADMIN` ou `PRODUCER` para categorias da fazenda.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "name": "Insumos",
+  "type": "EXPENSE",
+  "color": "#FF0000",
+  "icon": "package",
+  "farmId": 1,
+  "isDefault": false
+}
+```
+
+**Campos obrigatórios:**
+- `name`
+- `type`
+- `isDefault`
+
+**Campos opcionais:**
+- `color`
+- `icon`
+- `farmId`
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "name": "Insumos",
+  "type": "EXPENSE",
+  "color": "#FF0000",
+  "icon": "package",
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "isDefault": false,
+  "status": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `201 Created` em caso de sucesso.
+- `400 Bad Request` para body inválido, categoria default com `farmId` ou categoria de fazenda sem `farmId`.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão.
+- `404 Not Found` se a fazenda não existir.
+
+**Observações de regra de negócio:**
+- Categoria default é global e não pode ter `farmId`.
+- Categoria não default deve ter `farmId`.
+- Categoria é criada com status `ACTIVE`.
+
+### GET /api/financial/categories
+
+**Descrição:**  
+Lista categorias visíveis para uma fazenda.
+
+**Autenticação:** Sim  
+**Permissão:** `ADMIN`, `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com acesso financeiro à fazenda.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{
+  "farmId": 1,
+  "page": 0,
+  "size": 10,
+  "sort": "id",
+  "direction": "ASC"
+}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `farmId`
+
+**Campos opcionais:**
+- `page`
+- `size`
+- `sort`
+- `direction`
+
+**Resposta de sucesso:**
+```json
+{
+  "content": [
+    {
+      "id": 1,
+      "name": "Insumos",
+      "type": "EXPENSE",
+      "color": "#FF0000",
+      "icon": "package",
+      "farmId": 1,
+      "farmName": "Fazenda Boa Safra",
+      "isDefault": false,
+      "status": "ACTIVE",
+      "createdAt": "2026-06-21T10:00:00",
+      "updatedAt": "2026-06-21T10:00:00"
+    }
+  ],
+  "page": 0,
+  "size": 10,
+  "totalElements": 1,
+  "totalPages": 1,
+  "first": true,
+  "last": true
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `400 Bad Request` para query params inválidos.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem acesso financeiro à fazenda.
+- `404 Not Found` se a fazenda não existir.
+
+**Observações de regra de negócio:**
+- Retorna categorias ativas visíveis para a fazenda informada.
+- `ACCOUNTANT` pode consultar, mas não gerenciar.
+
+### GET /api/financial/categories/global
+
+**Descrição:**  
+Lista categorias financeiras globais/default.
+
+**Autenticação:** Sim  
+**Permissão:** Apenas `ADMIN`.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{
+  "page": 0,
+  "size": 10,
+  "sort": "id",
+  "direction": "ASC"
+}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- Nenhum.
+
+**Campos opcionais:**
+- `page`
+- `size`
+- `sort`
+- `direction`
+
+**Resposta de sucesso:**
+```json
+{
+  "content": [
+    {
+      "id": 10,
+      "name": "Venda de Safra",
+      "type": "INCOME",
+      "color": "#00AA00",
+      "icon": "wheat",
+      "farmId": null,
+      "farmName": null,
+      "isDefault": true,
+      "status": "ACTIVE",
+      "createdAt": "2026-06-21T10:00:00",
+      "updatedAt": "2026-06-21T10:00:00"
+    }
+  ],
+  "page": 0,
+  "size": 10,
+  "totalElements": 1,
+  "totalPages": 1,
+  "first": true,
+  "last": true
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem papel `ADMIN`.
+
+**Observações de regra de negócio:**
+- Categorias globais são categorias default.
+
+### GET /api/financial/categories/{id}
+
+**Descrição:**  
+Busca uma categoria financeira por id.
+
+**Autenticação:** Sim  
+**Permissão:** Usuário autenticado. A autorização contextual não está declarada no controller atual para este endpoint.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `id`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "name": "Insumos",
+  "type": "EXPENSE",
+  "color": "#FF0000",
+  "icon": "package",
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "isDefault": false,
+  "status": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `404 Not Found` se a categoria não existir.
+
+**Observações de regra de negócio:**
+- A categoria pode ser global (`farmId=null`) ou da fazenda.
+
+### PUT /api/financial/categories/{id}
+
+**Descrição:**  
+Atualiza uma categoria financeira.
+
+**Autenticação:** Sim  
+**Permissão:** `ADMIN`; ou `PRODUCER` para categoria da própria fazenda, não default.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "name": "Insumos Atualizados",
+  "type": "EXPENSE",
+  "color": "#AA0000",
+  "icon": "package",
+  "farmId": 1,
+  "isDefault": false
+}
+```
+
+**Campos obrigatórios:**
+- `id`
+- `name`
+- `type`
+- `isDefault`
+
+**Campos opcionais:**
+- `color`
+- `icon`
+- `farmId`
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "name": "Insumos Atualizados",
+  "type": "EXPENSE",
+  "color": "#AA0000",
+  "icon": "package",
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "isDefault": false,
+  "status": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:30:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `400 Bad Request` para body inválido, categoria default com `farmId` ou categoria de fazenda sem `farmId`.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão.
+- `404 Not Found` se categoria ou fazenda não existir.
+
+**Observações de regra de negócio:**
+- `PRODUCER` não pode alterar categoria default.
+- Para `PRODUCER`, o `farmId` do body deve bater com a fazenda da categoria.
+
+### DELETE /api/financial/categories/{id}
+
+**Descrição:**  
+Inativa uma categoria financeira.
+
+**Autenticação:** Sim  
+**Permissão:** `ADMIN`; ou `PRODUCER` para categoria da própria fazenda.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `id`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{}
+```
+
+**Possíveis erros/status HTTP:**
+- `204 No Content` em caso de sucesso.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão.
+- `404 Not Found` se a categoria não existir.
+
+**Observações de regra de negócio:**
+- A exclusão é lógica: o status passa para `INACTIVE`.
+
+### POST /api/financial/transactions
+
+**Descrição:**  
+Cria uma movimentação financeira.
+
+**Autenticação:** Sim  
+**Permissão:** `ADMIN`, `PRODUCER` ou `EMPLOYEE` com acesso à fazenda.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "description": "Compra de sementes",
+  "amount": 2500.00,
+  "type": "EXPENSE",
+  "status": "PENDING",
+  "paymentMethod": "PIX",
+  "transactionDate": "2026-06-21",
+  "dueDate": "2026-06-30",
+  "paidAt": null,
+  "notes": "Compra para safra",
+  "farmId": 1,
+  "categoryId": 1
+}
+```
+
+**Campos obrigatórios:**
+- `description`
+- `amount`
+- `type`
+- `transactionDate`
+- `farmId`
+
+**Campos opcionais:**
+- `status`
+- `paymentMethod`
+- `dueDate`
+- `paidAt`
+- `notes`
+- `categoryId`
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "description": "Compra de sementes",
+  "amount": 2500.00,
+  "type": "EXPENSE",
+  "status": "PENDING",
+  "paymentMethod": "PIX",
+  "transactionDate": "2026-06-21",
+  "dueDate": "2026-06-30",
+  "paidAt": null,
+  "notes": "Compra para safra",
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "categoryId": 1,
+  "categoryName": "Insumos",
+  "createdByUserId": 2,
+  "createdByUserName": "User",
+  "updatedByUserId": null,
+  "updatedByUserName": null,
+  "recordStatus": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `201 Created` em caso de sucesso.
+- `400 Bad Request` para body inválido, valor não positivo, fazenda inativa, categoria inativa, categoria de outra fazenda ou tipo de categoria incompatível.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão de gestão financeira.
+- `404 Not Found` se fazenda, categoria ou usuário autenticado não existir.
+
+**Observações de regra de negócio:**
+- Se `status` não for informado, o backend usa `PENDING`.
+- `createdByUserId` é definido pelo backend a partir do usuário autenticado.
+- `ACCOUNTANT` pode consultar dados financeiros, mas não criar movimentações.
+
+### GET /api/financial/transactions
+
+**Descrição:**  
+Lista movimentações financeiras ativas de uma fazenda.
+
+**Autenticação:** Sim  
+**Permissão:** `ADMIN`, `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com acesso financeiro à fazenda.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{
+  "farmId": 1,
+  "page": 0,
+  "size": 10,
+  "sort": "id",
+  "direction": "ASC"
+}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `farmId`
+
+**Campos opcionais:**
+- `page`
+- `size`
+- `sort`
+- `direction`
+
+**Resposta de sucesso:**
+```json
+{
+  "content": [
+    {
+      "id": 1,
+      "description": "Compra de sementes",
+      "amount": 2500.00,
+      "type": "EXPENSE",
+      "status": "PENDING",
+      "paymentMethod": "PIX",
+      "transactionDate": "2026-06-21",
+      "dueDate": "2026-06-30",
+      "paidAt": null,
+      "notes": "Compra para safra",
+      "farmId": 1,
+      "farmName": "Fazenda Boa Safra",
+      "categoryId": 1,
+      "categoryName": "Insumos",
+      "createdByUserId": 2,
+      "createdByUserName": "User",
+      "updatedByUserId": null,
+      "updatedByUserName": null,
+      "recordStatus": "ACTIVE",
+      "createdAt": "2026-06-21T10:00:00",
+      "updatedAt": "2026-06-21T10:00:00"
+    }
+  ],
+  "page": 0,
+  "size": 10,
+  "totalElements": 1,
+  "totalPages": 1,
+  "first": true,
+  "last": true
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `400 Bad Request` para query params inválidos.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem acesso financeiro à fazenda.
+
+**Observações de regra de negócio:**
+- Retorna somente movimentações com `recordStatus=ACTIVE`.
+- `ACCOUNTANT` pode consultar movimentações.
+
+### GET /api/financial/transactions/{id}
+
+**Descrição:**  
+Busca uma movimentação financeira por id.
+
+**Autenticação:** Sim  
+**Permissão:** `ADMIN`, `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com acesso financeiro à fazenda da movimentação.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `id`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "description": "Compra de sementes",
+  "amount": 2500.00,
+  "type": "EXPENSE",
+  "status": "PENDING",
+  "paymentMethod": "PIX",
+  "transactionDate": "2026-06-21",
+  "dueDate": "2026-06-30",
+  "paidAt": null,
+  "notes": "Compra para safra",
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "categoryId": 1,
+  "categoryName": "Insumos",
+  "createdByUserId": 2,
+  "createdByUserName": "User",
+  "updatedByUserId": null,
+  "updatedByUserName": null,
+  "recordStatus": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem acesso financeiro à fazenda da movimentação.
+- `404 Not Found` se a movimentação não existir.
+
+**Observações de regra de negócio:**
+- A autorização usa a fazenda associada à movimentação.
+
+### PUT /api/financial/transactions/{id}
+
+**Descrição:**  
+Atualiza uma movimentação financeira.
+
+**Autenticação:** Sim  
+**Permissão:** `ADMIN`, `PRODUCER` ou `EMPLOYEE` com acesso à fazenda da movimentação.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "description": "Compra de sementes atualizada",
+  "amount": 2600.00,
+  "type": "EXPENSE",
+  "status": "PENDING",
+  "paymentMethod": "PIX",
+  "transactionDate": "2026-06-21",
+  "dueDate": "2026-06-30",
+  "paidAt": null,
+  "notes": "Valor corrigido",
+  "categoryId": 1
+}
+```
+
+**Campos obrigatórios:**
+- `id`
+- `description`
+- `amount`
+- `type`
+- `status`
+- `transactionDate`
+
+**Campos opcionais:**
+- `paymentMethod`
+- `dueDate`
+- `paidAt`
+- `notes`
+- `categoryId`
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "description": "Compra de sementes atualizada",
+  "amount": 2600.00,
+  "type": "EXPENSE",
+  "status": "PENDING",
+  "paymentMethod": "PIX",
+  "transactionDate": "2026-06-21",
+  "dueDate": "2026-06-30",
+  "paidAt": null,
+  "notes": "Valor corrigido",
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "categoryId": 1,
+  "categoryName": "Insumos",
+  "createdByUserId": 2,
+  "createdByUserName": "User",
+  "updatedByUserId": 2,
+  "updatedByUserName": "User",
+  "recordStatus": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:30:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `400 Bad Request` para body inválido, valor não positivo, categoria inativa, categoria de outra fazenda ou tipo de categoria incompatível.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão de gestão financeira.
+- `404 Not Found` se movimentação ou categoria não existir.
+
+**Observações de regra de negócio:**
+- `farmId` não é aceito no request de atualização; a fazenda vem da movimentação existente.
+- `updatedByUserId` é definido pelo backend a partir do usuário autenticado.
+
+### DELETE /api/financial/transactions/{id}
+
+**Descrição:**  
+Exclui logicamente uma movimentação financeira.
+
+**Autenticação:** Sim  
+**Permissão:** `ADMIN`, `PRODUCER` ou `EMPLOYEE` com acesso à fazenda da movimentação.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `id`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{}
+```
+
+**Possíveis erros/status HTTP:**
+- `204 No Content` em caso de sucesso.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão de gestão financeira.
+- `404 Not Found` se a movimentação não existir.
+
+**Observações de regra de negócio:**
+- A exclusão é lógica: `recordStatus` passa para `DELETED`.
+- `updatedByUserId` é definido pelo backend.
+
+### PATCH /api/financial/transactions/{id}/pay
+
+**Descrição:**  
+Marca uma movimentação como paga.
+
+**Autenticação:** Sim  
+**Permissão:** `ADMIN`, `PRODUCER` ou `EMPLOYEE` com acesso à fazenda da movimentação.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "paidAt": "2026-06-21",
+  "paymentMethod": "PIX"
+}
+```
+
+**Campos obrigatórios:**
+- `id`
+
+**Campos opcionais:**
+- `paidAt`
+- `paymentMethod`
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "description": "Compra de sementes",
+  "amount": 2500.00,
+  "type": "EXPENSE",
+  "status": "PAID",
+  "paymentMethod": "PIX",
+  "transactionDate": "2026-06-21",
+  "dueDate": "2026-06-30",
+  "paidAt": "2026-06-21",
+  "notes": "Compra para safra",
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "categoryId": 1,
+  "categoryName": "Insumos",
+  "createdByUserId": 2,
+  "createdByUserName": "User",
+  "updatedByUserId": 2,
+  "updatedByUserName": "User",
+  "recordStatus": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:30:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão de gestão financeira.
+- `404 Not Found` se a movimentação não existir.
+
+**Observações de regra de negócio:**
+- Se `paidAt` não for informado, o backend usa a data atual.
+- O status passa para `PAID`.
+
+### PATCH /api/financial/transactions/{id}/cancel
+
+**Descrição:**  
+Cancela uma movimentação financeira.
+
+**Autenticação:** Sim  
+**Permissão:** `ADMIN`, `PRODUCER` ou `EMPLOYEE` com acesso à fazenda da movimentação.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `id`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "description": "Compra de sementes",
+  "amount": 2500.00,
+  "type": "EXPENSE",
+  "status": "CANCELED",
+  "paymentMethod": "PIX",
+  "transactionDate": "2026-06-21",
+  "dueDate": "2026-06-30",
+  "paidAt": null,
+  "notes": "Compra para safra",
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "categoryId": 1,
+  "categoryName": "Insumos",
+  "createdByUserId": 2,
+  "createdByUserName": "User",
+  "updatedByUserId": 2,
+  "updatedByUserName": "User",
+  "recordStatus": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:30:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão de gestão financeira.
+- `404 Not Found` se a movimentação não existir.
+
+**Observações de regra de negócio:**
+- O status passa para `CANCELED`.
+- Resumos financeiros ignoram movimentações canceladas nos totais por tipo.
+
+### GET /api/financial/summary
+
+**Descrição:**  
+Retorna resumo financeiro de uma fazenda.
+
+**Autenticação:** Sim  
+**Permissão:** `ADMIN`, `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com acesso financeiro à fazenda.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{
+  "farmId": 1
+}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `farmId`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "farmId": 1,
+  "incomeTotal": 10000.00,
+  "expenseTotal": 2500.00,
+  "balance": 7500.00,
+  "pendingTotal": 2500.00,
+  "paidTotal": 10000.00,
+  "overdueTotal": 0.00
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `400 Bad Request` para query params inválidos.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem acesso financeiro à fazenda.
+
+**Observações de regra de negócio:**
+- Soma apenas registros `ACTIVE`.
+- Totais por tipo ignoram status `CANCELED`.
+- `ACCOUNTANT` pode consultar resumo financeiro.
+
+### GET /api/financial/upcoming-bills
+
+**Descrição:**  
+Lista contas a vencer de uma fazenda.
+
+**Autenticação:** Sim  
+**Permissão:** `ADMIN`, `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com acesso financeiro à fazenda.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{
+  "farmId": 1,
+  "page": 0,
+  "size": 10,
+  "sort": "id",
+  "direction": "ASC"
+}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `farmId`
+
+**Campos opcionais:**
+- `page`
+- `size`
+- `sort`
+- `direction`
+
+**Resposta de sucesso:**
+```json
+{
+  "content": [
+    {
+      "id": 1,
+      "description": "Compra de sementes",
+      "amount": 2500.00,
+      "status": "PENDING",
+      "dueDate": "2026-06-30",
+      "farmId": 1,
+      "categoryId": 1,
+      "categoryName": "Insumos"
+    }
+  ],
+  "page": 0,
+  "size": 10,
+  "totalElements": 1,
+  "totalPages": 1,
+  "first": true,
+  "last": true
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `400 Bad Request` para query params inválidos.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem acesso financeiro à fazenda.
+
+**Observações de regra de negócio:**
+- Retorna apenas despesas (`EXPENSE`) com `recordStatus=ACTIVE`.
+- Considera status `PENDING` e `OVERDUE`.
+- Exige `dueDate` preenchido.
