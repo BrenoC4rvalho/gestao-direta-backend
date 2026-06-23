@@ -102,12 +102,21 @@ class FarmControllerTest extends PostgresIntegrationTest {
 
     @Test
     void shouldListAllFarmsAsAdmin() throws Exception {
-        saveFarm("Fazenda A", FarmStatus.ACTIVE);
-        saveFarm("Fazenda B", FarmStatus.INACTIVE);
+        saveFarm("Fazenda B", FarmStatus.ACTIVE);
+        saveFarm("Fazenda A", FarmStatus.INACTIVE);
 
-        mockMvc.perform(get("/api/farms").contextPath(CONTEXT_PATH).with(user("1").roles("ADMIN")))
+        mockMvc.perform(
+                        get("/api/farms")
+                                .contextPath(CONTEXT_PATH)
+                                .param("page", "0")
+                                .param("size", "100")
+                                .param("sort", "name")
+                                .param("direction", "ASC")
+                                .with(user("1").roles("ADMIN")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content", hasSize(2)));
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[0].name").value("Fazenda A"))
+                .andExpect(jsonPath("$.content[1].name").value("Fazenda B"));
     }
 
     @Test
@@ -128,12 +137,16 @@ class FarmControllerTest extends PostgresIntegrationTest {
         mockMvc.perform(
                         get("/api/farms")
                                 .contextPath(CONTEXT_PATH)
+                                .param("page", "0")
+                                .param("size", "100")
+                                .param("sort", "name")
+                                .param("direction", "ASC")
                                 .with(user(String.valueOf(user.getId())).roles("USER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(3)))
-                .andExpect(jsonPath("$.content[0].name").value("Producer Farm"))
+                .andExpect(jsonPath("$.content[0].name").value("Accountant Farm"))
                 .andExpect(jsonPath("$.content[1].name").value("Employee Farm"))
-                .andExpect(jsonPath("$.content[2].name").value("Accountant Farm"));
+                .andExpect(jsonPath("$.content[2].name").value("Producer Farm"));
     }
 
     @Test

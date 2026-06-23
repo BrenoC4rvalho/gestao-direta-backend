@@ -28,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -67,13 +68,15 @@ class FarmServiceTest extends PostgresIntegrationTest {
     @Test
     void shouldListAllFarmsForAdmin() {
         User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN, UserStatus.ACTIVE);
-        saveFarm("Fazenda A", FarmStatus.ACTIVE);
-        saveFarm("Fazenda B", FarmStatus.INACTIVE);
+        saveFarm("Fazenda B", FarmStatus.ACTIVE);
+        saveFarm("Fazenda A", FarmStatus.INACTIVE);
         authenticateAs(admin, "ROLE_ADMIN");
 
-        PageResponse<FarmResponse> response = farmService.findAll(new PaginationParams());
+        PageResponse<FarmResponse> response = farmService.findAll(sortedByName());
 
-        assertThat(response.content()).hasSize(2);
+        assertThat(response.content())
+                .extracting(FarmResponse::name)
+                .containsExactly("Fazenda A", "Fazenda B");
     }
 
     @Test
@@ -92,11 +95,11 @@ class FarmServiceTest extends PostgresIntegrationTest {
         saveFarmUser(inactiveFarm, user, FarmUserRole.PRODUCER);
         authenticateAs(user, "ROLE_USER");
 
-        PageResponse<FarmResponse> response = farmService.findAll(new PaginationParams());
+        PageResponse<FarmResponse> response = farmService.findAll(sortedByName());
 
         assertThat(response.content())
                 .extracting(FarmResponse::name)
-                .containsExactly("Producer Farm", "Employee Farm", "Accountant Farm");
+                .containsExactly("Accountant Farm", "Employee Farm", "Producer Farm");
     }
 
     @Test
@@ -157,6 +160,14 @@ class FarmServiceTest extends PostgresIntegrationTest {
 
         Farm savedFarm = farmRepository.findById(farm.getId()).orElseThrow();
         assertThat(savedFarm.getStatus()).isEqualTo(FarmStatus.INACTIVE);
+    }
+
+    private PaginationParams sortedByName() {
+        PaginationParams paginationParams = new PaginationParams();
+        paginationParams.setSort("name");
+        paginationParams.setDirection(Sort.Direction.ASC);
+
+        return paginationParams;
     }
 
     private FarmRequest farmRequest(String name) {

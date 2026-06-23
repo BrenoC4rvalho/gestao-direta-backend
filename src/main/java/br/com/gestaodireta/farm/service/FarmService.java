@@ -18,6 +18,9 @@ import br.com.gestaodireta.shared.security.SecurityUtils;
 import br.com.gestaodireta.user.enumeration.UserStatus;
 import br.com.gestaodireta.user.repository.UserRepository;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -70,7 +73,7 @@ public class FarmService {
                             SecurityUtils.getAuthenticatedUserId(),
                             FarmStatus.ACTIVE,
                             FarmUserRole.INACTIVE,
-                            paginationParams.toPageable());
+                            toFarmUserPageable(paginationParams.toPageable()));
         }
 
         return PageResponse.from(farms.map(farmMapper::toResponse));
@@ -125,5 +128,24 @@ public class FarmService {
         if (!active) {
             throw new ForbiddenException("Access denied");
         }
+    }
+
+    private Pageable toFarmUserPageable(Pageable pageable) {
+        Sort translatedSort =
+                Sort.by(pageable.getSort().stream().map(this::toFarmUserSortOrder).toList());
+
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), translatedSort);
+    }
+
+    private Sort.Order toFarmUserSortOrder(Sort.Order order) {
+        return order.withProperty(toFarmUserSortProperty(order.getProperty()));
+    }
+
+    private String toFarmUserSortProperty(String property) {
+        if (property.startsWith("farm.")) {
+            return property;
+        }
+
+        return "farm." + property;
     }
 }
