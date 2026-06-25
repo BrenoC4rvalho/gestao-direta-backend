@@ -88,6 +88,7 @@ Defaults:
 - `ADMIN` administra usuários, fazendas e categorias globais.
 - `USER` depende de vínculo ativo com fazenda.
 - `FarmUserRole.INACTIVE` não permite acesso à fazenda.
+- `GET /api/farms/{farmId}/access` retorna as permissões calculadas do usuário autenticado para a fazenda selecionada.
 - `PRODUCER` gerencia fazenda, vínculos de usuários e categorias da fazenda.
 - `EMPLOYEE` pode gerenciar movimentações financeiras.
 - `ACCOUNTANT` pode consultar dados financeiros, mas não gerenciar.
@@ -886,6 +887,139 @@ Busca uma fazenda por id.
 
 **Observações de regra de negócio:**
 - `USER` precisa de fazenda ativa e vínculo diferente de `INACTIVE`.
+
+### GET /api/farms/{farmId}/access
+
+**Descrição:**
+Retorna o contexto de acesso do usuário autenticado para uma fazenda, incluindo a role do usuário na fazenda e as permissões calculadas para a interface.
+
+**Autenticação:** Sim
+**Permissão:** Usuário autenticado. A permissão detalhada é calculada conforme `UserType`, vínculo com a fazenda e status da fazenda.
+
+**Path params:**
+```json
+{
+  "farmId": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `farmId`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso — ADMIN:**
+```json
+{
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "userId": 1,
+  "userType": "ADMIN",
+  "role": null,
+  "permissions": {
+    "canViewFarm": true,
+    "canEditFarm": true,
+    "canChangeFarmStatus": true,
+    "canManageFarmUsers": true,
+    "canViewFinancial": true,
+    "canManageTransactions": true,
+    "canManageCategories": true,
+    "canManageGlobalCategories": true,
+    "canCreateFarm": true
+  }
+}
+```
+
+**Resposta de sucesso — PRODUCER:**
+```json
+{
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "userId": 2,
+  "userType": "USER",
+  "role": "PRODUCER",
+  "permissions": {
+    "canViewFarm": true,
+    "canEditFarm": true,
+    "canChangeFarmStatus": false,
+    "canManageFarmUsers": true,
+    "canViewFinancial": true,
+    "canManageTransactions": true,
+    "canManageCategories": true,
+    "canManageGlobalCategories": false,
+    "canCreateFarm": false
+  }
+}
+```
+
+**Resposta de sucesso — EMPLOYEE:**
+```json
+{
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "userId": 3,
+  "userType": "USER",
+  "role": "EMPLOYEE",
+  "permissions": {
+    "canViewFarm": true,
+    "canEditFarm": false,
+    "canChangeFarmStatus": false,
+    "canManageFarmUsers": false,
+    "canViewFinancial": true,
+    "canManageTransactions": true,
+    "canManageCategories": false,
+    "canManageGlobalCategories": false,
+    "canCreateFarm": false
+  }
+}
+```
+
+**Resposta de sucesso — ACCOUNTANT:**
+```json
+{
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "userId": 4,
+  "userType": "USER",
+  "role": "ACCOUNTANT",
+  "permissions": {
+    "canViewFarm": true,
+    "canEditFarm": false,
+    "canChangeFarmStatus": false,
+    "canManageFarmUsers": false,
+    "canViewFinancial": true,
+    "canManageTransactions": false,
+    "canManageCategories": false,
+    "canManageGlobalCategories": false,
+    "canCreateFarm": false
+  }
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem vínculo ativo, vínculo `INACTIVE`, usuário inválido ou fazenda inativa para usuário comum.
+- `404 Not Found` se a fazenda não existir.
+
+**Observações de regra de negócio:**
+- `ADMIN` não depende de vínculo com fazenda, pode acessar fazendas ativas e inativas e recebe todas as permissões como `true`.
+- Para `ADMIN`, o campo `role` retorna `null`.
+- `USER` depende de vínculo ativo e não acessa fazenda `INACTIVE`; vínculo `INACTIVE` ou ausência de vínculo resulta em `403 Forbidden`.
+- `PRODUCER` pode visualizar e editar a fazenda, gerenciar vínculos, visualizar financeiro, gerenciar movimentações e categorias da fazenda. Não pode alterar o status da fazenda, criar fazenda ou gerenciar categorias globais.
+- `EMPLOYEE` pode visualizar a fazenda e o financeiro e gerenciar movimentações. Não pode editar a fazenda, gerenciar vínculos ou categorias, nem alterar o status da fazenda.
+- `ACCOUNTANT` pode visualizar a fazenda e os dados financeiros. Não pode editar a fazenda, gerenciar vínculos, movimentações ou categorias, nem alterar o status da fazenda.
+- O endpoint melhora a UX do frontend, mas não substitui a autorização aplicada em cada endpoint protegido do backend.
 
 ### PUT /api/farms/{id}
 
