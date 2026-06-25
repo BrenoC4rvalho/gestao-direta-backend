@@ -1,9 +1,11 @@
 package br.com.gestaodireta.farm.controller;
 
+import br.com.gestaodireta.farm.dto.FarmAccessResponse;
 import br.com.gestaodireta.farm.dto.FarmRequest;
 import br.com.gestaodireta.farm.dto.FarmResponse;
 import br.com.gestaodireta.farm.dto.FarmStatusUpdateRequest;
 import br.com.gestaodireta.farm.dto.FarmUpdateRequest;
+import br.com.gestaodireta.farm.service.FarmAccessService;
 import br.com.gestaodireta.farm.service.FarmService;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
@@ -28,8 +30,11 @@ public class FarmController {
 
     private final FarmService farmService;
 
-    public FarmController(FarmService farmService) {
+    private final FarmAccessService farmAccessService;
+
+    public FarmController(FarmService farmService, FarmAccessService farmAccessService) {
         this.farmService = farmService;
+        this.farmAccessService = farmAccessService;
     }
 
     @PostMapping
@@ -49,6 +54,12 @@ public class FarmController {
     @PreAuthorize("@farmAccess.canViewFarm(#id)")
     public FarmResponse findById(@PathVariable Long id) {
         return farmService.findById(id);
+    }
+
+    @GetMapping("/{farmId}/access")
+    @PreAuthorize("isAuthenticated()")
+    public FarmAccessResponse getAccess(@PathVariable Long farmId) {
+        return farmAccessService.getAccess(farmId);
     }
 
     @PutMapping("/{id}")
