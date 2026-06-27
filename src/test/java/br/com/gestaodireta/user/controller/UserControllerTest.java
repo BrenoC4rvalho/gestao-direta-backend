@@ -10,6 +10,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.gestaodireta.farm.entity.Farm;
+import br.com.gestaodireta.farm.entity.FarmUser;
+import br.com.gestaodireta.farm.enumeration.FarmStatus;
+import br.com.gestaodireta.farm.enumeration.FarmUserRole;
+import br.com.gestaodireta.farm.repository.FarmRepository;
+import br.com.gestaodireta.farm.repository.FarmUserRepository;
 import br.com.gestaodireta.support.PostgresIntegrationTest;
 import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.enumeration.UserStatus;
@@ -37,61 +43,113 @@ class UserControllerTest extends PostgresIntegrationTest {
 
     @Autowired private UserRepository userRepository;
 
+    @Autowired private FarmRepository farmRepository;
+
+    @Autowired private FarmUserRepository farmUserRepository;
+
     @Autowired private PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void setUp() {
+        farmUserRepository.deleteAll();
+        farmRepository.deleteAll();
         userRepository.deleteAll();
     }
 
     @Test
     void shouldCreateUserAsAdmin() throws Exception {
-        String body =
-                """
-                {
-                  "name": "Maria Silva",
-                  "email": "maria@example.com",
-                  "password": "Strong1!",
-                  "document": "12345678900",
-                  "userType": "USER"
-                }
-                """;
-
         mockMvc.perform(
                         post("/api/users")
                                 .contextPath(CONTEXT_PATH)
                                 .with(user("1").roles("ADMIN"))
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(body))
+                                .content(
+                                        userBody(
+                                                "Maria Silva", "maria@example.com", UserType.USER)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.name").value("Maria Silva"))
                 .andExpect(jsonPath("$.email").value("maria@example.com"))
+                .andExpect(jsonPath("$.userType").value("USER"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.password").doesNotExist());
     }
 
     @Test
-    void shouldRejectUserCreationWhenAuthenticatedUserIsNotAdmin() throws Exception {
-        String body =
-                """
-                {
-                  "name": "Maria Silva",
-                  "email": "maria@example.com",
-                  "password": "Strong1!",
-                  "userType": "USER"
-                }
-                """;
+    void shouldCreateAdminAsAdmin() throws Exception {
+        mockMvc.perform(
+                        post("/api/users")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user("1").roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        userBody(
+                                                "Admin User",
+                                                "admin-new@example.com",
+                                                UserType.ADMIN)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.userType").value("ADMIN"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+    }
+
+    @Test
+    void shouldCreateUserAsActiveProducer() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        User producer = saveUser("Producer", "producer@example.com", UserType.USER);
+        saveFarmUser(farm, producer, FarmUserRole.PRODUCER);
 
         mockMvc.perform(
                         post("/api/users")
                                 .contextPath(CONTEXT_PATH)
-                                .with(user("1").roles("USER"))
+                                .with(user(String.valueOf(producer.getId())).roles("USER"))
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(body))
+                                .content(
+                                        userBody(
+                                                "Employee",
+                                                "employee-new@example.com",
+                                                UserType.USER)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.userType").value("USER"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+    }
+
+    @Test
+    void shouldRejectAdminCreationAsProducer() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        User producer = saveUser("Producer", "producer@example.com", UserType.USER);
+        saveFarmUser(farm, producer, FarmUserRole.PRODUCER);
+
+        mockMvc.perform(
+                        post("/api/users")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(producer.getId())).roles("USER"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        userBody("Admin", "admin-new@example.com", UserType.ADMIN)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldRejectUserCreationWithoutActiveProducerPermission() throws Exception {
+        Farm activeFarm = saveFarm("Active Farm", FarmStatus.ACTIVE);
+        Farm inactiveFarm = saveFarm("Inactive Farm", FarmStatus.INACTIVE);
+        User employee = saveUser("Employee", "employee@example.com", UserType.USER);
+        User accountant = saveUser("Accountant", "accountant@example.com", UserType.USER);
+        User inactiveProducer =
+                saveUser("Inactive Producer", "inactive-producer@example.com", UserType.USER);
+        User noLinkUser = saveUser("No Link", "no-link@example.com", UserType.USER);
+        saveFarmUser(activeFarm, employee, FarmUserRole.EMPLOYEE);
+        saveFarmUser(activeFarm, accountant, FarmUserRole.ACCOUNTANT);
+        saveFarmUser(inactiveFarm, inactiveProducer, FarmUserRole.PRODUCER);
+
+        expectCannotCreateUser(employee);
+        expectCannotCreateUser(accountant);
+        expectCannotCreateUser(inactiveProducer);
+        expectCannotCreateUser(noLinkUser);
     }
 
     @Test
@@ -149,15 +207,6 @@ class UserControllerTest extends PostgresIntegrationTest {
     @Test
     void shouldRejectDuplicatedEmail() throws Exception {
         saveUser("Maria Silva", "maria@example.com", UserType.USER);
-        String body =
-                """
-                {
-                  "name": "Maria Souza",
-                  "email": "maria@example.com",
-                  "password": "Strong1!",
-                  "userType": "USER"
-                }
-                """;
 
         mockMvc.perform(
                         post("/api/users")
@@ -165,7 +214,9 @@ class UserControllerTest extends PostgresIntegrationTest {
                                 .with(user("1").roles("ADMIN"))
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(body))
+                                .content(
+                                        userBody(
+                                                "Maria Souza", "maria@example.com", UserType.USER)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Email is already in use"));
     }
@@ -210,6 +261,87 @@ class UserControllerTest extends PostgresIntegrationTest {
                                 .contextPath(CONTEXT_PATH)
                                 .with(user("1").roles("USER")))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldFindUserByEmailAsAdmin() throws Exception {
+        User savedUser = saveUser("Target User", "target@example.com", UserType.USER);
+
+        mockMvc.perform(
+                        get("/api/users/search-by-email")
+                                .contextPath(CONTEXT_PATH)
+                                .param("email", "target@example.com")
+                                .with(user("1").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(savedUser.getId()))
+                .andExpect(jsonPath("$.email").value("target@example.com"))
+                .andExpect(jsonPath("$.password").doesNotExist());
+    }
+
+    @Test
+    void shouldFindUserByEmailAsActiveProducer() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        User producer = saveUser("Producer", "producer@example.com", UserType.USER);
+        User target = saveUser("Target User", "target@example.com", UserType.USER);
+        saveFarmUser(farm, producer, FarmUserRole.PRODUCER);
+
+        mockMvc.perform(
+                        get("/api/users/search-by-email")
+                                .contextPath(CONTEXT_PATH)
+                                .param("email", " TARGET@EXAMPLE.COM ")
+                                .with(user(String.valueOf(producer.getId())).roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(target.getId()))
+                .andExpect(jsonPath("$.email").value("target@example.com"));
+    }
+
+    @Test
+    void shouldRejectEmailSearchWithoutActiveProducerPermission() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        User employee = saveUser("Employee", "employee@example.com", UserType.USER);
+        User accountant = saveUser("Accountant", "accountant@example.com", UserType.USER);
+        User inactive = saveUser("Inactive", "inactive@example.com", UserType.USER);
+        User noLinkUser = saveUser("No Link", "no-link@example.com", UserType.USER);
+        saveFarmUser(farm, employee, FarmUserRole.EMPLOYEE);
+        saveFarmUser(farm, accountant, FarmUserRole.ACCOUNTANT);
+        saveFarmUser(farm, inactive, FarmUserRole.INACTIVE);
+
+        expectCannotSearchByEmail(employee);
+        expectCannotSearchByEmail(accountant);
+        expectCannotSearchByEmail(inactive);
+        expectCannotSearchByEmail(noLinkUser);
+    }
+
+    @Test
+    void shouldRejectEmailSearchWithoutEmail() throws Exception {
+        mockMvc.perform(
+                        get("/api/users/search-by-email")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user("1").roles("ADMIN")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Email is required"));
+    }
+
+    @Test
+    void shouldRejectEmailSearchWithInvalidEmail() throws Exception {
+        mockMvc.perform(
+                        get("/api/users/search-by-email")
+                                .contextPath(CONTEXT_PATH)
+                                .param("email", "invalid")
+                                .with(user("1").roles("ADMIN")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Email is invalid"));
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenEmailDoesNotExist() throws Exception {
+        mockMvc.perform(
+                        get("/api/users/search-by-email")
+                                .contextPath(CONTEXT_PATH)
+                                .param("email", "missing@example.com")
+                                .with(user("1").roles("ADMIN")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("User not found"));
     }
 
     @Test
@@ -315,6 +447,46 @@ class UserControllerTest extends PostgresIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+    private void expectCannotCreateUser(User authenticatedUser) throws Exception {
+        mockMvc.perform(
+                        post("/api/users")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(authenticatedUser.getId())).roles("USER"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        userBody(
+                                                "New User",
+                                                "new-user-%d@example.com"
+                                                        .formatted(authenticatedUser.getId()),
+                                                UserType.USER)))
+                .andExpect(status().isForbidden());
+    }
+
+    private void expectCannotSearchByEmail(User authenticatedUser) throws Exception {
+        mockMvc.perform(
+                        get("/api/users/search-by-email")
+                                .contextPath(CONTEXT_PATH)
+                                .param("email", "target@example.com")
+                                .with(
+                                        user(String.valueOf(authenticatedUser.getId()))
+                                                .roles("USER")))
+                .andExpect(status().isForbidden());
+    }
+
+    private String userBody(String name, String email, UserType userType) {
+        return """
+                {
+                  "name": "%s",
+                  "email": "%s",
+                  "password": "Strong1!",
+                  "document": "12345678900",
+                  "userType": "%s"
+                }
+                """
+                .formatted(name, email, userType.name());
+    }
+
     private User saveUser(String name, String email, UserType userType) {
         User user = new User();
         user.setName(name);
@@ -324,6 +496,23 @@ class UserControllerTest extends PostgresIntegrationTest {
         user.setStatus(UserStatus.ACTIVE);
 
         return userRepository.save(user);
+    }
+
+    private Farm saveFarm(String name, FarmStatus status) {
+        Farm farm = new Farm();
+        farm.setName(name);
+        farm.setStatus(status);
+
+        return farmRepository.save(farm);
+    }
+
+    private FarmUser saveFarmUser(Farm farm, User user, FarmUserRole role) {
+        FarmUser farmUser = new FarmUser();
+        farmUser.setFarm(farm);
+        farmUser.setUser(user);
+        farmUser.setRole(role);
+
+        return farmUserRepository.save(farmUser);
     }
 
     private record StatusBody(UserStatus status) {}

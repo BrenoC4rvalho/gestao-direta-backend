@@ -105,10 +105,10 @@ Defaults:
 
 ### POST /api/auth/login
 
-**Descrição:**  
+**Descrição:**
 Autentica um usuário ativo e grava o JWT no cookie `gd_session`.
 
-**Autenticação:** Não  
+**Autenticação:** Não
 **Permissão:** Público.
 
 **Path params:**
@@ -160,10 +160,10 @@ Autentica um usuário ativo e grava o JWT no cookie `gd_session`.
 
 ### POST /api/auth/logout
 
-**Descrição:**  
+**Descrição:**
 Encerra a sessão removendo o cookie de autenticação.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** Usuário autenticado.
 
 **Path params:**
@@ -201,10 +201,10 @@ Encerra a sessão removendo o cookie de autenticação.
 
 ### GET /api/auth/session
 
-**Descrição:**  
+**Descrição:**
 Retorna os dados do usuário autenticado.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** Usuário autenticado.
 
 **Path params:**
@@ -250,10 +250,10 @@ Retorna os dados do usuário autenticado.
 
 ### POST /api/auth/change-password
 
-**Descrição:**  
+**Descrição:**
 Altera a senha do usuário autenticado e expira a sessão atual.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** Usuário autenticado.
 
 **Path params:**
@@ -297,10 +297,10 @@ Altera a senha do usuário autenticado e expira a sessão atual.
 
 ### GET /api/users/me
 
-**Descrição:**  
+**Descrição:**
 Retorna o usuário autenticado.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** Usuário autenticado.
 
 **Path params:**
@@ -347,10 +347,10 @@ Retorna o usuário autenticado.
 
 ### PUT /api/users/me
 
-**Descrição:**  
+**Descrição:**
 Atualiza nome e documento do usuário autenticado.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** Usuário autenticado.
 
 **Path params:**
@@ -401,10 +401,10 @@ Atualiza nome e documento do usuário autenticado.
 
 ### GET /api/users
 
-**Descrição:**  
+**Descrição:**
 Lista usuários com paginação.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** Apenas `ADMIN`.
 
 **Path params:**
@@ -467,12 +467,70 @@ Lista usuários com paginação.
 **Observações de regra de negócio:**
 - A senha nunca é retornada.
 
+### GET /api/users/search-by-email
+
+**Descrição:**
+Busca um usuário pelo e-mail exato para auxiliar o vínculo de usuários a uma fazenda.
+
+**Autenticação:** Sim
+**Permissão:** `ADMIN` ou `PRODUCER` ativo em pelo menos uma fazenda ativa.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{
+  "email": "usuario@email.com"
+}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `email`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 5,
+  "name": "João Silva",
+  "email": "joao@email.com",
+  "document": "12345678900",
+  "userType": "USER",
+  "status": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `200 OK` se encontrou.
+- `400 Bad Request` para email ausente, vazio ou inválido.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão para pesquisar por e-mail.
+- `404 Not Found` se o usuário não existir.
+
+**Observações de regra de negócio:**
+- A busca é por e-mail exato; não existe busca parcial, `contains`, `like` ou autocomplete aberto.
+- `GET /api/users` continua restrito a `ADMIN`.
+- A senha nunca é retornada.
+- O endpoint de vínculo continua validando se o usuário encontrado pode ser vinculado à fazenda.
+
 ### GET /api/users/{id}
 
-**Descrição:**  
+**Descrição:**
 Busca um usuário por id.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** Apenas `ADMIN`.
 
 **Path params:**
@@ -522,11 +580,11 @@ Busca um usuário por id.
 
 ### POST /api/users
 
-**Descrição:**  
+**Descrição:**
 Cria usuário. Não existe cadastro público.
 
-**Autenticação:** Sim  
-**Permissão:** Apenas `ADMIN`.
+**Autenticação:** Sim
+**Permissão:** `ADMIN` ou `PRODUCER` ativo em pelo menos uma fazenda ativa.
 
 **Path params:**
 ```json
@@ -576,19 +634,23 @@ Cria usuário. Não existe cadastro público.
 - `201 Created` em caso de sucesso.
 - `400 Bad Request` para body inválido ou email já cadastrado.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
-- `403 Forbidden` para usuário sem papel `ADMIN`.
+- `403 Forbidden` para usuário sem permissão ou para `PRODUCER` tentando criar `ADMIN`.
 
 **Observações de regra de negócio:**
-- Usuários são criados apenas por `ADMIN`.
+- `ADMIN` pode criar usuários `ADMIN` e `USER`.
+- `PRODUCER` ativo em pelo menos uma fazenda ativa pode criar apenas usuários `USER`.
+- `PRODUCER` não pode criar usuário `ADMIN`.
+- `EMPLOYEE` e `ACCOUNTANT` não podem criar usuários.
+- Usuário sem vínculo ativo como `PRODUCER` em fazenda ativa não pode criar usuários.
 - Novo usuário é criado com status `ACTIVE`.
 - A senha é armazenada criptografada e nunca é retornada.
 
 ### PATCH /api/users/{id}/status
 
-**Descrição:**  
+**Descrição:**
 Altera o status de um usuário.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** Apenas `ADMIN`.
 
 **Path params:**
@@ -642,10 +704,10 @@ Altera o status de um usuário.
 
 ### PATCH /api/users/{id}/type
 
-**Descrição:**  
+**Descrição:**
 Altera o tipo global de um usuário.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** Apenas `ADMIN`.
 
 **Path params:**
@@ -699,10 +761,10 @@ Altera o tipo global de um usuário.
 
 ### POST /api/farms
 
-**Descrição:**  
+**Descrição:**
 Cria uma fazenda.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** Apenas `ADMIN`.
 
 **Path params:**
@@ -764,10 +826,10 @@ Cria uma fazenda.
 
 ### GET /api/farms
 
-**Descrição:**  
+**Descrição:**
 Lista fazendas com paginação.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** `ADMIN` lista todas; `USER` lista fazendas ativas com vínculo ativo.
 
 **Path params:**
@@ -835,10 +897,10 @@ Lista fazendas com paginação.
 
 ### GET /api/farms/{id}
 
-**Descrição:**  
+**Descrição:**
 Busca uma fazenda por id.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** `ADMIN` ou usuário com vínculo ativo na fazenda ativa.
 
 **Path params:**
@@ -1023,10 +1085,10 @@ Retorna o contexto de acesso do usuário autenticado para uma fazenda, incluindo
 
 ### PUT /api/farms/{id}
 
-**Descrição:**  
+**Descrição:**
 Atualiza dados cadastrais de uma fazenda.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** `ADMIN` ou `PRODUCER` da fazenda ativa.
 
 **Path params:**
@@ -1091,10 +1153,10 @@ Atualiza dados cadastrais de uma fazenda.
 
 ### PATCH /api/farms/{id}/status
 
-**Descrição:**  
+**Descrição:**
 Altera o status de uma fazenda.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** Apenas `ADMIN`.
 
 **Path params:**
@@ -1150,10 +1212,10 @@ Altera o status de uma fazenda.
 
 ### DELETE /api/farms/{id}
 
-**Descrição:**  
+**Descrição:**
 Inativa uma fazenda.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** Apenas `ADMIN`.
 
 **Path params:**
@@ -1195,10 +1257,10 @@ Inativa uma fazenda.
 
 ### POST /api/farms/{farmId}/users
 
-**Descrição:**  
+**Descrição:**
 Cria vínculo entre usuário e fazenda.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** `ADMIN` ou `PRODUCER` da fazenda ativa, com restrições para alvo e papel.
 
 **Path params:**
@@ -1258,10 +1320,10 @@ Cria vínculo entre usuário e fazenda.
 
 ### GET /api/farms/{farmId}/users
 
-**Descrição:**  
+**Descrição:**
 Lista vínculos de usuários de uma fazenda.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** `ADMIN` ou `PRODUCER` da fazenda ativa.
 
 **Path params:**
@@ -1314,10 +1376,10 @@ Lista vínculos de usuários de uma fazenda.
 
 ### PATCH /api/farms/{farmId}/users/{userId}/role
 
-**Descrição:**  
+**Descrição:**
 Altera o papel de um usuário dentro da fazenda.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** `ADMIN` ou `PRODUCER` da fazenda ativa, com restrições para alvo e novo papel.
 
 **Path params:**
@@ -1376,10 +1438,10 @@ Altera o papel de um usuário dentro da fazenda.
 
 ### DELETE /api/farms/{farmId}/users/{userId}
 
-**Descrição:**  
+**Descrição:**
 Inativa o vínculo de um usuário com uma fazenda.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** `ADMIN` ou `PRODUCER` da fazenda ativa, com restrições para alvo.
 
 **Path params:**
@@ -1425,10 +1487,10 @@ Inativa o vínculo de um usuário com uma fazenda.
 
 ### POST /api/financial/categories
 
-**Descrição:**  
+**Descrição:**
 Cria categoria financeira global ou vinculada a uma fazenda.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** `ADMIN` para categorias default/globais; `ADMIN` ou `PRODUCER` para categorias da fazenda.
 
 **Path params:**
@@ -1494,10 +1556,10 @@ Cria categoria financeira global ou vinculada a uma fazenda.
 
 ### GET /api/financial/categories
 
-**Descrição:**  
+**Descrição:**
 Lista categorias visíveis para uma fazenda.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** `ADMIN`, `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com acesso financeiro à fazenda.
 
 **Path params:**
@@ -1569,10 +1631,10 @@ Lista categorias visíveis para uma fazenda.
 
 ### GET /api/financial/categories/global
 
-**Descrição:**  
+**Descrição:**
 Lista categorias financeiras globais/default.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** Apenas `ADMIN`.
 
 **Path params:**
@@ -1640,10 +1702,10 @@ Lista categorias financeiras globais/default.
 
 ### GET /api/financial/categories/{id}
 
-**Descrição:**  
+**Descrição:**
 Busca uma categoria financeira por id.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** Usuário autenticado. A autorização contextual não está declarada no controller atual para este endpoint.
 
 **Path params:**
@@ -1695,10 +1757,10 @@ Busca uma categoria financeira por id.
 
 ### PUT /api/financial/categories/{id}
 
-**Descrição:**  
+**Descrição:**
 Atualiza uma categoria financeira.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** `ADMIN`; ou `PRODUCER` para categoria da própria fazenda, não default.
 
 **Path params:**
@@ -1765,10 +1827,10 @@ Atualiza uma categoria financeira.
 
 ### DELETE /api/financial/categories/{id}
 
-**Descrição:**  
+**Descrição:**
 Inativa uma categoria financeira.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** `ADMIN`; ou `PRODUCER` para categoria da própria fazenda.
 
 **Path params:**
@@ -1810,10 +1872,10 @@ Inativa uma categoria financeira.
 
 ### POST /api/financial/transactions
 
-**Descrição:**  
+**Descrição:**
 Cria uma movimentação financeira.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** `ADMIN`, `PRODUCER` ou `EMPLOYEE` com acesso à fazenda.
 
 **Path params:**
@@ -1899,10 +1961,10 @@ Cria uma movimentação financeira.
 
 ### GET /api/financial/transactions
 
-**Descrição:**  
+**Descrição:**
 Lista movimentações financeiras ativas de uma fazenda.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** `ADMIN`, `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com acesso financeiro à fazenda.
 
 **Path params:**
@@ -1983,10 +2045,10 @@ Lista movimentações financeiras ativas de uma fazenda.
 
 ### GET /api/financial/transactions/{id}
 
-**Descrição:**  
+**Descrição:**
 Busca uma movimentação financeira por id.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** `ADMIN`, `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com acesso financeiro à fazenda da movimentação.
 
 **Path params:**
@@ -2049,10 +2111,10 @@ Busca uma movimentação financeira por id.
 
 ### PUT /api/financial/transactions/{id}
 
-**Descrição:**  
+**Descrição:**
 Atualiza uma movimentação financeira.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** `ADMIN`, `PRODUCER` ou `EMPLOYEE` com acesso à fazenda da movimentação.
 
 **Path params:**
@@ -2137,10 +2199,10 @@ Atualiza uma movimentação financeira.
 
 ### DELETE /api/financial/transactions/{id}
 
-**Descrição:**  
+**Descrição:**
 Exclui logicamente uma movimentação financeira.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** `ADMIN`, `PRODUCER` ou `EMPLOYEE` com acesso à fazenda da movimentação.
 
 **Path params:**
@@ -2183,10 +2245,10 @@ Exclui logicamente uma movimentação financeira.
 
 ### PATCH /api/financial/transactions/{id}/pay
 
-**Descrição:**  
+**Descrição:**
 Marca uma movimentação como paga.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** `ADMIN`, `PRODUCER` ou `EMPLOYEE` com acesso à fazenda da movimentação.
 
 **Path params:**
@@ -2254,10 +2316,10 @@ Marca uma movimentação como paga.
 
 ### PATCH /api/financial/transactions/{id}/cancel
 
-**Descrição:**  
+**Descrição:**
 Cancela uma movimentação financeira.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** `ADMIN`, `PRODUCER` ou `EMPLOYEE` com acesso à fazenda da movimentação.
 
 **Path params:**
@@ -2321,10 +2383,10 @@ Cancela uma movimentação financeira.
 
 ### GET /api/financial/summary
 
-**Descrição:**  
+**Descrição:**
 Retorna resumo financeiro de uma fazenda.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** `ADMIN`, `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com acesso financeiro à fazenda.
 
 **Path params:**
@@ -2375,10 +2437,10 @@ Retorna resumo financeiro de uma fazenda.
 
 ### GET /api/financial/upcoming-bills
 
-**Descrição:**  
+**Descrição:**
 Lista contas a vencer de uma fazenda.
 
-**Autenticação:** Sim  
+**Autenticação:** Sim
 **Permissão:** `ADMIN`, `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com acesso financeiro à fazenda.
 
 **Path params:**

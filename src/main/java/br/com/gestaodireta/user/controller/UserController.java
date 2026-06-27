@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -49,6 +50,12 @@ public class UserController {
         return userService.findAll(paginationParams);
     }
 
+    @GetMapping("/search-by-email")
+    @PreAuthorize("@userAccess.canSearchUserByEmail()")
+    public UserResponse findByEmail(@RequestParam(required = false) String email) {
+        return userService.findByEmail(email);
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public UserResponse findById(@PathVariable Long id) {
@@ -57,7 +64,7 @@ public class UserController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@userAccess.canCreateUser(#request)")
     public UserResponse create(@Valid @RequestBody UserCreateRequest request) {
         return userService.create(request);
     }

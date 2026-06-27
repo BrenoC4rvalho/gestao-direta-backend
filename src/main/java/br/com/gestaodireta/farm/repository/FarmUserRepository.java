@@ -16,6 +16,17 @@ public interface FarmUserRepository extends JpaRepository<FarmUser, Long> {
 
     boolean existsByFarmIdAndUserId(Long farmId, Long userId);
 
+    @Query(
+            """
+            select count(fu) > 0
+            from FarmUser fu
+            where fu.user.id = :userId
+              and fu.user.status = br.com.gestaodireta.user.enumeration.UserStatus.ACTIVE
+              and fu.farm.status = br.com.gestaodireta.farm.enumeration.FarmStatus.ACTIVE
+              and fu.role = br.com.gestaodireta.farm.enumeration.FarmUserRole.PRODUCER
+            """)
+    boolean existsActiveProducerByUserId(@Param("userId") Long userId);
+
     Optional<FarmUser> findByFarmIdAndUserId(Long farmId, Long userId);
 
     List<FarmUser> findByFarmId(Long farmId);

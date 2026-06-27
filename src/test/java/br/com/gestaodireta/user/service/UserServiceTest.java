@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import br.com.gestaodireta.shared.exception.BusinessException;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
+import br.com.gestaodireta.shared.exception.ValidationException;
 import br.com.gestaodireta.support.PostgresIntegrationTest;
 import br.com.gestaodireta.user.dto.UserCreateRequest;
 import br.com.gestaodireta.user.dto.UserResponse;
@@ -59,6 +60,14 @@ class UserServiceTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldCreateAdminUser() {
+        UserResponse response = createUser("admin@example.com", UserType.ADMIN);
+
+        assertThat(response.userType()).isEqualTo(UserType.ADMIN);
+        assertThat(response.status()).isEqualTo(UserStatus.ACTIVE);
+    }
+
+    @Test
     void shouldRejectDuplicatedEmail() {
         userService.create(
                 new UserCreateRequest(
@@ -88,6 +97,37 @@ class UserServiceTest extends PostgresIntegrationTest {
         assertThatThrownBy(() -> userService.findById(999L))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("User not found");
+    }
+
+    @Test
+    void shouldFindUserByExactEmailIgnoringCaseAndSpaces() {
+        UserResponse createdUser = createUser("target@example.com", UserType.USER);
+
+        UserResponse foundUser = userService.findByEmail("  TARGET@example.com  ");
+
+        assertThat(foundUser.id()).isEqualTo(createdUser.id());
+        assertThat(foundUser.email()).isEqualTo("target@example.com");
+    }
+
+    @Test
+    void shouldThrowResourceNotFoundWhenEmailDoesNotExist() {
+        assertThatThrownBy(() -> userService.findByEmail("missing@example.com"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("User not found");
+    }
+
+    @Test
+    void shouldRejectBlankEmailSearch() {
+        assertThatThrownBy(() -> userService.findByEmail("   "))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Email is required");
+    }
+
+    @Test
+    void shouldRejectInvalidEmailSearch() {
+        assertThatThrownBy(() -> userService.findByEmail("invalid"))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Email is invalid");
     }
 
     @Test

@@ -2,6 +2,7 @@ package br.com.gestaodireta.user.service;
 
 import br.com.gestaodireta.shared.exception.BusinessException;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
+import br.com.gestaodireta.shared.exception.ValidationException;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
 import br.com.gestaodireta.shared.security.SecurityUtils;
@@ -14,6 +15,8 @@ import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.enumeration.UserStatus;
 import br.com.gestaodireta.user.mapper.UserMapper;
 import br.com.gestaodireta.user.repository.UserRepository;
+import java.util.Locale;
+import java.util.regex.Pattern;
 import org.springframework.data.domain.Page;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -21,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UserService {
+
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
 
     private final UserRepository userRepository;
 
@@ -66,6 +71,16 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
+    public UserResponse findByEmail(String email) {
+        String normalizedEmail = normalizeEmail(email);
+
+        return userRepository
+                .findByEmailIgnoreCase(normalizedEmail)
+                .map(userMapper::toResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+
+    @Transactional(readOnly = true)
     public UserResponse findMe() {
         return userMapper.toResponse(findEntityById(SecurityUtils.getAuthenticatedUserId()));
     }
@@ -99,5 +114,23 @@ public class UserService {
         return userRepository
                 .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+
+    private String normalizeEmail(String email) {
+        if (email == null) {
+            throw new ValidationException("Email is required");
+        }
+
+        String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
+
+        if (normalizedEmail.isBlank()) {
+            throw new ValidationException("Email is required");
+        }
+
+        if (!EMAIL_PATTERN.matcher(normalizedEmail).matches()) {
+            throw new ValidationException("Email is invalid");
+        }
+
+        return normalizedEmail;
     }
 }
