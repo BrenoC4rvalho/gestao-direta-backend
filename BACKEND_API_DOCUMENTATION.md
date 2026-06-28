@@ -578,6 +578,129 @@ Busca um usuário por id.
 **Observações de regra de negócio:**
 - A senha nunca é retornada.
 
+### PUT /api/users/{id}
+
+**Descrição:**
+Atualiza dados básicos de um usuário. Endpoint administrativo.
+
+**Autenticação:** Sim
+**Permissão:** Apenas `ADMIN`.
+
+**Path params:**
+```json
+{
+  "id": 2
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "name": "João Silva",
+  "document": "12345678900"
+}
+```
+
+**Campos obrigatórios:**
+- `id`
+- `name`
+
+**Campos opcionais:**
+- `document`
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 2,
+  "name": "João Silva",
+  "email": "joao@email.com",
+  "document": "12345678900",
+  "userType": "USER",
+  "status": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:30:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `400 Bad Request` para dados inválidos.
+- `401 Unauthorized` para usuário não autenticado.
+- `403 Forbidden` para usuário autenticado sem papel `ADMIN`.
+- `404 Not Found` se o usuário não existir.
+
+**Observações de regra de negócio:**
+- Este endpoint não altera e-mail, senha, status ou tipo do usuário.
+- Status e tipo possuem endpoints próprios.
+- Senha possui endpoint próprio de reset administrativo.
+- `name` é normalizado com `trim`.
+- `document` é normalizado com `trim`; valor vazio é salvo como `null`.
+
+### PATCH /api/users/{id}/reset-password
+
+**Descrição:**
+Permite que um `ADMIN` defina uma nova senha temporária para outro usuário.
+
+**Autenticação:** Sim
+**Permissão:** Apenas `ADMIN`.
+
+**Path params:**
+```json
+{
+  "id": 2
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "newPassword": "NewPassword@123"
+}
+```
+
+**Campos obrigatórios:**
+- `id`
+- `newPassword`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 2,
+  "name": "João Silva",
+  "email": "joao@email.com",
+  "document": "12345678900",
+  "userType": "USER",
+  "status": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:30:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `400 Bad Request` para senha inválida ou tentativa de resetar a própria senha.
+- `401 Unauthorized` para usuário não autenticado.
+- `403 Forbidden` para usuário autenticado sem papel `ADMIN`.
+- `404 Not Found` se o usuário não existir.
+
+**Observações de regra de negócio:**
+- A senha não é retornada na resposta.
+- A senha é armazenada criptografada.
+- `newPassword` deve ter pelo menos 8 caracteres, letra maiúscula, letra minúscula, número e caractere especial.
+- O `ADMIN` não deve usar este endpoint para alterar a própria senha; para isso existe `POST /api/auth/change-password`.
+- Este endpoint não cria token, não envia e-mail e não gera senha automática.
+
 ### POST /api/users
 
 **Descrição:**

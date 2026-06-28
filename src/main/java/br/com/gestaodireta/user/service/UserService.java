@@ -6,6 +6,7 @@ import br.com.gestaodireta.shared.exception.ValidationException;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
 import br.com.gestaodireta.shared.security.SecurityUtils;
+import br.com.gestaodireta.user.dto.ResetUserPasswordRequest;
 import br.com.gestaodireta.user.dto.UserCreateRequest;
 import br.com.gestaodireta.user.dto.UserResponse;
 import br.com.gestaodireta.user.dto.UserStatusUpdateRequest;
@@ -26,6 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+
+    private static final Pattern PASSWORD_PATTERN =
+            Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,}$");
 
     private final UserRepository userRepository;
 
@@ -88,8 +92,30 @@ public class UserService {
     @Transactional
     public UserResponse updateMe(UserUpdateRequest request) {
         User user = findEntityById(SecurityUtils.getAuthenticatedUserId());
-        user.setName(request.name());
-        user.setDocument(request.document());
+        updateBasicData(user, request);
+
+        return userMapper.toResponse(userRepository.save(user));
+    }
+
+    @Transactional
+    public UserResponse updateUser(Long id, UserUpdateRequest request) {
+        User user = findEntityById(id);
+        updateBasicData(user, request);
+
+        return userMapper.toResponse(userRepository.save(user));
+    }
+
+    @Transactional
+    public UserResponse resetPassword(Long id, ResetUserPasswordRequest request) {
+        User user = findEntityById(id);
+
+        if (id.equals(SecurityUtils.getAuthenticatedUserId())) {
+            throw new BusinessException(
+                    "Use /auth/change-password to change the authenticated user's own password");
+        }
+
+        String newPassword = normalizePassword(request.newPassword());
+        user.setPassword(passwordEncoder.encode(newPassword));
 
         return userMapper.toResponse(userRepository.save(user));
     }
@@ -108,6 +134,52 @@ public class UserService {
         user.setUserType(request.userType());
 
         return userMapper.toResponse(userRepository.save(user));
+    }
+
+    private void updateBasicData(User user, UserUpdateRequest request) {
+        user.setName(normalizeName(request.name()));
+        user.setDocument(normalizeDocument(request.document()));
+    }
+
+    private String normalizeName(String name) {
+        if (name == null) {
+            throw new ValidationException("Name is required");
+        }
+
+        String normalizedName = name.trim();
+
+        if (normalizedName.isBlank()) {
+            throw new ValidationException("Name is required");
+        }
+
+        return normalizedName;
+    }
+
+    private String normalizeDocument(String document) {
+        if (document == null) {
+            return null;
+        }
+
+        String normalizedDocument = document.trim();
+
+        if (normalizedDocument.isBlank()) {
+            return null;
+        }
+
+        return normalizedDocument;
+    }
+
+    private String normalizePassword(String password) {
+        if (password == null || password.isBlank()) {
+            throw new ValidationException("Password is required");
+        }
+
+        if (!PASSWORD_PATTERN.matcher(password).matches()) {
+            throw new ValidationException(
+                    "Password must have at least 8 characters, uppercase, lowercase, number and special character");
+        }
+
+        return password;
     }
 
     private User findEntityById(Long id) {

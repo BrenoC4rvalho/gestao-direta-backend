@@ -1,5 +1,6 @@
 package br.com.gestaodireta.user.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -372,6 +373,180 @@ class UserControllerTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldUpdateUserAsAdmin() throws Exception {
+        User savedUser = saveUser("Common User", "user@example.com", UserType.USER);
+
+        mockMvc.perform(
+                        put("/api/users/{id}", savedUser.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user("1").roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(updateUserBody("Updated User", "98765432100")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Updated User"))
+                .andExpect(jsonPath("$.document").value("98765432100"))
+                .andExpect(jsonPath("$.email").value("user@example.com"))
+                .andExpect(jsonPath("$.userType").value("USER"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.password").doesNotExist());
+    }
+
+    @Test
+    void shouldRejectUserUpdateWhenAuthenticatedUserIsNotAdmin() throws Exception {
+        User savedUser = saveUser("Common User", "user@example.com", UserType.USER);
+
+        mockMvc.perform(
+                        put("/api/users/{id}", savedUser.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user("1").roles("USER"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(updateUserBody("Updated User", "98765432100")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldRejectUserUpdateWhenAuthenticatedUserIsProducer() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        User producer = saveUser("Producer", "producer@example.com", UserType.USER);
+        User savedUser = saveUser("Common User", "user@example.com", UserType.USER);
+        saveFarmUser(farm, producer, FarmUserRole.PRODUCER);
+
+        mockMvc.perform(
+                        put("/api/users/{id}", savedUser.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(producer.getId())).roles("USER"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(updateUserBody("Updated User", "98765432100")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldRejectUserUpdateWithBlankName() throws Exception {
+        User savedUser = saveUser("Common User", "user@example.com", UserType.USER);
+
+        mockMvc.perform(
+                        put("/api/users/{id}", savedUser.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user("1").roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(updateUserBody("   ", "98765432100")))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenUpdatingUserDoesNotExist() throws Exception {
+        mockMvc.perform(
+                        put("/api/users/{id}", 999L)
+                                .contextPath(CONTEXT_PATH)
+                                .with(user("1").roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(updateUserBody("Updated User", "98765432100")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("User not found"));
+    }
+
+    @Test
+    void shouldResetPasswordAsAdmin() throws Exception {
+        User savedUser = saveUser("Common User", "user@example.com", UserType.USER);
+
+        mockMvc.perform(
+                        patch("/api/users/{id}/reset-password", savedUser.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user("1").roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(resetPasswordBody("NewPassword@123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(savedUser.getId()))
+                .andExpect(jsonPath("$.email").value("user@example.com"))
+                .andExpect(jsonPath("$.password").doesNotExist());
+
+        User updatedUser = userRepository.findById(savedUser.getId()).orElseThrow();
+        assertThat(passwordEncoder.matches("NewPassword@123", updatedUser.getPassword())).isTrue();
+    }
+
+    @Test
+    void shouldRejectPasswordResetWhenAuthenticatedUserIsNotAdmin() throws Exception {
+        User savedUser = saveUser("Common User", "user@example.com", UserType.USER);
+
+        mockMvc.perform(
+                        patch("/api/users/{id}/reset-password", savedUser.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user("1").roles("USER"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(resetPasswordBody("NewPassword@123")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldRejectPasswordResetWhenAuthenticatedUserIsProducer() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        User producer = saveUser("Producer", "producer@example.com", UserType.USER);
+        User savedUser = saveUser("Common User", "user@example.com", UserType.USER);
+        saveFarmUser(farm, producer, FarmUserRole.PRODUCER);
+
+        mockMvc.perform(
+                        patch("/api/users/{id}/reset-password", savedUser.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(producer.getId())).roles("USER"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(resetPasswordBody("NewPassword@123")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldRejectPasswordResetWithBlankPassword() throws Exception {
+        User savedUser = saveUser("Common User", "user@example.com", UserType.USER);
+
+        mockMvc.perform(
+                        patch("/api/users/{id}/reset-password", savedUser.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user("1").roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(resetPasswordBody("")))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenResetPasswordUserDoesNotExist() throws Exception {
+        mockMvc.perform(
+                        patch("/api/users/{id}/reset-password", 999L)
+                                .contextPath(CONTEXT_PATH)
+                                .with(user("1").roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(resetPasswordBody("NewPassword@123")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("User not found"));
+    }
+
+    @Test
+    void shouldRejectResettingOwnPasswordAsAdmin() throws Exception {
+        User admin = saveUser("Admin User", "admin@example.com", UserType.ADMIN);
+
+        mockMvc.perform(
+                        patch("/api/users/{id}/reset-password", admin.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(resetPasswordBody("NewPassword@123")))
+                .andExpect(status().isBadRequest())
+                .andExpect(
+                        jsonPath("$.message")
+                                .value(
+                                        "Use /auth/change-password to change the authenticated user's own password"));
+    }
+
+    @Test
     void shouldReturnAuthenticatedUserProfile() throws Exception {
         User savedUser = saveUser("Common User", "user@example.com", UserType.USER);
 
@@ -472,6 +647,25 @@ class UserControllerTest extends PostgresIntegrationTest {
                                         user(String.valueOf(authenticatedUser.getId()))
                                                 .roles("USER")))
                 .andExpect(status().isForbidden());
+    }
+
+    private String updateUserBody(String name, String document) {
+        return """
+                {
+                  "name": "%s",
+                  "document": "%s"
+                }
+                """
+                .formatted(name, document);
+    }
+
+    private String resetPasswordBody(String newPassword) {
+        return """
+                {
+                  "newPassword": "%s"
+                }
+                """
+                .formatted(newPassword);
     }
 
     private String userBody(String name, String email, UserType userType) {

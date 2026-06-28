@@ -7,6 +7,7 @@ import br.com.gestaodireta.shared.exception.BusinessException;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
 import br.com.gestaodireta.shared.exception.ValidationException;
 import br.com.gestaodireta.support.PostgresIntegrationTest;
+import br.com.gestaodireta.user.dto.ResetUserPasswordRequest;
 import br.com.gestaodireta.user.dto.UserCreateRequest;
 import br.com.gestaodireta.user.dto.UserResponse;
 import br.com.gestaodireta.user.dto.UserStatusUpdateRequest;
@@ -165,6 +166,176 @@ class UserServiceTest extends PostgresIntegrationTest {
                 userService.updateType(createdUser.id(), new UserTypeUpdateRequest(UserType.ADMIN));
 
         assertThat(response.userType()).isEqualTo(UserType.ADMIN);
+    }
+
+    @Test
+    void shouldUpdateUserAsAdmin() {
+        UserResponse createdUser = createUser("user@example.com", UserType.USER);
+
+        UserResponse response =
+                userService.updateUser(
+                        createdUser.id(), new UserUpdateRequest("Updated Name", "98765432100"));
+
+        assertThat(response.name()).isEqualTo("Updated Name");
+        assertThat(response.document()).isEqualTo("98765432100");
+    }
+
+    @Test
+    void shouldTrimNameAndDocumentWhenUpdatingUser() {
+        UserResponse createdUser = createUser("user@example.com", UserType.USER);
+
+        UserResponse response =
+                userService.updateUser(
+                        createdUser.id(),
+                        new UserUpdateRequest("  Updated Name  ", "  98765432100  "));
+
+        assertThat(response.name()).isEqualTo("Updated Name");
+        assertThat(response.document()).isEqualTo("98765432100");
+    }
+
+    @Test
+    void shouldNormalizeBlankDocumentToNullWhenUpdatingUser() {
+        UserResponse createdUser = createUser("user@example.com", UserType.USER);
+
+        UserResponse response =
+                userService.updateUser(
+                        createdUser.id(), new UserUpdateRequest("Updated Name", "   "));
+
+        assertThat(response.document()).isNull();
+    }
+
+    @Test
+    void shouldThrowResourceNotFoundWhenUpdatingUserDoesNotExist() {
+        assertThatThrownBy(() -> userService.updateUser(999L, new UserUpdateRequest("User", null)))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("User not found");
+    }
+
+    @Test
+    void shouldRejectBlankNameWhenUpdatingUser() {
+        UserResponse createdUser = createUser("user@example.com", UserType.USER);
+
+        assertThatThrownBy(
+                        () ->
+                                userService.updateUser(
+                                        createdUser.id(), new UserUpdateRequest("   ", null)))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Name is required");
+    }
+
+    @Test
+    void shouldNotUpdateProtectedFieldsWhenUpdatingUser() {
+        UserResponse createdUser = createUser("user@example.com", UserType.USER);
+        User originalUser = userRepository.findById(createdUser.id()).orElseThrow();
+        String originalPassword = originalUser.getPassword();
+
+        userService.updateUser(createdUser.id(), new UserUpdateRequest("Updated Name", "123"));
+        User savedUser = userRepository.findById(createdUser.id()).orElseThrow();
+
+        assertThat(savedUser.getEmail()).isEqualTo("user@example.com");
+        assertThat(savedUser.getUserType()).isEqualTo(UserType.USER);
+        assertThat(savedUser.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(savedUser.getPassword()).isEqualTo(originalPassword);
+    }
+
+    @Test
+    void shouldResetPasswordForAnotherUserAsAdmin() {
+        UserResponse admin = createUser("admin@example.com", UserType.ADMIN);
+        UserResponse target = createUser("target@example.com", UserType.USER);
+        authenticateAs(admin.id(), "ROLE_ADMIN");
+
+        UserResponse response =
+                userService.resetPassword(
+                        target.id(), new ResetUserPasswordRequest("NewPassword@123"));
+        User savedUser = userRepository.findById(target.id()).orElseThrow();
+
+        assertThat(response.id()).isEqualTo(target.id());
+        assertThat(passwordEncoder.matches("NewPassword@123", savedUser.getPassword())).isTrue();
+        assertThat(savedUser.getPassword()).isNotEqualTo("NewPassword@123");
+    }
+
+    @Test
+    void shouldNotExposePasswordWhenResettingPassword() {
+        UserResponse admin = createUser("admin@example.com", UserType.ADMIN);
+        UserResponse target = createUser("target@example.com", UserType.USER);
+        authenticateAs(admin.id(), "ROLE_ADMIN");
+
+        UserResponse response =
+                userService.resetPassword(
+                        target.id(), new ResetUserPasswordRequest("NewPassword@123"));
+
+        assertThat(response).hasNoNullFieldsOrPropertiesExcept("document");
+    }
+
+    @Test
+    void shouldThrowResourceNotFoundWhenResetPasswordUserDoesNotExist() {
+        UserResponse admin = createUser("admin@example.com", UserType.ADMIN);
+        authenticateAs(admin.id(), "ROLE_ADMIN");
+
+        assertThatThrownBy(
+                        () ->
+                                userService.resetPassword(
+                                        999L, new ResetUserPasswordRequest("NewPassword@123")))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("User not found");
+    }
+
+    @Test
+    void shouldRejectInvalidPasswordWhenResettingPassword() {
+        UserResponse admin = createUser("admin@example.com", UserType.ADMIN);
+        UserResponse target = createUser("target@example.com", UserType.USER);
+        authenticateAs(admin.id(), "ROLE_ADMIN");
+
+        assertThatThrownBy(
+                        () ->
+                                userService.resetPassword(
+                                        target.id(), new ResetUserPasswordRequest("weak")))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage(
+                        "Password must have at least 8 characters, uppercase, lowercase, number and special character");
+    }
+
+    @Test
+    void shouldRejectBlankPasswordWhenResettingPassword() {
+        UserResponse admin = createUser("admin@example.com", UserType.ADMIN);
+        UserResponse target = createUser("target@example.com", UserType.USER);
+        authenticateAs(admin.id(), "ROLE_ADMIN");
+
+        assertThatThrownBy(
+                        () ->
+                                userService.resetPassword(
+                                        target.id(), new ResetUserPasswordRequest("   ")))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Password is required");
+    }
+
+    @Test
+    void shouldRejectResettingOwnPassword() {
+        UserResponse admin = createUser("admin@example.com", UserType.ADMIN);
+        authenticateAs(admin.id(), "ROLE_ADMIN");
+
+        assertThatThrownBy(
+                        () ->
+                                userService.resetPassword(
+                                        admin.id(),
+                                        new ResetUserPasswordRequest("NewPassword@123")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(
+                        "Use /auth/change-password to change the authenticated user's own password");
+    }
+
+    @Test
+    void shouldNotUpdateProtectedFieldsWhenResettingPassword() {
+        UserResponse admin = createUser("admin@example.com", UserType.ADMIN);
+        UserResponse target = createUser("target@example.com", UserType.USER);
+        authenticateAs(admin.id(), "ROLE_ADMIN");
+
+        userService.resetPassword(target.id(), new ResetUserPasswordRequest("NewPassword@123"));
+        User savedUser = userRepository.findById(target.id()).orElseThrow();
+
+        assertThat(savedUser.getEmail()).isEqualTo("target@example.com");
+        assertThat(savedUser.getUserType()).isEqualTo(UserType.USER);
+        assertThat(savedUser.getStatus()).isEqualTo(UserStatus.ACTIVE);
     }
 
     private UserResponse createUser(String email, UserType userType) {

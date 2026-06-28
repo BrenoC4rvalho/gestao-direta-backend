@@ -2,6 +2,7 @@ package br.com.gestaodireta.user.controller;
 
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
+import br.com.gestaodireta.user.dto.ResetUserPasswordRequest;
 import br.com.gestaodireta.user.dto.UserCreateRequest;
 import br.com.gestaodireta.user.dto.UserResponse;
 import br.com.gestaodireta.user.dto.UserStatusUpdateRequest;
@@ -69,6 +70,13 @@ public class UserController {
         return userService.create(request);
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public UserResponse update(
+            @PathVariable Long id, @Valid @RequestBody UserUpdateRequest request) {
+        return userService.updateUser(id, request);
+    }
+
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public UserResponse updateStatus(
@@ -81,5 +89,12 @@ public class UserController {
     public UserResponse updateType(
             @PathVariable Long id, @Valid @RequestBody UserTypeUpdateRequest request) {
         return userService.updateType(id, request);
+    }
+
+    @PatchMapping("/{id}/reset-password")
+    @PreAuthorize("hasRole('ADMIN')")
+    public UserResponse resetPassword(
+            @PathVariable Long id, @Valid @RequestBody ResetUserPasswordRequest request) {
+        return userService.resetPassword(id, request);
     }
 }
