@@ -82,6 +82,14 @@ public class FinancialCategoryService {
     }
 
     @Transactional
+    public FinancialCategoryResponse activate(Long id) {
+        FinancialCategory category = findEntityById(id);
+        category.setStatus(FinancialCategoryStatus.ACTIVE);
+
+        return financialCategoryMapper.toResponse(financialCategoryRepository.save(category));
+    }
+
+    @Transactional
     public void inactivate(Long id) {
         FinancialCategory category = findEntityById(id);
         category.setStatus(FinancialCategoryStatus.INACTIVE);

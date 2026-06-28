@@ -1948,6 +1948,64 @@ Atualiza uma categoria financeira.
 - `PRODUCER` não pode alterar categoria default.
 - Para `PRODUCER`, o `farmId` do body deve bater com a fazenda da categoria.
 
+### PATCH /api/financial/categories/{id}/activate
+
+**Descrição:**
+Ativa uma categoria financeira inativa.
+
+**Autenticação:** Sim
+**Permissão:** `ADMIN`; ou `PRODUCER` para categoria da própria fazenda.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `id`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "name": "Insumos",
+  "type": "EXPENSE",
+  "color": "#FF0000",
+  "icon": "package",
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "isDefault": false,
+  "status": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:30:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `200 OK` em caso de sucesso.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão.
+- `404 Not Found` se a categoria não existir.
+
+**Observações de regra de negócio:**
+- O endpoint é idempotente: categoria já `ACTIVE` retorna sucesso com o DTO atual.
+- Apenas o status passa para `ACTIVE`; os demais dados da categoria não são alterados.
+
 ### DELETE /api/financial/categories/{id}
 
 **Descrição:**

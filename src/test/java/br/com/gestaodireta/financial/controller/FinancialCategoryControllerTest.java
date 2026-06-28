@@ -7,6 +7,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -202,6 +203,93 @@ class FinancialCategoryControllerTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldActivateCategoryAsAdmin() throws Exception {
+        User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN);
+        FinancialCategory category =
+                saveCategory(
+                        "Farm Category", saveFarm("Farm"), false, FinancialCategoryStatus.INACTIVE);
+
+        mockMvc.perform(
+                        patch("/api/financial/categories/{id}/activate", category.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+
+        FinancialCategory savedCategory =
+                financialCategoryRepository.findById(category.getId()).orElseThrow();
+        assertThat(savedCategory.getStatus()).isEqualTo(FinancialCategoryStatus.ACTIVE);
+    }
+
+    @Test
+    void shouldActivateOwnFarmCategoryAsProducer() throws Exception {
+        Farm farm = saveFarm("Farm");
+        User producer = saveUser("Producer", "producer@example.com", UserType.USER);
+        saveFarmUser(farm, producer, FarmUserRole.PRODUCER);
+        FinancialCategory category =
+                saveCategory("Farm Category", farm, false, FinancialCategoryStatus.INACTIVE);
+
+        mockMvc.perform(
+                        patch("/api/financial/categories/{id}/activate", category.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(producer.getId())).roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+
+        FinancialCategory savedCategory =
+                financialCategoryRepository.findById(category.getId()).orElseThrow();
+        assertThat(savedCategory.getStatus()).isEqualTo(FinancialCategoryStatus.ACTIVE);
+    }
+
+    @Test
+    void shouldDenyActivateCategoryForEmployeeAccountantAndUserWithoutFarmLink() throws Exception {
+        Farm farm = saveFarm("Farm");
+        User employee = saveUser("Employee", "employee@example.com", UserType.USER);
+        User accountant = saveUser("Accountant", "accountant@example.com", UserType.USER);
+        User unlinkedUser = saveUser("Unlinked", "unlinked@example.com", UserType.USER);
+        saveFarmUser(farm, employee, FarmUserRole.EMPLOYEE);
+        saveFarmUser(farm, accountant, FarmUserRole.ACCOUNTANT);
+        FinancialCategory category =
+                saveCategory("Farm Category", farm, false, FinancialCategoryStatus.INACTIVE);
+
+        expectCannotActivate(employee, category);
+        expectCannotActivate(accountant, category);
+        expectCannotActivate(unlinkedUser, category);
+    }
+
+    @Test
+    void shouldDenyActivateGlobalCategoryForNonAdmin() throws Exception {
+        User user = saveUser("User", "user@example.com", UserType.USER);
+        FinancialCategory category =
+                saveCategory("Global Category", null, true, FinancialCategoryStatus.INACTIVE);
+
+        expectCannotActivate(user, category);
+    }
+
+    @Test
+    void shouldDenyActivateCategoryWithoutAuthentication() throws Exception {
+        FinancialCategory category =
+                saveCategory(
+                        "Farm Category", saveFarm("Farm"), false, FinancialCategoryStatus.INACTIVE);
+
+        mockMvc.perform(
+                        patch("/api/financial/categories/{id}/activate", category.getId())
+                                .contextPath(CONTEXT_PATH))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenActivatingMissingCategoryAsAdmin() throws Exception {
+        User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN);
+
+        mockMvc.perform(
+                        patch("/api/financial/categories/{id}/activate", 999L)
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void shouldDenyProducerUpdatingFarmCategoryToGlobal() throws Exception {
         Farm farm = saveFarm("Farm");
         User producer = saveUser("Producer", "producer@example.com", UserType.USER);
@@ -240,6 +328,14 @@ class FinancialCategoryControllerTest extends PostgresIntegrationTest {
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(categoryBody(farm.getId(), false)))
+                .andExpect(status().isForbidden());
+    }
+
+    private void expectCannotActivate(User user, FinancialCategory category) throws Exception {
+        mockMvc.perform(
+                        patch("/api/financial/categories/{id}/activate", category.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(user.getId())).roles("USER")))
                 .andExpect(status().isForbidden());
     }
 
