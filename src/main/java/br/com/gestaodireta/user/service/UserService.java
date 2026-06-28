@@ -8,6 +8,7 @@ import br.com.gestaodireta.shared.response.PageResponse;
 import br.com.gestaodireta.shared.security.SecurityUtils;
 import br.com.gestaodireta.user.dto.ResetUserPasswordRequest;
 import br.com.gestaodireta.user.dto.UserCreateRequest;
+import br.com.gestaodireta.user.dto.UserFilterRequest;
 import br.com.gestaodireta.user.dto.UserResponse;
 import br.com.gestaodireta.user.dto.UserStatusUpdateRequest;
 import br.com.gestaodireta.user.dto.UserTypeUpdateRequest;
@@ -63,8 +64,21 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public PageResponse<UserResponse> findAll(PaginationParams paginationParams) {
+        return findAll(new UserFilterRequest(null, null, null), paginationParams);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<UserResponse> findAll(
+            UserFilterRequest filterRequest, PaginationParams paginationParams) {
+        UserFilterRequest normalizedFilter = normalizeFilter(filterRequest);
         Page<UserResponse> users =
-                userRepository.findAll(paginationParams.toPageable()).map(userMapper::toResponse);
+                userRepository
+                        .findAllFiltered(
+                                normalizedFilter.search(),
+                                normalizedFilter.userType(),
+                                normalizedFilter.status(),
+                                paginationParams.toPageable())
+                        .map(userMapper::toResponse);
 
         return PageResponse.from(users);
     }
@@ -204,5 +218,30 @@ public class UserService {
         }
 
         return normalizedEmail;
+    }
+
+    private UserFilterRequest normalizeFilter(UserFilterRequest filterRequest) {
+        if (filterRequest == null) {
+            return new UserFilterRequest(null, null, null);
+        }
+
+        return new UserFilterRequest(
+                normalizeNullableLowercaseText(filterRequest.search()),
+                filterRequest.userType(),
+                filterRequest.status());
+    }
+
+    private String normalizeNullableLowercaseText(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String normalizedValue = value.trim().toLowerCase(Locale.ROOT);
+
+        if (normalizedValue.isBlank()) {
+            return null;
+        }
+
+        return normalizedValue;
     }
 }

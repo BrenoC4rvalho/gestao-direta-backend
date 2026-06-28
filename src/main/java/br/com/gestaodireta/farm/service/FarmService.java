@@ -1,5 +1,6 @@
 package br.com.gestaodireta.farm.service;
 
+import br.com.gestaodireta.farm.dto.FarmFilterRequest;
 import br.com.gestaodireta.farm.dto.FarmRequest;
 import br.com.gestaodireta.farm.dto.FarmResponse;
 import br.com.gestaodireta.farm.dto.FarmStatusUpdateRequest;
@@ -17,6 +18,7 @@ import br.com.gestaodireta.shared.response.PageResponse;
 import br.com.gestaodireta.shared.security.SecurityUtils;
 import br.com.gestaodireta.user.enumeration.UserStatus;
 import br.com.gestaodireta.user.repository.UserRepository;
+import java.util.Locale;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -62,17 +64,33 @@ public class FarmService {
 
     @Transactional(readOnly = true)
     public PageResponse<FarmResponse> findAll(PaginationParams paginationParams) {
+        return findAll(new FarmFilterRequest(null, null, null, null), paginationParams);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<FarmResponse> findAll(
+            FarmFilterRequest filterRequest, PaginationParams paginationParams) {
+        FarmFilterRequest normalizedFilter = normalizeFilter(filterRequest);
         Page<Farm> farms;
 
         if (SecurityUtils.isAdmin()) {
-            farms = farmRepository.findAll(paginationParams.toPageable());
+            farms =
+                    farmRepository.findAllFilteredForAdmin(
+                            normalizedFilter.search(),
+                            normalizedFilter.document(),
+                            normalizedFilter.productionType(),
+                            normalizedFilter.status(),
+                            paginationParams.toPageable());
         } else {
             ensureCurrentUserIsActive();
             farms =
-                    farmUserRepository.findActiveFarmsByUserId(
+                    farmUserRepository.findActiveFarmsByUserIdFiltered(
                             SecurityUtils.getAuthenticatedUserId(),
                             FarmStatus.ACTIVE,
                             FarmUserRole.INACTIVE,
+                            normalizedFilter.search(),
+                            normalizedFilter.document(),
+                            normalizedFilter.productionType(),
                             toFarmUserPageable(paginationParams.toPageable()));
         }
 
@@ -147,5 +165,45 @@ public class FarmService {
         }
 
         return "farm." + property;
+    }
+
+    private FarmFilterRequest normalizeFilter(FarmFilterRequest filterRequest) {
+        if (filterRequest == null) {
+            return new FarmFilterRequest(null, null, null, null);
+        }
+
+        return new FarmFilterRequest(
+                normalizeNullableLowercaseText(filterRequest.search()),
+                normalizeDocumentFilter(filterRequest.document()),
+                filterRequest.productionType(),
+                filterRequest.status());
+    }
+
+    private String normalizeNullableLowercaseText(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String normalizedValue = value.trim().toLowerCase(Locale.ROOT);
+
+        if (normalizedValue.isBlank()) {
+            return null;
+        }
+
+        return normalizedValue;
+    }
+
+    private String normalizeDocumentFilter(String document) {
+        if (document == null) {
+            return null;
+        }
+
+        String normalizedDocument = document.replaceAll("\\D", "");
+
+        if (normalizedDocument.isBlank()) {
+            return null;
+        }
+
+        return normalizedDocument;
     }
 }

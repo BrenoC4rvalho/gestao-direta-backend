@@ -418,7 +418,10 @@ Lista usuários com paginação.
   "page": 0,
   "size": 10,
   "sort": "id",
-  "direction": "ASC"
+  "direction": "ASC",
+  "search": "maria",
+  "userType": "USER",
+  "status": "ACTIVE"
 }
 ```
 
@@ -435,6 +438,9 @@ Lista usuários com paginação.
 - `size`
 - `sort`
 - `direction`
+- `search`: filtra por nome ou email, sem diferenciar maiúsculas/minúsculas.
+- `userType`: `ADMIN` ou `USER`.
+- `status`: `ACTIVE`, `INACTIVE` ou `BLOCKED`.
 
 **Resposta de sucesso:**
 ```json
@@ -461,6 +467,7 @@ Lista usuários com paginação.
 ```
 
 **Possíveis erros/status HTTP:**
+- `400 Bad Request` para enum inválido em filtros.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
 - `403 Forbidden` para usuário sem papel `ADMIN`.
 
@@ -966,7 +973,11 @@ Lista fazendas com paginação.
   "page": 0,
   "size": 10,
   "sort": "id",
-  "direction": "ASC"
+  "direction": "ASC",
+  "search": "boa safra",
+  "document": "12345678000199",
+  "productionType": "AGRICULTURE",
+  "status": "ACTIVE"
 }
 ```
 
@@ -983,6 +994,10 @@ Lista fazendas com paginação.
 - `size`
 - `sort`
 - `direction`
+- `search`: filtra por nome da fazenda, sem diferenciar maiúsculas/minúsculas.
+- `document`: filtra por documento, ignorando máscara e caracteres não numéricos.
+- `productionType`: `AGRICULTURE`, `LIVESTOCK`, `MIXED` ou `OTHER`.
+- `status`: `ACTIVE` ou `INACTIVE`.
 
 **Resposta de sucesso:**
 ```json
@@ -1011,11 +1026,14 @@ Lista fazendas com paginação.
 ```
 
 **Possíveis erros/status HTTP:**
+- `400 Bad Request` para enum inválido em filtros.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
 - `403 Forbidden` se o usuário autenticado não estiver ativo.
 
 **Observações de regra de negócio:**
 - `ADMIN` não precisa de vínculo com fazenda.
+- `ADMIN` lista todas as fazendas conforme os filtros enviados.
+- `USER` lista apenas fazendas `ACTIVE` com vínculo ativo; `status=INACTIVE` não libera fazendas inativas para usuário comum.
 - `USER` com vínculo `INACTIVE` não enxerga a fazenda.
 
 ### GET /api/farms/{id}
@@ -1458,7 +1476,14 @@ Lista vínculos de usuários de uma fazenda.
 
 **Query params:**
 ```json
-{}
+{
+  "page": 0,
+  "size": 10,
+  "sort": "id",
+  "direction": "ASC",
+  "search": "user",
+  "role": "EMPLOYEE"
+}
 ```
 
 **Body esperado:**
@@ -1470,26 +1495,40 @@ Lista vínculos de usuários de uma fazenda.
 - `farmId`
 
 **Campos opcionais:**
-- Nenhum.
+- `page`
+- `size`
+- `sort`
+- `direction`
+- `search`: filtra por nome ou email do usuário vinculado, sem diferenciar maiúsculas/minúsculas.
+- `role`: `PRODUCER`, `EMPLOYEE`, `ACCOUNTANT` ou `INACTIVE`.
 
 **Resposta de sucesso:**
 ```json
-[
-  {
-    "id": 1,
-    "farmId": 1,
-    "farmName": "Fazenda Boa Safra",
-    "userId": 2,
-    "userName": "User",
-    "userEmail": "user@gestaodireta.com",
-    "role": "EMPLOYEE",
-    "createdAt": "2026-06-21T10:00:00",
-    "updatedAt": "2026-06-21T10:00:00"
-  }
-]
+{
+  "content": [
+    {
+      "id": 1,
+      "farmId": 1,
+      "farmName": "Fazenda Boa Safra",
+      "userId": 2,
+      "userName": "User",
+      "userEmail": "user@gestaodireta.com",
+      "role": "EMPLOYEE",
+      "createdAt": "2026-06-21T10:00:00",
+      "updatedAt": "2026-06-21T10:00:00"
+    }
+  ],
+  "page": 0,
+  "size": 10,
+  "totalElements": 1,
+  "totalPages": 1,
+  "first": true,
+  "last": true
+}
 ```
 
 **Possíveis erros/status HTTP:**
+- `400 Bad Request` para enum inválido em filtros.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
 - `403 Forbidden` para usuário sem permissão.
 - `404 Not Found` se a fazenda não existir.

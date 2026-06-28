@@ -1,5 +1,6 @@
 package br.com.gestaodireta.farm.service;
 
+import br.com.gestaodireta.farm.dto.FarmUserFilterRequest;
 import br.com.gestaodireta.farm.dto.FarmUserRequest;
 import br.com.gestaodireta.farm.dto.FarmUserResponse;
 import br.com.gestaodireta.farm.dto.FarmUserRoleUpdateRequest;
@@ -12,10 +13,16 @@ import br.com.gestaodireta.farm.repository.FarmRepository;
 import br.com.gestaodireta.farm.repository.FarmUserRepository;
 import br.com.gestaodireta.shared.exception.BusinessException;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
+import br.com.gestaodireta.shared.pagination.PaginationParams;
+import br.com.gestaodireta.shared.response.PageResponse;
 import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.enumeration.UserType;
 import br.com.gestaodireta.user.repository.UserRepository;
-import java.util.List;
+import java.util.Locale;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,12 +66,20 @@ public class FarmUserService {
     }
 
     @Transactional(readOnly = true)
-    public List<FarmUserResponse> findByFarmId(Long farmId) {
+    public PageResponse<FarmUserResponse> findByFarmId(
+            Long farmId, FarmUserFilterRequest filterRequest, PaginationParams paginationParams) {
         findFarmById(farmId);
+        FarmUserFilterRequest normalizedFilter = normalizeFilter(filterRequest);
+        Page<FarmUserResponse> farmUsers =
+                farmUserRepository
+                        .findByFarmFiltered(
+                                farmId,
+                                normalizedFilter.search(),
+                                normalizedFilter.role(),
+                                toFarmUserPageable(paginationParams.toPageable()))
+                        .map(farmUserMapper::toResponse);
 
-        return farmUserRepository.findByFarmId(farmId).stream()
-                .map(farmUserMapper::toResponse)
-                .toList();
+        return PageResponse.from(farmUsers);
     }
 
     @Transactional
@@ -134,5 +149,47 @@ public class FarmUserService {
         if (activeProducerCount <= 1) {
             throw new BusinessException("Farm must have at least one active producer");
         }
+    }
+
+    private FarmUserFilterRequest normalizeFilter(FarmUserFilterRequest filterRequest) {
+        if (filterRequest == null) {
+            return new FarmUserFilterRequest(null, null);
+        }
+
+        return new FarmUserFilterRequest(
+                normalizeNullableLowercaseText(filterRequest.search()), filterRequest.role());
+    }
+
+    private String normalizeNullableLowercaseText(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String normalizedValue = value.trim().toLowerCase(Locale.ROOT);
+
+        if (normalizedValue.isBlank()) {
+            return null;
+        }
+
+        return normalizedValue;
+    }
+
+    private Pageable toFarmUserPageable(Pageable pageable) {
+        Sort translatedSort =
+                Sort.by(pageable.getSort().stream().map(this::toFarmUserSortOrder).toList());
+
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), translatedSort);
+    }
+
+    private Sort.Order toFarmUserSortOrder(Sort.Order order) {
+        return order.withProperty(toFarmUserSortProperty(order.getProperty()));
+    }
+
+    private String toFarmUserSortProperty(String property) {
+        return switch (property) {
+            case "userName" -> "user.name";
+            case "userEmail" -> "user.email";
+            default -> property;
+        };
     }
 }

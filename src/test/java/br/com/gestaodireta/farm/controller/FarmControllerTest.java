@@ -120,6 +120,37 @@ class FarmControllerTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldListFarmsWithFiltersAsAdmin() throws Exception {
+        Farm target = saveFarm("Soy Farm", FarmStatus.ACTIVE);
+        target.setDocument("12.345.678/0001-99");
+        target.setProductionType(br.com.gestaodireta.farm.enumeration.ProductionType.AGRICULTURE);
+        farmRepository.save(target);
+        saveFarm("Cattle Farm", FarmStatus.INACTIVE);
+
+        mockMvc.perform(
+                        get("/api/farms")
+                                .contextPath(CONTEXT_PATH)
+                                .param("search", "SOY")
+                                .param("document", "12.345.678/0001-99")
+                                .param("productionType", "AGRICULTURE")
+                                .param("status", "ACTIVE")
+                                .with(user("1").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].name").value("Soy Farm"));
+    }
+
+    @Test
+    void shouldRejectInvalidFarmFilterEnum() throws Exception {
+        mockMvc.perform(
+                        get("/api/farms")
+                                .contextPath(CONTEXT_PATH)
+                                .param("status", "INVALID")
+                                .with(user("1").roles("ADMIN")))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void shouldListOnlyActiveLinkedFarmsAsUser() throws Exception {
         User user = saveUser("User", "user@example.com", UserType.USER, UserStatus.ACTIVE);
         Farm producerFarm = saveFarm("Producer Farm", FarmStatus.ACTIVE);

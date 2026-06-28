@@ -4,10 +4,13 @@ import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
 import br.com.gestaodireta.user.dto.ResetUserPasswordRequest;
 import br.com.gestaodireta.user.dto.UserCreateRequest;
+import br.com.gestaodireta.user.dto.UserFilterRequest;
 import br.com.gestaodireta.user.dto.UserResponse;
 import br.com.gestaodireta.user.dto.UserStatusUpdateRequest;
 import br.com.gestaodireta.user.dto.UserTypeUpdateRequest;
 import br.com.gestaodireta.user.dto.UserUpdateRequest;
+import br.com.gestaodireta.user.enumeration.UserStatus;
+import br.com.gestaodireta.user.enumeration.UserType;
 import br.com.gestaodireta.user.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -47,8 +50,12 @@ public class UserController {
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public PageResponse<UserResponse> findAll(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) UserType userType,
+            @RequestParam(required = false) UserStatus status,
             @Valid @ModelAttribute PaginationParams paginationParams) {
-        return userService.findAll(paginationParams);
+        return userService.findAll(
+                new UserFilterRequest(search, userType, status), paginationParams);
     }
 
     @GetMapping("/search-by-email")

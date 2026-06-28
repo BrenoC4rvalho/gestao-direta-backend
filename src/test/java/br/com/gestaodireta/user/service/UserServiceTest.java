@@ -6,9 +6,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import br.com.gestaodireta.shared.exception.BusinessException;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
 import br.com.gestaodireta.shared.exception.ValidationException;
+import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.support.PostgresIntegrationTest;
 import br.com.gestaodireta.user.dto.ResetUserPasswordRequest;
 import br.com.gestaodireta.user.dto.UserCreateRequest;
+import br.com.gestaodireta.user.dto.UserFilterRequest;
 import br.com.gestaodireta.user.dto.UserResponse;
 import br.com.gestaodireta.user.dto.UserStatusUpdateRequest;
 import br.com.gestaodireta.user.dto.UserTypeUpdateRequest;
@@ -81,6 +83,73 @@ class UserServiceTest extends PostgresIntegrationTest {
         assertThatThrownBy(() -> userService.create(duplicatedRequest))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("Email is already in use");
+    }
+
+    @Test
+    void shouldListUsersWithoutFilter() {
+        createUser("admin@example.com", UserType.ADMIN);
+        createUser("user@example.com", UserType.USER);
+
+        assertThat(userService.findAll(new PaginationParams()).content())
+                .extracting(UserResponse::email)
+                .containsExactly("admin@example.com", "user@example.com");
+    }
+
+    @Test
+    void shouldFilterUsersBySearchIgnoringCaseAndBlankSearch() {
+        createNamedUser("Maria Silva", "maria@example.com", UserType.USER);
+        createNamedUser("Joao Souza", "joao@example.com", UserType.USER);
+
+        assertThat(
+                        userService
+                                .findAll(
+                                        new UserFilterRequest("  MARIA  ", null, null),
+                                        new PaginationParams())
+                                .content())
+                .extracting(UserResponse::email)
+                .containsExactly("maria@example.com");
+
+        assertThat(
+                        userService
+                                .findAll(
+                                        new UserFilterRequest("   ", null, null),
+                                        new PaginationParams())
+                                .content())
+                .hasSize(2);
+    }
+
+    @Test
+    void shouldFilterUsersByTypeStatusAndCombination() {
+        UserResponse admin = createNamedUser("Admin", "admin@example.com", UserType.ADMIN);
+        UserResponse activeUser = createNamedUser("Active", "active@example.com", UserType.USER);
+        UserResponse blockedUser = createNamedUser("Blocked", "blocked@example.com", UserType.USER);
+        userService.updateStatus(blockedUser.id(), new UserStatusUpdateRequest(UserStatus.BLOCKED));
+
+        assertThat(
+                        userService
+                                .findAll(
+                                        new UserFilterRequest(null, UserType.ADMIN, null),
+                                        new PaginationParams())
+                                .content())
+                .extracting(UserResponse::id)
+                .containsExactly(admin.id());
+        assertThat(
+                        userService
+                                .findAll(
+                                        new UserFilterRequest(null, null, UserStatus.ACTIVE),
+                                        new PaginationParams())
+                                .content())
+                .extracting(UserResponse::id)
+                .containsExactly(admin.id(), activeUser.id());
+        assertThat(
+                        userService
+                                .findAll(
+                                        new UserFilterRequest(
+                                                null, UserType.USER, UserStatus.BLOCKED),
+                                        new PaginationParams())
+                                .content())
+                .extracting(UserResponse::id)
+                .containsExactly(blockedUser.id());
     }
 
     @Test
@@ -339,8 +408,11 @@ class UserServiceTest extends PostgresIntegrationTest {
     }
 
     private UserResponse createUser(String email, UserType userType) {
-        return userService.create(
-                new UserCreateRequest("Test User", email, "Strong1!", null, userType));
+        return createNamedUser("Test User", email, userType);
+    }
+
+    private UserResponse createNamedUser(String name, String email, UserType userType) {
+        return userService.create(new UserCreateRequest(name, email, "Strong1!", null, userType));
     }
 
     private void authenticateAs(Long userId, String role) {

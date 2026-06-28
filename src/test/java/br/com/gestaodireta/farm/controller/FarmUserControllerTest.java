@@ -181,14 +181,14 @@ class FarmUserControllerTest extends PostgresIntegrationTest {
                                 .contextPath(CONTEXT_PATH)
                                 .with(user("1").roles("ADMIN")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(3)));
+                .andExpect(jsonPath("$.content", hasSize(3)));
 
         mockMvc.perform(
                         get("/api/farms/{farmId}/users", farm.getId())
                                 .contextPath(CONTEXT_PATH)
                                 .with(user(String.valueOf(producer.getId())).roles("USER")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(3)));
+                .andExpect(jsonPath("$.content", hasSize(3)));
 
         mockMvc.perform(
                         get("/api/farms/{farmId}/users", farm.getId())
@@ -201,6 +201,33 @@ class FarmUserControllerTest extends PostgresIntegrationTest {
                                 .contextPath(CONTEXT_PATH)
                                 .with(user(String.valueOf(accountant.getId())).roles("USER")))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldListFarmUsersWithFiltersAndRejectInvalidRole() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        User employee = saveUser("Employee", "employee@example.com", UserType.USER);
+        User accountant = saveUser("Accountant", "accountant@example.com", UserType.USER);
+        saveFarmUser(farm, employee, FarmUserRole.EMPLOYEE);
+        saveFarmUser(farm, accountant, FarmUserRole.ACCOUNTANT);
+
+        mockMvc.perform(
+                        get("/api/farms/{farmId}/users", farm.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .param("search", "employee")
+                                .param("role", "EMPLOYEE")
+                                .param("sort", "userEmail")
+                                .with(user("1").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].userEmail").value("employee@example.com"));
+
+        mockMvc.perform(
+                        get("/api/farms/{farmId}/users", farm.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .param("role", "INVALID")
+                                .with(user("1").roles("ADMIN")))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

@@ -4,6 +4,7 @@ import br.com.gestaodireta.farm.entity.Farm;
 import br.com.gestaodireta.farm.entity.FarmUser;
 import br.com.gestaodireta.farm.enumeration.FarmStatus;
 import br.com.gestaodireta.farm.enumeration.FarmUserRole;
+import br.com.gestaodireta.farm.enumeration.ProductionType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -56,5 +57,57 @@ public interface FarmUserRepository extends JpaRepository<FarmUser, Long> {
             @Param("userId") Long userId,
             @Param("farmStatus") FarmStatus farmStatus,
             @Param("inactiveRole") FarmUserRole inactiveRole,
+            Pageable pageable);
+
+    @Query(
+            """
+            select fu.farm
+            from FarmUser fu
+            where fu.user.id = :userId
+              and fu.user.status = br.com.gestaodireta.user.enumeration.UserStatus.ACTIVE
+              and fu.farm.status = :farmStatus
+              and fu.role <> :inactiveRole
+              and (:search is null or lower(fu.farm.name) like concat('%', cast(:search as string), '%'))
+              and (:document is null
+                or cast(function('regexp_replace', coalesce(fu.farm.document, ''), '[^0-9]', '', 'g') as string)
+                    like concat('%', cast(:document as string), '%'))
+              and (:productionType is null or fu.farm.productionType = :productionType)
+            """)
+    Page<Farm> findActiveFarmsByUserIdFiltered(
+            @Param("userId") Long userId,
+            @Param("farmStatus") FarmStatus farmStatus,
+            @Param("inactiveRole") FarmUserRole inactiveRole,
+            @Param("search") String search,
+            @Param("document") String document,
+            @Param("productionType") ProductionType productionType,
+            Pageable pageable);
+
+    @Query(
+            value =
+                    """
+                    select fu
+                    from FarmUser fu
+                    join fetch fu.farm
+                    join fetch fu.user
+                    where fu.farm.id = :farmId
+                      and (:search is null
+                        or lower(fu.user.name) like concat('%', cast(:search as string), '%')
+                        or lower(fu.user.email) like concat('%', cast(:search as string), '%'))
+                      and (:role is null or fu.role = :role)
+                    """,
+            countQuery =
+                    """
+                    select count(fu)
+                    from FarmUser fu
+                    where fu.farm.id = :farmId
+                      and (:search is null
+                        or lower(fu.user.name) like concat('%', cast(:search as string), '%')
+                        or lower(fu.user.email) like concat('%', cast(:search as string), '%'))
+                      and (:role is null or fu.role = :role)
+                    """)
+    Page<FarmUser> findByFarmFiltered(
+            @Param("farmId") Long farmId,
+            @Param("search") String search,
+            @Param("role") FarmUserRole role,
             Pageable pageable);
 }

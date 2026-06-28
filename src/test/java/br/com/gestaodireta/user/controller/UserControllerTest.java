@@ -234,6 +234,33 @@ class UserControllerTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldListUsersWithFiltersAsAdmin() throws Exception {
+        saveUser("Admin User", "admin@example.com", UserType.ADMIN);
+        saveUser("Common User", "user@example.com", UserType.USER);
+
+        mockMvc.perform(
+                        get("/api/users")
+                                .contextPath(CONTEXT_PATH)
+                                .param("search", "COMMON")
+                                .param("userType", "USER")
+                                .param("status", "ACTIVE")
+                                .with(user("1").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].email").value("user@example.com"));
+    }
+
+    @Test
+    void shouldRejectInvalidUserFilterEnum() throws Exception {
+        mockMvc.perform(
+                        get("/api/users")
+                                .contextPath(CONTEXT_PATH)
+                                .param("userType", "INVALID")
+                                .with(user("1").roles("ADMIN")))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void shouldRejectListUsersWhenAuthenticatedUserIsNotAdmin() throws Exception {
         mockMvc.perform(get("/api/users").contextPath(CONTEXT_PATH).with(user("1").roles("USER")))
                 .andExpect(status().isForbidden());

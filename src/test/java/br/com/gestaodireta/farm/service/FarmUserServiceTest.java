@@ -3,6 +3,7 @@ package br.com.gestaodireta.farm.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import br.com.gestaodireta.farm.dto.FarmUserFilterRequest;
 import br.com.gestaodireta.farm.dto.FarmUserRequest;
 import br.com.gestaodireta.farm.dto.FarmUserResponse;
 import br.com.gestaodireta.farm.dto.FarmUserRoleUpdateRequest;
@@ -14,6 +15,8 @@ import br.com.gestaodireta.farm.repository.FarmRepository;
 import br.com.gestaodireta.farm.repository.FarmUserRepository;
 import br.com.gestaodireta.shared.exception.BusinessException;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
+import br.com.gestaodireta.shared.pagination.PaginationParams;
+import br.com.gestaodireta.shared.response.PageResponse;
 import br.com.gestaodireta.support.PostgresIntegrationTest;
 import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.enumeration.UserStatus;
@@ -23,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -120,9 +124,63 @@ class FarmUserServiceTest extends PostgresIntegrationTest {
         saveFarmUser(farm, employee, FarmUserRole.EMPLOYEE);
         saveFarmUser(farm, accountant, FarmUserRole.ACCOUNTANT);
 
-        assertThat(farmUserService.findByFarmId(farm.getId()))
+        PageResponse<FarmUserResponse> response =
+                farmUserService.findByFarmId(
+                        farm.getId(), new FarmUserFilterRequest(null, null), sortedByUserName());
+
+        assertThat(response.content())
                 .extracting(FarmUserResponse::userEmail)
-                .containsExactly("employee@example.com", "accountant@example.com");
+                .containsExactly("accountant@example.com", "employee@example.com");
+    }
+
+    @Test
+    void shouldFilterFarmUsersBySearchRoleAndFarm() {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        Farm otherFarm = saveFarm("Other Farm", FarmStatus.ACTIVE);
+        User employee = saveUser("Employee Alpha", "employee@example.com", UserType.USER);
+        User accountant = saveUser("Accountant Beta", "accountant@example.com", UserType.USER);
+        User otherEmployee = saveUser("Employee Other", "other@example.com", UserType.USER);
+        saveFarmUser(farm, employee, FarmUserRole.EMPLOYEE);
+        saveFarmUser(farm, accountant, FarmUserRole.ACCOUNTANT);
+        saveFarmUser(otherFarm, otherEmployee, FarmUserRole.EMPLOYEE);
+
+        PageResponse<FarmUserResponse> response =
+                farmUserService.findByFarmId(
+                        farm.getId(),
+                        new FarmUserFilterRequest(" EMPLOYEE ", FarmUserRole.EMPLOYEE),
+                        sortedByUserEmail());
+
+        assertThat(response.content())
+                .extracting(FarmUserResponse::userEmail)
+                .containsExactly("employee@example.com");
+    }
+
+    @Test
+    void shouldSortFarmUsersByPublicUserFields() {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        User beta = saveUser("Beta", "b@example.com", UserType.USER);
+        User alpha = saveUser("Alpha", "a@example.com", UserType.USER);
+        saveFarmUser(farm, beta, FarmUserRole.EMPLOYEE);
+        saveFarmUser(farm, alpha, FarmUserRole.EMPLOYEE);
+
+        assertThat(
+                        farmUserService
+                                .findByFarmId(
+                                        farm.getId(),
+                                        new FarmUserFilterRequest(null, null),
+                                        sortedByUserName())
+                                .content())
+                .extracting(FarmUserResponse::userName)
+                .containsExactly("Alpha", "Beta");
+        assertThat(
+                        farmUserService
+                                .findByFarmId(
+                                        farm.getId(),
+                                        new FarmUserFilterRequest(null, null),
+                                        sortedByUserEmail())
+                                .content())
+                .extracting(FarmUserResponse::userEmail)
+                .containsExactly("a@example.com", "b@example.com");
     }
 
     @Test
@@ -188,6 +246,22 @@ class FarmUserServiceTest extends PostgresIntegrationTest {
                         new FarmUserRoleUpdateRequest(FarmUserRole.INACTIVE));
 
         assertThat(response.role()).isEqualTo(FarmUserRole.INACTIVE);
+    }
+
+    private PaginationParams sortedByUserName() {
+        PaginationParams paginationParams = new PaginationParams();
+        paginationParams.setSort("userName");
+        paginationParams.setDirection(Sort.Direction.ASC);
+
+        return paginationParams;
+    }
+
+    private PaginationParams sortedByUserEmail() {
+        PaginationParams paginationParams = new PaginationParams();
+        paginationParams.setSort("userEmail");
+        paginationParams.setDirection(Sort.Direction.ASC);
+
+        return paginationParams;
     }
 
     private User saveUser(String name, String email, UserType userType) {

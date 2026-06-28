@@ -1,10 +1,13 @@
 package br.com.gestaodireta.farm.controller;
 
 import br.com.gestaodireta.farm.dto.FarmAccessResponse;
+import br.com.gestaodireta.farm.dto.FarmFilterRequest;
 import br.com.gestaodireta.farm.dto.FarmRequest;
 import br.com.gestaodireta.farm.dto.FarmResponse;
 import br.com.gestaodireta.farm.dto.FarmStatusUpdateRequest;
 import br.com.gestaodireta.farm.dto.FarmUpdateRequest;
+import br.com.gestaodireta.farm.enumeration.FarmStatus;
+import br.com.gestaodireta.farm.enumeration.ProductionType;
 import br.com.gestaodireta.farm.service.FarmAccessService;
 import br.com.gestaodireta.farm.service.FarmService;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -46,8 +50,13 @@ public class FarmController {
 
     @GetMapping
     public PageResponse<FarmResponse> findAll(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String document,
+            @RequestParam(required = false) ProductionType productionType,
+            @RequestParam(required = false) FarmStatus status,
             @Valid @ModelAttribute PaginationParams paginationParams) {
-        return farmService.findAll(paginationParams);
+        return farmService.findAll(
+                new FarmFilterRequest(search, document, productionType, status), paginationParams);
     }
 
     @GetMapping("/{id}")

@@ -3,6 +3,7 @@ package br.com.gestaodireta.farm.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import br.com.gestaodireta.farm.dto.FarmFilterRequest;
 import br.com.gestaodireta.farm.dto.FarmRequest;
 import br.com.gestaodireta.farm.dto.FarmResponse;
 import br.com.gestaodireta.farm.dto.FarmStatusUpdateRequest;
@@ -103,6 +104,72 @@ class FarmServiceTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldFilterFarmsForAdmin() {
+        User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN, UserStatus.ACTIVE);
+        saveFarm("Soy Farm", FarmStatus.ACTIVE, "12.345.678/0001-99", ProductionType.AGRICULTURE);
+        saveFarm("Cattle Farm", FarmStatus.INACTIVE, "98765432000100", ProductionType.LIVESTOCK);
+        authenticateAs(admin, "ROLE_ADMIN");
+
+        PageResponse<FarmResponse> response =
+                farmService.findAll(
+                        new FarmFilterRequest(
+                                " soy ",
+                                "12345678000199",
+                                ProductionType.AGRICULTURE,
+                                FarmStatus.ACTIVE),
+                        sortedByName());
+
+        assertThat(response.content()).extracting(FarmResponse::name).containsExactly("Soy Farm");
+    }
+
+    @Test
+    void shouldIgnoreInactiveStatusFilterForUserFarmList() {
+        User user = saveUser("User", "user@example.com", UserType.USER, UserStatus.ACTIVE);
+        Farm activeFarm = saveFarm("Active Farm", FarmStatus.ACTIVE);
+        Farm inactiveFarm = saveFarm("Inactive Farm", FarmStatus.INACTIVE);
+        saveFarmUser(activeFarm, user, FarmUserRole.PRODUCER);
+        saveFarmUser(inactiveFarm, user, FarmUserRole.PRODUCER);
+        authenticateAs(user, "ROLE_USER");
+
+        PageResponse<FarmResponse> response =
+                farmService.findAll(
+                        new FarmFilterRequest(null, null, null, FarmStatus.INACTIVE),
+                        sortedByName());
+
+        assertThat(response.content())
+                .extracting(FarmResponse::name)
+                .containsExactly("Active Farm");
+    }
+
+    @Test
+    void shouldFilterLinkedFarmsForUser() {
+        User user = saveUser("User", "user@example.com", UserType.USER, UserStatus.ACTIVE);
+        Farm soyFarm =
+                saveFarm(
+                        "Soy Farm",
+                        FarmStatus.ACTIVE,
+                        "12.345.678/0001-99",
+                        ProductionType.AGRICULTURE);
+        Farm cattleFarm =
+                saveFarm(
+                        "Cattle Farm",
+                        FarmStatus.ACTIVE,
+                        "98765432000100",
+                        ProductionType.LIVESTOCK);
+        saveFarmUser(soyFarm, user, FarmUserRole.PRODUCER);
+        saveFarmUser(cattleFarm, user, FarmUserRole.PRODUCER);
+        authenticateAs(user, "ROLE_USER");
+
+        PageResponse<FarmResponse> response =
+                farmService.findAll(
+                        new FarmFilterRequest(
+                                "SOY", "12345678000199", ProductionType.AGRICULTURE, null),
+                        sortedByName());
+
+        assertThat(response.content()).extracting(FarmResponse::name).containsExactly("Soy Farm");
+    }
+
+    @Test
     void shouldRejectFarmListWhenUserStatusIsInactiveOrBlocked() {
         User inactive =
                 saveUser("Inactive", "inactive@example.com", UserType.USER, UserStatus.INACTIVE);
@@ -186,8 +253,15 @@ class FarmServiceTest extends PostgresIntegrationTest {
     }
 
     private Farm saveFarm(String name, FarmStatus status) {
+        return saveFarm(name, status, null, null);
+    }
+
+    private Farm saveFarm(
+            String name, FarmStatus status, String document, ProductionType productionType) {
         Farm farm = new Farm();
         farm.setName(name);
+        farm.setDocument(document);
+        farm.setProductionType(productionType);
         farm.setStatus(status);
 
         return farmRepository.save(farm);
