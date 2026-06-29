@@ -13,6 +13,7 @@ import br.com.gestaodireta.farm.service.FarmService;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -53,10 +54,12 @@ public class FarmController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String document,
             @RequestParam(required = false) ProductionType productionType,
+            @RequestParam(required = false) List<ProductionType> productionTypes,
             @RequestParam(required = false) FarmStatus status,
             @Valid @ModelAttribute PaginationParams paginationParams) {
         return farmService.findAll(
-                new FarmFilterRequest(search, document, productionType, status), paginationParams);
+                new FarmFilterRequest(search, document, productionType, productionTypes, status),
+                paginationParams);
     }
 
     @GetMapping("/{id}")

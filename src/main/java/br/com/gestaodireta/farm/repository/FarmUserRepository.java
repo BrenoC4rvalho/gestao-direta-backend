@@ -71,7 +71,7 @@ public interface FarmUserRepository extends JpaRepository<FarmUser, Long> {
               and (:document is null
                 or cast(function('regexp_replace', coalesce(fu.farm.document, ''), '[^0-9]', '', 'g') as string)
                     like concat('%', cast(:document as string), '%'))
-              and (:productionType is null or fu.farm.productionType = :productionType)
+              and (:filterProductionTypes = false or fu.farm.productionType in :productionTypes)
             """)
     Page<Farm> findActiveFarmsByUserIdFiltered(
             @Param("userId") Long userId,
@@ -79,7 +79,8 @@ public interface FarmUserRepository extends JpaRepository<FarmUser, Long> {
             @Param("inactiveRole") FarmUserRole inactiveRole,
             @Param("search") String search,
             @Param("document") String document,
-            @Param("productionType") ProductionType productionType,
+            @Param("filterProductionTypes") boolean filterProductionTypes,
+            @Param("productionTypes") List<ProductionType> productionTypes,
             Pageable pageable);
 
     @Query(
@@ -93,7 +94,7 @@ public interface FarmUserRepository extends JpaRepository<FarmUser, Long> {
                       and (:search is null
                         or lower(fu.user.name) like concat('%', cast(:search as string), '%')
                         or lower(fu.user.email) like concat('%', cast(:search as string), '%'))
-                      and (:role is null or fu.role = :role)
+                      and (:filterRoles = false or fu.role in :roles)
                     """,
             countQuery =
                     """
@@ -103,11 +104,12 @@ public interface FarmUserRepository extends JpaRepository<FarmUser, Long> {
                       and (:search is null
                         or lower(fu.user.name) like concat('%', cast(:search as string), '%')
                         or lower(fu.user.email) like concat('%', cast(:search as string), '%'))
-                      and (:role is null or fu.role = :role)
+                      and (:filterRoles = false or fu.role in :roles)
                     """)
     Page<FarmUser> findByFarmFiltered(
             @Param("farmId") Long farmId,
             @Param("search") String search,
-            @Param("role") FarmUserRole role,
+            @Param("filterRoles") boolean filterRoles,
+            @Param("roles") List<FarmUserRole> roles,
             Pageable pageable);
 }

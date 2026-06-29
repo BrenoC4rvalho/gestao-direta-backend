@@ -475,6 +475,108 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldPreferPluralCategoryStatusAndPaymentMethodFilters() {
+        FilterScenario scenario = saveFilterScenario();
+
+        assertThat(
+                        findIds(
+                                pluralFilter(
+                                        scenario.farm.getId(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        scenario.incomeCategory.getId(),
+                                        List.of(
+                                                scenario.expenseCategory.getId(),
+                                                scenario.expenseCategory.getId()),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)))
+                .containsExactlyInAnyOrder(scenario.expense.getId(), scenario.paid.getId());
+        assertThat(
+                        findIds(
+                                pluralFilter(
+                                        scenario.farm.getId(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        PaymentStatus.PENDING,
+                                        List.of(PaymentStatus.PAID, PaymentStatus.PAID),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)))
+                .containsExactly(scenario.paid.getId());
+        assertThat(
+                        findIds(
+                                pluralFilter(
+                                        scenario.farm.getId(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        PaymentMethod.CASH,
+                                        List.of(PaymentMethod.PIX, PaymentMethod.PIX),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)))
+                .containsExactlyInAnyOrder(scenario.income.getId(), scenario.paid.getId());
+    }
+
+    @Test
+    void shouldCombinePluralTransactionFiltersWithDefaultActiveRecordStatus() {
+        FilterScenario scenario = saveFilterScenario();
+
+        List<Long> ids =
+                findIds(
+                        pluralFilter(
+                                scenario.farm.getId(),
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                List.of(
+                                        scenario.incomeCategory.getId(),
+                                        scenario.expenseCategory.getId()),
+                                null,
+                                List.of(PaymentStatus.PENDING, PaymentStatus.PAID),
+                                null,
+                                List.of(PaymentMethod.PIX),
+                                null,
+                                null,
+                                null,
+                                null,
+                                null));
+
+        assertThat(ids).containsExactlyInAnyOrder(scenario.income.getId(), scenario.paid.getId());
+        assertThat(ids).doesNotContain(scenario.deleted.getId());
+    }
+
+    @Test
     void shouldFilterByDescriptionCreatedByUserAndAmountRange() {
         FilterScenario scenario = saveFilterScenario();
 
@@ -887,6 +989,44 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
             Long createdByUserId,
             BigDecimal minAmount,
             BigDecimal maxAmount) {
+        return pluralFilter(
+                farmId,
+                transactionDateStart,
+                transactionDateEnd,
+                paidAtStart,
+                paidAtEnd,
+                type,
+                categoryId,
+                null,
+                paymentStatus,
+                null,
+                paymentMethod,
+                null,
+                recordStatus,
+                description,
+                createdByUserId,
+                minAmount,
+                maxAmount);
+    }
+
+    private FinancialTransactionFilterRequest pluralFilter(
+            Long farmId,
+            LocalDate transactionDateStart,
+            LocalDate transactionDateEnd,
+            LocalDate paidAtStart,
+            LocalDate paidAtEnd,
+            TransactionType type,
+            Long categoryId,
+            List<Long> categoryIds,
+            PaymentStatus paymentStatus,
+            List<PaymentStatus> paymentStatuses,
+            PaymentMethod paymentMethod,
+            List<PaymentMethod> paymentMethods,
+            FinancialRecordStatus recordStatus,
+            String description,
+            Long createdByUserId,
+            BigDecimal minAmount,
+            BigDecimal maxAmount) {
         return new FinancialTransactionFilterRequest(
                 farmId,
                 transactionDateStart,
@@ -895,8 +1035,11 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
                 paidAtEnd,
                 type,
                 categoryId,
+                categoryIds,
                 paymentStatus,
+                paymentStatuses,
                 paymentMethod,
+                paymentMethods,
                 recordStatus,
                 description,
                 createdByUserId,
@@ -982,6 +1125,7 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
 
         return new FilterScenario(
                 farm,
+                incomeCategory,
                 expenseCategory,
                 otherUser,
                 income,
@@ -1079,6 +1223,7 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
 
     private record FilterScenario(
             Farm farm,
+            FinancialCategory incomeCategory,
             FinancialCategory expenseCategory,
             User otherUser,
             FinancialTransaction income,

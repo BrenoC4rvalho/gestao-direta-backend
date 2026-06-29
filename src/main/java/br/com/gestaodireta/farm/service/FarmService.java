@@ -8,6 +8,7 @@ import br.com.gestaodireta.farm.dto.FarmUpdateRequest;
 import br.com.gestaodireta.farm.entity.Farm;
 import br.com.gestaodireta.farm.enumeration.FarmStatus;
 import br.com.gestaodireta.farm.enumeration.FarmUserRole;
+import br.com.gestaodireta.farm.enumeration.ProductionType;
 import br.com.gestaodireta.farm.mapper.FarmMapper;
 import br.com.gestaodireta.farm.repository.FarmRepository;
 import br.com.gestaodireta.farm.repository.FarmUserRepository;
@@ -18,7 +19,9 @@ import br.com.gestaodireta.shared.response.PageResponse;
 import br.com.gestaodireta.shared.security.SecurityUtils;
 import br.com.gestaodireta.user.enumeration.UserStatus;
 import br.com.gestaodireta.user.repository.UserRepository;
+import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -78,7 +81,8 @@ public class FarmService {
                     farmRepository.findAllFilteredForAdmin(
                             normalizedFilter.search(),
                             normalizedFilter.document(),
-                            normalizedFilter.productionType(),
+                            hasProductionTypes(normalizedFilter),
+                            productionTypesOrPlaceholder(normalizedFilter),
                             normalizedFilter.status(),
                             paginationParams.toPageable());
         } else {
@@ -90,7 +94,8 @@ public class FarmService {
                             FarmUserRole.INACTIVE,
                             normalizedFilter.search(),
                             normalizedFilter.document(),
-                            normalizedFilter.productionType(),
+                            hasProductionTypes(normalizedFilter),
+                            productionTypesOrPlaceholder(normalizedFilter),
                             toFarmUserPageable(paginationParams.toPageable()));
         }
 
@@ -176,7 +181,50 @@ public class FarmService {
                 normalizeNullableLowercaseText(filterRequest.search()),
                 normalizeDocumentFilter(filterRequest.document()),
                 filterRequest.productionType(),
+                effectiveProductionTypes(
+                        filterRequest.productionType(), filterRequest.productionTypes()),
                 filterRequest.status());
+    }
+
+    private boolean hasProductionTypes(FarmFilterRequest filterRequest) {
+        return filterRequest.productionTypes() != null;
+    }
+
+    private List<ProductionType> productionTypesOrPlaceholder(FarmFilterRequest filterRequest) {
+        if (hasProductionTypes(filterRequest)) {
+            return filterRequest.productionTypes();
+        }
+
+        return List.of(ProductionType.OTHER);
+    }
+
+    private List<ProductionType> effectiveProductionTypes(
+            ProductionType productionType, List<ProductionType> productionTypes) {
+        List<ProductionType> normalizedProductionTypes = normalizeList(productionTypes);
+
+        if (normalizedProductionTypes != null) {
+            return normalizedProductionTypes;
+        }
+
+        if (productionType == null) {
+            return null;
+        }
+
+        return List.of(productionType);
+    }
+
+    private <T> List<T> normalizeList(List<T> values) {
+        if (values == null) {
+            return null;
+        }
+
+        List<T> normalizedValues = values.stream().filter(Objects::nonNull).distinct().toList();
+
+        if (normalizedValues.isEmpty()) {
+            return null;
+        }
+
+        return normalizedValues;
     }
 
     private String normalizeNullableLowercaseText(String value) {

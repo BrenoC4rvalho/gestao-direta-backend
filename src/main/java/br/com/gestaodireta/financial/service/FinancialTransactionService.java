@@ -12,6 +12,7 @@ import br.com.gestaodireta.financial.entity.FinancialCategory;
 import br.com.gestaodireta.financial.entity.FinancialTransaction;
 import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
 import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
+import br.com.gestaodireta.financial.enumeration.PaymentMethod;
 import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.mapper.FinancialTransactionMapper;
@@ -28,7 +29,9 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -109,9 +112,12 @@ public class FinancialTransactionService {
                                 endDateOrDefault(normalizedFilter.paidAtEnd()),
                                 shouldFilterPaidAt(normalizedFilter),
                                 normalizedFilter.type(),
-                                normalizedFilter.categoryId(),
-                                normalizedFilter.paymentStatus(),
-                                normalizedFilter.paymentMethod(),
+                                hasCategoryIds(normalizedFilter),
+                                categoryIdsOrPlaceholder(normalizedFilter),
+                                hasPaymentStatuses(normalizedFilter),
+                                paymentStatusesOrPlaceholder(normalizedFilter),
+                                hasPaymentMethods(normalizedFilter),
+                                paymentMethodsOrPlaceholder(normalizedFilter),
                                 normalizedFilter.recordStatus(),
                                 normalizedFilter.description(),
                                 normalizedFilter.createdByUserId(),
@@ -217,8 +223,11 @@ public class FinancialTransactionService {
                 filterRequest.paidAtEnd(),
                 filterRequest.type(),
                 filterRequest.categoryId(),
+                effectiveValues(filterRequest.categoryId(), filterRequest.categoryIds()),
                 filterRequest.paymentStatus(),
+                effectiveValues(filterRequest.paymentStatus(), filterRequest.paymentStatuses()),
                 filterRequest.paymentMethod(),
+                effectiveValues(filterRequest.paymentMethod(), filterRequest.paymentMethods()),
                 recordStatus,
                 normalizeNullableLowercaseText(filterRequest.description()),
                 filterRequest.createdByUserId(),
@@ -256,6 +265,72 @@ public class FinancialTransactionService {
         if (amount != null && amount.compareTo(BigDecimal.ZERO) < 0) {
             throw new ValidationException(message);
         }
+    }
+
+    private boolean hasCategoryIds(FinancialTransactionFilterRequest filterRequest) {
+        return filterRequest.categoryIds() != null;
+    }
+
+    private List<Long> categoryIdsOrPlaceholder(FinancialTransactionFilterRequest filterRequest) {
+        if (hasCategoryIds(filterRequest)) {
+            return filterRequest.categoryIds();
+        }
+
+        return List.of(-1L);
+    }
+
+    private boolean hasPaymentStatuses(FinancialTransactionFilterRequest filterRequest) {
+        return filterRequest.paymentStatuses() != null;
+    }
+
+    private List<PaymentStatus> paymentStatusesOrPlaceholder(
+            FinancialTransactionFilterRequest filterRequest) {
+        if (hasPaymentStatuses(filterRequest)) {
+            return filterRequest.paymentStatuses();
+        }
+
+        return List.of(PaymentStatus.PENDING);
+    }
+
+    private boolean hasPaymentMethods(FinancialTransactionFilterRequest filterRequest) {
+        return filterRequest.paymentMethods() != null;
+    }
+
+    private List<PaymentMethod> paymentMethodsOrPlaceholder(
+            FinancialTransactionFilterRequest filterRequest) {
+        if (hasPaymentMethods(filterRequest)) {
+            return filterRequest.paymentMethods();
+        }
+
+        return List.of(PaymentMethod.CASH);
+    }
+
+    private <T> List<T> effectiveValues(T value, List<T> values) {
+        List<T> normalizedValues = normalizeList(values);
+
+        if (normalizedValues != null) {
+            return normalizedValues;
+        }
+
+        if (value == null) {
+            return null;
+        }
+
+        return List.of(value);
+    }
+
+    private <T> List<T> normalizeList(List<T> values) {
+        if (values == null) {
+            return null;
+        }
+
+        List<T> normalizedValues = values.stream().filter(Objects::nonNull).distinct().toList();
+
+        if (normalizedValues.isEmpty()) {
+            return null;
+        }
+
+        return normalizedValues;
     }
 
     private String normalizeNullableLowercaseText(String value) {

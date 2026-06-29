@@ -251,6 +251,34 @@ class UserControllerTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldListUsersWithRepeatedStatusFiltersAsAdmin() throws Exception {
+        saveUser("Admin User", "admin-list@example.com", UserType.ADMIN);
+        saveUser("Common User", "user@example.com", UserType.USER);
+        User blockedUser = saveUser("Blocked User", "blocked-user@example.com", UserType.USER);
+        blockedUser.setStatus(UserStatus.BLOCKED);
+        userRepository.save(blockedUser);
+        User inactiveUser = saveUser("Inactive User", "inactive-user@example.com", UserType.USER);
+        inactiveUser.setStatus(UserStatus.INACTIVE);
+        userRepository.save(inactiveUser);
+
+        mockMvc.perform(
+                        get("/api/users")
+                                .contextPath(CONTEXT_PATH)
+                                .param("userType", "USER")
+                                .param("status", "INACTIVE")
+                                .param("statuses", "ACTIVE")
+                                .param("statuses", "BLOCKED")
+                                .param("statuses", "ACTIVE")
+                                .param("sort", "email")
+                                .param("direction", "ASC")
+                                .with(user("1").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[0].email").value("blocked-user@example.com"))
+                .andExpect(jsonPath("$.content[1].email").value("user@example.com"));
+    }
+
+    @Test
     void shouldRejectInvalidUserFilterEnum() throws Exception {
         mockMvc.perform(
                         get("/api/users")

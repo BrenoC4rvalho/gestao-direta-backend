@@ -15,6 +15,7 @@ import br.com.gestaodireta.farm.entity.Farm;
 import br.com.gestaodireta.farm.entity.FarmUser;
 import br.com.gestaodireta.farm.enumeration.FarmStatus;
 import br.com.gestaodireta.farm.enumeration.FarmUserRole;
+import br.com.gestaodireta.farm.enumeration.ProductionType;
 import br.com.gestaodireta.farm.repository.FarmRepository;
 import br.com.gestaodireta.farm.repository.FarmUserRepository;
 import br.com.gestaodireta.support.PostgresIntegrationTest;
@@ -123,9 +124,17 @@ class FarmControllerTest extends PostgresIntegrationTest {
     void shouldListFarmsWithFiltersAsAdmin() throws Exception {
         Farm target = saveFarm("Soy Farm", FarmStatus.ACTIVE);
         target.setDocument("12.345.678/0001-99");
-        target.setProductionType(br.com.gestaodireta.farm.enumeration.ProductionType.AGRICULTURE);
+        target.setProductionType(ProductionType.AGRICULTURE);
         farmRepository.save(target);
-        saveFarm("Cattle Farm", FarmStatus.INACTIVE);
+        Farm livestock = saveFarm("Livestock Farm", FarmStatus.ACTIVE);
+        livestock.setProductionType(ProductionType.LIVESTOCK);
+        farmRepository.save(livestock);
+        Farm mixed = saveFarm("Mixed Farm", FarmStatus.ACTIVE);
+        mixed.setProductionType(ProductionType.MIXED);
+        farmRepository.save(mixed);
+        Farm inactive = saveFarm("Cattle Farm", FarmStatus.INACTIVE);
+        inactive.setProductionType(ProductionType.LIVESTOCK);
+        farmRepository.save(inactive);
 
         mockMvc.perform(
                         get("/api/farms")
@@ -138,6 +147,35 @@ class FarmControllerTest extends PostgresIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(1)))
                 .andExpect(jsonPath("$.content[0].name").value("Soy Farm"));
+    }
+
+    @Test
+    void shouldListFarmsWithRepeatedProductionTypesAsAdmin() throws Exception {
+        Farm agriculture = saveFarm("Soy Farm", FarmStatus.ACTIVE);
+        agriculture.setProductionType(ProductionType.AGRICULTURE);
+        farmRepository.save(agriculture);
+        Farm livestock = saveFarm("Livestock Farm", FarmStatus.ACTIVE);
+        livestock.setProductionType(ProductionType.LIVESTOCK);
+        farmRepository.save(livestock);
+        Farm mixed = saveFarm("Mixed Farm", FarmStatus.ACTIVE);
+        mixed.setProductionType(ProductionType.MIXED);
+        farmRepository.save(mixed);
+
+        mockMvc.perform(
+                        get("/api/farms")
+                                .contextPath(CONTEXT_PATH)
+                                .param("productionType", "OTHER")
+                                .param("productionTypes", "AGRICULTURE")
+                                .param("productionTypes", "LIVESTOCK")
+                                .param("productionTypes", "AGRICULTURE")
+                                .param("status", "ACTIVE")
+                                .param("sort", "name")
+                                .param("direction", "ASC")
+                                .with(user("1").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[0].name").value("Livestock Farm"))
+                .andExpect(jsonPath("$.content[1].name").value("Soy Farm"));
     }
 
     @Test
@@ -178,6 +216,41 @@ class FarmControllerTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.content[0].name").value("Accountant Farm"))
                 .andExpect(jsonPath("$.content[1].name").value("Employee Farm"))
                 .andExpect(jsonPath("$.content[2].name").value("Producer Farm"));
+    }
+
+    @Test
+    void shouldListOnlyActiveLinkedFarmsWithProductionTypesAsUser() throws Exception {
+        User user = saveUser("User", "linked-filter@example.com", UserType.USER, UserStatus.ACTIVE);
+        Farm agriculture = saveFarm("Agriculture Farm", FarmStatus.ACTIVE);
+        agriculture.setProductionType(ProductionType.AGRICULTURE);
+        farmRepository.save(agriculture);
+        Farm livestock = saveFarm("Livestock Farm", FarmStatus.ACTIVE);
+        livestock.setProductionType(ProductionType.LIVESTOCK);
+        farmRepository.save(livestock);
+        Farm inactive = saveFarm("Inactive Farm", FarmStatus.INACTIVE);
+        inactive.setProductionType(ProductionType.AGRICULTURE);
+        farmRepository.save(inactive);
+        Farm mixed = saveFarm("Mixed Farm", FarmStatus.ACTIVE);
+        mixed.setProductionType(ProductionType.MIXED);
+        farmRepository.save(mixed);
+        saveFarmUser(agriculture, user, FarmUserRole.PRODUCER);
+        saveFarmUser(livestock, user, FarmUserRole.EMPLOYEE);
+        saveFarmUser(inactive, user, FarmUserRole.PRODUCER);
+
+        mockMvc.perform(
+                        get("/api/farms")
+                                .contextPath(CONTEXT_PATH)
+                                .param("productionType", "MIXED")
+                                .param("productionTypes", "AGRICULTURE")
+                                .param("productionTypes", "LIVESTOCK")
+                                .param("productionTypes", "AGRICULTURE")
+                                .param("sort", "name")
+                                .param("direction", "ASC")
+                                .with(user(String.valueOf(user.getId())).roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[0].name").value("Agriculture Farm"))
+                .andExpect(jsonPath("$.content[1].name").value("Livestock Farm"));
     }
 
     @Test

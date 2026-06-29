@@ -9,6 +9,7 @@ import br.com.gestaodireta.farm.service.FarmUserService;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -47,9 +48,10 @@ public class FarmUserController {
             @PathVariable Long farmId,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) FarmUserRole role,
+            @RequestParam(required = false) List<FarmUserRole> roles,
             @Valid @ModelAttribute PaginationParams paginationParams) {
         return farmUserService.findByFarmId(
-                farmId, new FarmUserFilterRequest(search, role), paginationParams);
+                farmId, new FarmUserFilterRequest(search, role, roles), paginationParams);
     }
 
     @PatchMapping("/{userId}/role")

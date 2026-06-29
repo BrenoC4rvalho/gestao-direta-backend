@@ -33,9 +33,9 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
               and (:filterPaidAt = false
                 or (transaction.paidAt >= :paidAtStart and transaction.paidAt <= :paidAtEnd))
               and (:type is null or transaction.type = :type)
-              and (:categoryId is null or transaction.category.id = :categoryId)
-              and (:paymentStatus is null or transaction.status = :paymentStatus)
-              and (:paymentMethod is null or transaction.paymentMethod = :paymentMethod)
+              and (:filterCategoryIds = false or transaction.category.id in :categoryIds)
+              and (:filterPaymentStatuses = false or transaction.status in :paymentStatuses)
+              and (:filterPaymentMethods = false or transaction.paymentMethod in :paymentMethods)
               and (:description is null
                 or lower(transaction.description) like concat('%', cast(:description as string), '%'))
               and (:createdByUserId is null
@@ -51,9 +51,12 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
             @Param("paidAtEnd") LocalDate paidAtEnd,
             @Param("filterPaidAt") boolean filterPaidAt,
             @Param("type") TransactionType type,
-            @Param("categoryId") Long categoryId,
-            @Param("paymentStatus") PaymentStatus paymentStatus,
-            @Param("paymentMethod") PaymentMethod paymentMethod,
+            @Param("filterCategoryIds") boolean filterCategoryIds,
+            @Param("categoryIds") Collection<Long> categoryIds,
+            @Param("filterPaymentStatuses") boolean filterPaymentStatuses,
+            @Param("paymentStatuses") Collection<PaymentStatus> paymentStatuses,
+            @Param("filterPaymentMethods") boolean filterPaymentMethods,
+            @Param("paymentMethods") Collection<PaymentMethod> paymentMethods,
             @Param("recordStatus") FinancialRecordStatus recordStatus,
             @Param("description") String description,
             @Param("createdByUserId") Long createdByUserId,

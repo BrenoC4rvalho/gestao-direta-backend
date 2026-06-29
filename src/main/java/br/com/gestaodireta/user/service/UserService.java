@@ -17,7 +17,9 @@ import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.enumeration.UserStatus;
 import br.com.gestaodireta.user.mapper.UserMapper;
 import br.com.gestaodireta.user.repository.UserRepository;
+import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import org.springframework.data.domain.Page;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -76,7 +78,8 @@ public class UserService {
                         .findAllFiltered(
                                 normalizedFilter.search(),
                                 normalizedFilter.userType(),
-                                normalizedFilter.status(),
+                                hasStatuses(normalizedFilter),
+                                statusesOrPlaceholder(normalizedFilter),
                                 paginationParams.toPageable())
                         .map(userMapper::toResponse);
 
@@ -228,7 +231,48 @@ public class UserService {
         return new UserFilterRequest(
                 normalizeNullableLowercaseText(filterRequest.search()),
                 filterRequest.userType(),
-                filterRequest.status());
+                filterRequest.status(),
+                effectiveStatuses(filterRequest.status(), filterRequest.statuses()));
+    }
+
+    private boolean hasStatuses(UserFilterRequest filterRequest) {
+        return filterRequest.statuses() != null;
+    }
+
+    private List<UserStatus> statusesOrPlaceholder(UserFilterRequest filterRequest) {
+        if (hasStatuses(filterRequest)) {
+            return filterRequest.statuses();
+        }
+
+        return List.of(UserStatus.ACTIVE);
+    }
+
+    private List<UserStatus> effectiveStatuses(UserStatus status, List<UserStatus> statuses) {
+        List<UserStatus> normalizedStatuses = normalizeList(statuses);
+
+        if (normalizedStatuses != null) {
+            return normalizedStatuses;
+        }
+
+        if (status == null) {
+            return null;
+        }
+
+        return List.of(status);
+    }
+
+    private <T> List<T> normalizeList(List<T> values) {
+        if (values == null) {
+            return null;
+        }
+
+        List<T> normalizedValues = values.stream().filter(Objects::nonNull).distinct().toList();
+
+        if (normalizedValues.isEmpty()) {
+            return null;
+        }
+
+        return normalizedValues;
     }
 
     private String normalizeNullableLowercaseText(String value) {

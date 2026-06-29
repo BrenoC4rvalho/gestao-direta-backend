@@ -145,6 +145,7 @@ class FinancialTransactionControllerTest extends PostgresIntegrationTest {
         Farm farm = saveFarm(FarmStatus.ACTIVE);
         User admin = saveUser("Admin", "all-filters-admin@example.com", UserType.ADMIN);
         FinancialCategory category = saveCategory(farm, TransactionType.EXPENSE);
+        FinancialCategory otherCategory = saveCategory(farm, TransactionType.EXPENSE);
         FinancialTransaction transaction =
                 saveTransaction(
                         farm,
@@ -185,6 +186,21 @@ class FinancialTransactionControllerTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.content[0].categoryId").value(category.getId()))
                 .andExpect(jsonPath("$.content[0].status").value("PAID"))
                 .andExpect(jsonPath("$.content[0].paymentMethod").value("PIX"));
+
+        mockMvc.perform(
+                        get("/api/financial/transactions")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN"))
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("categoryId", String.valueOf(otherCategory.getId()))
+                                .param("categoryIds", String.valueOf(category.getId()))
+                                .param("categoryIds", String.valueOf(category.getId()))
+                                .param("paymentStatus", "PENDING")
+                                .param("paymentStatuses", "PAID")
+                                .param("paymentMethod", "CASH")
+                                .param("paymentMethods", "PIX"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(transaction.getId()));
     }
 
     @Test

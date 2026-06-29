@@ -6,6 +6,7 @@ import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 public record FinancialTransactionFilterRequest(
         Long farmId,
@@ -15,10 +16,49 @@ public record FinancialTransactionFilterRequest(
         LocalDate paidAtEnd,
         TransactionType type,
         Long categoryId,
+        List<Long> categoryIds,
         PaymentStatus paymentStatus,
+        List<PaymentStatus> paymentStatuses,
         PaymentMethod paymentMethod,
+        List<PaymentMethod> paymentMethods,
         FinancialRecordStatus recordStatus,
         String description,
         Long createdByUserId,
         BigDecimal minAmount,
-        BigDecimal maxAmount) {}
+        BigDecimal maxAmount) {
+
+    public FinancialTransactionFilterRequest(
+            Long farmId,
+            LocalDate transactionDateStart,
+            LocalDate transactionDateEnd,
+            LocalDate paidAtStart,
+            LocalDate paidAtEnd,
+            TransactionType type,
+            Long categoryId,
+            PaymentStatus paymentStatus,
+            PaymentMethod paymentMethod,
+            FinancialRecordStatus recordStatus,
+            String description,
+            Long createdByUserId,
+            BigDecimal minAmount,
+            BigDecimal maxAmount) {
+        this(
+                farmId,
+                transactionDateStart,
+                transactionDateEnd,
+                paidAtStart,
+                paidAtEnd,
+                type,
+                categoryId,
+                null,
+                paymentStatus,
+                null,
+                paymentMethod,
+                null,
+                recordStatus,
+                description,
+                createdByUserId,
+                minAmount,
+                maxAmount);
+    }
+}

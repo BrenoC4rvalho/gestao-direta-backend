@@ -231,6 +231,34 @@ class FarmUserControllerTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldListFarmUsersWithRepeatedRoles() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        User producer = saveUser("Producer", "producer-filter@example.com", UserType.USER);
+        User employee = saveUser("Employee", "employee-filter@example.com", UserType.USER);
+        User accountant = saveUser("Accountant", "accountant-filter@example.com", UserType.USER);
+        User inactive = saveUser("Inactive", "inactive-filter@example.com", UserType.USER);
+        saveFarmUser(farm, producer, FarmUserRole.PRODUCER);
+        saveFarmUser(farm, employee, FarmUserRole.EMPLOYEE);
+        saveFarmUser(farm, accountant, FarmUserRole.ACCOUNTANT);
+        saveFarmUser(farm, inactive, FarmUserRole.INACTIVE);
+
+        mockMvc.perform(
+                        get("/api/farms/{farmId}/users", farm.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .param("role", "PRODUCER")
+                                .param("roles", "EMPLOYEE")
+                                .param("roles", "ACCOUNTANT")
+                                .param("roles", "EMPLOYEE")
+                                .param("sort", "userEmail")
+                                .with(user("1").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(
+                        jsonPath("$.content[0].userEmail").value("accountant-filter@example.com"))
+                .andExpect(jsonPath("$.content[1].userEmail").value("employee-filter@example.com"));
+    }
+
+    @Test
     void shouldChangeRolesAccordingToAdminAndProducerRules() throws Exception {
         Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
         User producer = saveUser("Producer", "producer@example.com", UserType.USER);

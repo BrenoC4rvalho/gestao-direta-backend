@@ -18,7 +18,9 @@ import br.com.gestaodireta.shared.response.PageResponse;
 import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.enumeration.UserType;
 import br.com.gestaodireta.user.repository.UserRepository;
+import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -75,7 +77,8 @@ public class FarmUserService {
                         .findByFarmFiltered(
                                 farmId,
                                 normalizedFilter.search(),
-                                normalizedFilter.role(),
+                                hasRoles(normalizedFilter),
+                                rolesOrPlaceholder(normalizedFilter),
                                 toFarmUserPageable(paginationParams.toPageable()))
                         .map(farmUserMapper::toResponse);
 
@@ -157,7 +160,49 @@ public class FarmUserService {
         }
 
         return new FarmUserFilterRequest(
-                normalizeNullableLowercaseText(filterRequest.search()), filterRequest.role());
+                normalizeNullableLowercaseText(filterRequest.search()),
+                filterRequest.role(),
+                effectiveRoles(filterRequest.role(), filterRequest.roles()));
+    }
+
+    private boolean hasRoles(FarmUserFilterRequest filterRequest) {
+        return filterRequest.roles() != null;
+    }
+
+    private List<FarmUserRole> rolesOrPlaceholder(FarmUserFilterRequest filterRequest) {
+        if (hasRoles(filterRequest)) {
+            return filterRequest.roles();
+        }
+
+        return List.of(FarmUserRole.INACTIVE);
+    }
+
+    private List<FarmUserRole> effectiveRoles(FarmUserRole role, List<FarmUserRole> roles) {
+        List<FarmUserRole> normalizedRoles = normalizeList(roles);
+
+        if (normalizedRoles != null) {
+            return normalizedRoles;
+        }
+
+        if (role == null) {
+            return null;
+        }
+
+        return List.of(role);
+    }
+
+    private <T> List<T> normalizeList(List<T> values) {
+        if (values == null) {
+            return null;
+        }
+
+        List<T> normalizedValues = values.stream().filter(Objects::nonNull).distinct().toList();
+
+        if (normalizedValues.isEmpty()) {
+            return null;
+        }
+
+        return normalizedValues;
     }
 
     private String normalizeNullableLowercaseText(String value) {

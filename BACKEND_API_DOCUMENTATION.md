@@ -433,7 +433,8 @@ Lista usuários com paginação.
   "direction": "ASC",
   "search": "maria",
   "userType": "USER",
-  "status": "ACTIVE"
+  "status": "ACTIVE",
+  "statuses": ["ACTIVE", "BLOCKED"]
 }
 ```
 
@@ -446,19 +447,6 @@ Lista usuários com paginação.
 - Nenhum.
 
 **Campos opcionais:**
-- `transactionDateStart`
-- `transactionDateEnd`
-- `paidAtStart`
-- `paidAtEnd`
-- `type`
-- `categoryId`
-- `paymentStatus`
-- `paymentMethod`
-- `recordStatus`
-- `description`
-- `createdByUserId`
-- `minAmount`
-- `maxAmount`
 - `page`
 - `size`
 - `sort`
@@ -466,6 +454,7 @@ Lista usuários com paginação.
 - `search`: filtra por nome ou email, sem diferenciar maiúsculas/minúsculas.
 - `userType`: `ADMIN` ou `USER`.
 - `status`: `ACTIVE`, `INACTIVE` ou `BLOCKED`.
+- `statuses`: aceita query params repetidos, por exemplo `statuses=ACTIVE&statuses=BLOCKED`. Quando informado com valores válidos, tem prioridade sobre `status`.
 
 **Resposta de sucesso:**
 ```json
@@ -1002,6 +991,7 @@ Lista fazendas com paginação.
   "search": "boa safra",
   "document": "12345678000199",
   "productionType": "AGRICULTURE",
+  "productionTypes": ["AGRICULTURE", "LIVESTOCK"],
   "status": "ACTIVE"
 }
 ```
@@ -1022,6 +1012,7 @@ Lista fazendas com paginação.
 - `search`: filtra por nome da fazenda, sem diferenciar maiúsculas/minúsculas.
 - `document`: filtra por documento, ignorando máscara e caracteres não numéricos.
 - `productionType`: `AGRICULTURE`, `LIVESTOCK`, `MIXED` ou `OTHER`.
+- `productionTypes`: aceita query params repetidos, por exemplo `productionTypes=AGRICULTURE&productionTypes=LIVESTOCK`. Quando informado com valores válidos, tem prioridade sobre `productionType`.
 - `status`: `ACTIVE` ou `INACTIVE`.
 
 **Resposta de sucesso:**
@@ -1507,7 +1498,8 @@ Lista vínculos de usuários de uma fazenda.
   "sort": "id",
   "direction": "ASC",
   "search": "user",
-  "role": "EMPLOYEE"
+  "role": "EMPLOYEE",
+  "roles": ["EMPLOYEE", "ACCOUNTANT"]
 }
 ```
 
@@ -1526,6 +1518,7 @@ Lista vínculos de usuários de uma fazenda.
 - `direction`
 - `search`: filtra por nome ou email do usuário vinculado, sem diferenciar maiúsculas/minúsculas.
 - `role`: `PRODUCER`, `EMPLOYEE`, `ACCOUNTANT` ou `INACTIVE`.
+- `roles`: aceita query params repetidos, por exemplo `roles=EMPLOYEE&roles=ACCOUNTANT`. Quando informado com valores válidos, tem prioridade sobre `role`.
 
 **Resposta de sucesso:**
 ```json
@@ -2238,8 +2231,11 @@ Lista movimentações financeiras ativas de uma fazenda.
   "paidAtEnd": "2026-06-30",
   "type": "EXPENSE",
   "categoryId": 1,
+  "categoryIds": [1, 2],
   "paymentStatus": "PENDING",
+  "paymentStatuses": ["PENDING", "PAID"],
   "paymentMethod": "PIX",
+  "paymentMethods": ["PIX", "CASH"],
   "recordStatus": "ACTIVE",
   "description": "soja",
   "createdByUserId": 2,
@@ -2265,6 +2261,22 @@ Lista movimentações financeiras ativas de uma fazenda.
 - `size`
 - `sort`
 - `direction`
+- `transactionDateStart`
+- `transactionDateEnd`
+- `paidAtStart`
+- `paidAtEnd`
+- `type`
+- `categoryId`
+- `categoryIds`
+- `paymentStatus`
+- `paymentStatuses`
+- `paymentMethod`
+- `paymentMethods`
+- `recordStatus`
+- `description`
+- `createdByUserId`
+- `minAmount`
+- `maxAmount`
 
 **Resposta de sucesso:**
 ```json
@@ -2315,7 +2327,11 @@ Lista movimentações financeiras ativas de uma fazenda.
 - Filtros de intervalo são inclusivos.
 - `description` usa busca parcial e case-insensitive.
 - `paymentStatus` filtra o campo `status` da movimentação.
+- `paymentMethod` filtra a forma de pagamento da movimentação.
+- `paymentStatuses`: aceita query params repetidos, por exemplo `paymentStatuses=PENDING&paymentStatuses=PAID`. Quando informado com valores válidos, tem prioridade sobre `paymentStatus`.
 - `categoryId` filtra a categoria vinculada à movimentação, mantendo o escopo da fazenda consultada.
+- `categoryIds`: aceita query params repetidos, por exemplo `categoryIds=1&categoryIds=2`. Quando informado com valores válidos, tem prioridade sobre `categoryId`.
+- `paymentMethods`: aceita query params repetidos, por exemplo `paymentMethods=PIX&paymentMethods=CASH`. Quando informado com valores válidos, tem prioridade sobre `paymentMethod`.
 - `ACCOUNTANT` pode consultar movimentações.
 
 ### GET /api/financial/transactions/{id}

@@ -15,6 +15,7 @@ import br.com.gestaodireta.shared.response.PageResponse;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -58,8 +59,11 @@ public class FinancialTransactionController {
             @RequestParam(required = false) LocalDate paidAtEnd,
             @RequestParam(required = false) TransactionType type,
             @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) List<Long> categoryIds,
             @RequestParam(required = false) PaymentStatus paymentStatus,
+            @RequestParam(required = false) List<PaymentStatus> paymentStatuses,
             @RequestParam(required = false) PaymentMethod paymentMethod,
+            @RequestParam(required = false) List<PaymentMethod> paymentMethods,
             @RequestParam(required = false) FinancialRecordStatus recordStatus,
             @RequestParam(required = false) String description,
             @RequestParam(required = false) Long createdByUserId,
@@ -75,8 +79,11 @@ public class FinancialTransactionController {
                         paidAtEnd,
                         type,
                         categoryId,
+                        categoryIds,
                         paymentStatus,
+                        paymentStatuses,
                         paymentMethod,
+                        paymentMethods,
                         recordStatus,
                         description,
                         createdByUserId,

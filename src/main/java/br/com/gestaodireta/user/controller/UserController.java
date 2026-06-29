@@ -13,6 +13,7 @@ import br.com.gestaodireta.user.enumeration.UserStatus;
 import br.com.gestaodireta.user.enumeration.UserType;
 import br.com.gestaodireta.user.service.UserService;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -53,9 +54,10 @@ public class UserController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false) UserType userType,
             @RequestParam(required = false) UserStatus status,
+            @RequestParam(required = false) List<UserStatus> statuses,
             @Valid @ModelAttribute PaginationParams paginationParams) {
         return userService.findAll(
-                new UserFilterRequest(search, userType, status), paginationParams);
+                new UserFilterRequest(search, userType, status, statuses), paginationParams);
     }
 
     @GetMapping("/search-by-email")
