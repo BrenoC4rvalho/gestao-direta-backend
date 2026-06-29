@@ -101,6 +101,18 @@ Defaults:
 - Exclusão de transação é lógica por `recordStatus=DELETED`.
 - Exclusão de categoria é lógica por status `INACTIVE`.
 
+## Jobs agendados
+
+### Atualização de movimentações vencidas
+
+O backend executa diariamente um job para marcar contas vencidas.
+
+- Cron: `0 0 0 * * *`
+- Timezone: `America/Sao_Paulo`
+- Regra de vencimento: `dueDate < hoje`
+- Registros atualizados: movimentações `EXPENSE`, `PENDING`, `ACTIVE`, com `dueDate` preenchido e anterior à data atual.
+- Registros não atualizados: `INCOME`, `PAID`, `CANCELED`, `OVERDUE`, `DELETED`, `dueDate=null`, `dueDate=hoje` ou `dueDate>hoje`.
+
 ## Endpoints
 
 ### POST /api/auth/login

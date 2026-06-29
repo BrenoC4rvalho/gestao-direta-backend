@@ -25,7 +25,9 @@ import br.com.gestaodireta.shared.security.SecurityUtils;
 import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.repository.UserRepository;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Locale;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
@@ -50,17 +52,21 @@ public class FinancialTransactionService {
 
     private final FinancialTransactionMapper financialTransactionMapper;
 
+    private final Clock clock;
+
     public FinancialTransactionService(
             FinancialTransactionRepository financialTransactionRepository,
             FarmService farmService,
             FinancialCategoryService financialCategoryService,
             UserRepository userRepository,
-            FinancialTransactionMapper financialTransactionMapper) {
+            FinancialTransactionMapper financialTransactionMapper,
+            Clock clock) {
         this.financialTransactionRepository = financialTransactionRepository;
         this.farmService = farmService;
         this.financialCategoryService = financialCategoryService;
         this.userRepository = userRepository;
         this.financialTransactionMapper = financialTransactionMapper;
+        this.clock = clock;
     }
 
     @Transactional
@@ -163,6 +169,20 @@ public class FinancialTransactionService {
 
         return financialTransactionMapper.toResponse(
                 financialTransactionRepository.save(transaction));
+    }
+
+    @Transactional
+    public int markOverdueTransactions() {
+        LocalDate today = LocalDate.now(clock);
+        LocalDateTime updatedAt = LocalDateTime.now(clock);
+
+        return financialTransactionRepository.markOverdueTransactions(
+                PaymentStatus.OVERDUE,
+                updatedAt,
+                TransactionType.EXPENSE,
+                PaymentStatus.PENDING,
+                FinancialRecordStatus.ACTIVE,
+                today);
     }
 
     public FinancialTransaction findEntityById(Long id) {

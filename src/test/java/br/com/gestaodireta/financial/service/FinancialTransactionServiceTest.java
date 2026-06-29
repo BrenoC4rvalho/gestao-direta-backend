@@ -29,12 +29,19 @@ import br.com.gestaodireta.user.enumeration.UserStatus;
 import br.com.gestaodireta.user.enumeration.UserType;
 import br.com.gestaodireta.user.repository.UserRepository;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -682,6 +689,103 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
                 .hasMessage("Minimum amount cannot be negative");
     }
 
+    @Test
+    void shouldMarkOnlyActivePendingOverdueExpenses() {
+        User admin = saveUser("Admin", "admin-overdue@example.com", UserType.ADMIN);
+        Farm farm = saveFarm("Overdue Farm", FarmStatus.ACTIVE);
+        FinancialTransaction pastPendingExpense =
+                saveTransaction(
+                        farm,
+                        admin,
+                        TransactionType.EXPENSE,
+                        PaymentStatus.PENDING,
+                        FinancialRecordStatus.ACTIVE,
+                        LocalDate.of(2026, 6, 28));
+        FinancialTransaction todayPendingExpense =
+                saveTransaction(
+                        farm,
+                        admin,
+                        TransactionType.EXPENSE,
+                        PaymentStatus.PENDING,
+                        FinancialRecordStatus.ACTIVE,
+                        LocalDate.of(2026, 6, 29));
+        FinancialTransaction futurePendingExpense =
+                saveTransaction(
+                        farm,
+                        admin,
+                        TransactionType.EXPENSE,
+                        PaymentStatus.PENDING,
+                        FinancialRecordStatus.ACTIVE,
+                        LocalDate.of(2026, 6, 30));
+        FinancialTransaction paidExpense =
+                saveTransaction(
+                        farm,
+                        admin,
+                        TransactionType.EXPENSE,
+                        PaymentStatus.PAID,
+                        FinancialRecordStatus.ACTIVE,
+                        LocalDate.of(2026, 6, 28));
+        FinancialTransaction canceledExpense =
+                saveTransaction(
+                        farm,
+                        admin,
+                        TransactionType.EXPENSE,
+                        PaymentStatus.CANCELED,
+                        FinancialRecordStatus.ACTIVE,
+                        LocalDate.of(2026, 6, 28));
+        FinancialTransaction alreadyOverdueExpense =
+                saveTransaction(
+                        farm,
+                        admin,
+                        TransactionType.EXPENSE,
+                        PaymentStatus.OVERDUE,
+                        FinancialRecordStatus.ACTIVE,
+                        LocalDate.of(2026, 6, 28));
+        FinancialTransaction income =
+                saveTransaction(
+                        farm,
+                        admin,
+                        TransactionType.INCOME,
+                        PaymentStatus.PENDING,
+                        FinancialRecordStatus.ACTIVE,
+                        LocalDate.of(2026, 6, 28));
+        FinancialTransaction deletedExpense =
+                saveTransaction(
+                        farm,
+                        admin,
+                        TransactionType.EXPENSE,
+                        PaymentStatus.PENDING,
+                        FinancialRecordStatus.DELETED,
+                        LocalDate.of(2026, 6, 28));
+        FinancialTransaction expenseWithoutDueDate =
+                saveTransaction(
+                        farm,
+                        admin,
+                        TransactionType.EXPENSE,
+                        PaymentStatus.PENDING,
+                        FinancialRecordStatus.ACTIVE,
+                        null);
+
+        int updatedTransactions = financialTransactionService.markOverdueTransactions();
+
+        assertThat(updatedTransactions).isEqualTo(1);
+        assertTransactionStatus(pastPendingExpense, PaymentStatus.OVERDUE);
+        assertThat(
+                        financialTransactionRepository
+                                .findById(pastPendingExpense.getId())
+                                .orElseThrow()
+                                .getUpdatedAt())
+                .isEqualTo(LocalDateTime.of(2026, 6, 29, 0, 0));
+        assertTransactionStatus(todayPendingExpense, PaymentStatus.PENDING);
+        assertTransactionStatus(futurePendingExpense, PaymentStatus.PENDING);
+        assertTransactionStatus(paidExpense, PaymentStatus.PAID);
+        assertTransactionStatus(canceledExpense, PaymentStatus.CANCELED);
+        assertTransactionStatus(alreadyOverdueExpense, PaymentStatus.OVERDUE);
+        assertTransactionStatus(income, PaymentStatus.PENDING);
+        assertTransactionStatus(deletedExpense, PaymentStatus.PENDING);
+        assertTransactionStatus(expenseWithoutDueDate, PaymentStatus.PENDING);
+    }
+
     private FinancialTransactionRequest transactionRequest(
             Farm farm, FinancialCategory category, BigDecimal amount) {
         return new FinancialTransactionRequest(
@@ -933,6 +1037,37 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
         return financialTransactionRepository.save(transaction);
     }
 
+    private FinancialTransaction saveTransaction(
+            Farm farm,
+            User user,
+            TransactionType type,
+            PaymentStatus status,
+            FinancialRecordStatus recordStatus,
+            LocalDate dueDate) {
+        FinancialTransaction transaction = new FinancialTransaction();
+        transaction.setDescription("Overdue transaction");
+        transaction.setAmount(BigDecimal.TEN);
+        transaction.setType(type);
+        transaction.setStatus(status);
+        transaction.setTransactionDate(LocalDate.of(2026, 6, 1));
+        transaction.setDueDate(dueDate);
+        transaction.setFarm(farm);
+        transaction.setCreatedByUser(user);
+        transaction.setRecordStatus(recordStatus);
+
+        return financialTransactionRepository.save(transaction);
+    }
+
+    private void assertTransactionStatus(
+            FinancialTransaction transaction, PaymentStatus expectedStatus) {
+        assertThat(
+                        financialTransactionRepository
+                                .findById(transaction.getId())
+                                .orElseThrow()
+                                .getStatus())
+                .isEqualTo(expectedStatus);
+    }
+
     private void authenticateAs(User user, String role) {
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(
@@ -951,4 +1086,15 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
             FinancialTransaction paid,
             FinancialTransaction deleted,
             FinancialTransaction otherFarmTransaction) {}
+
+    @TestConfiguration
+    static class FixedClockConfig {
+
+        @Bean
+        @Primary
+        Clock fixedClock() {
+            return Clock.fixed(
+                    Instant.parse("2026-06-29T03:00:00Z"), ZoneId.of("America/Sao_Paulo"));
+        }
+    }
 }

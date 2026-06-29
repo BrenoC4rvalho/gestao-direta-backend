@@ -7,11 +7,13 @@ import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -101,4 +103,24 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
             FinancialRecordStatus recordStatus,
             Collection<PaymentStatus> statuses,
             Pageable pageable);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+            """
+            update FinancialTransaction transaction
+            set transaction.status = :overdueStatus,
+                transaction.updatedAt = :updatedAt
+            where transaction.type = :type
+              and transaction.status = :pendingStatus
+              and transaction.recordStatus = :recordStatus
+              and transaction.dueDate is not null
+              and transaction.dueDate < :today
+            """)
+    int markOverdueTransactions(
+            @Param("overdueStatus") PaymentStatus overdueStatus,
+            @Param("updatedAt") LocalDateTime updatedAt,
+            @Param("type") TransactionType type,
+            @Param("pendingStatus") PaymentStatus pendingStatus,
+            @Param("recordStatus") FinancialRecordStatus recordStatus,
+            @Param("today") LocalDate today);
 }
