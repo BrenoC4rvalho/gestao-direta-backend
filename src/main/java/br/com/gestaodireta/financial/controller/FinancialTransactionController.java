@@ -1,13 +1,20 @@
 package br.com.gestaodireta.financial.controller;
 
+import br.com.gestaodireta.financial.dto.FinancialTransactionFilterRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionResponse;
 import br.com.gestaodireta.financial.dto.FinancialTransactionUpdateRequest;
 import br.com.gestaodireta.financial.dto.PayTransactionRequest;
+import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
+import br.com.gestaodireta.financial.enumeration.PaymentMethod;
+import br.com.gestaodireta.financial.enumeration.PaymentStatus;
+import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.service.FinancialTransactionService;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
 import jakarta.validation.Valid;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -44,8 +51,39 @@ public class FinancialTransactionController {
     @GetMapping
     @PreAuthorize("@financialAccess.canViewFinancialData(#farmId)")
     public PageResponse<FinancialTransactionResponse> findAll(
-            @RequestParam Long farmId, @Valid @ModelAttribute PaginationParams paginationParams) {
-        return financialTransactionService.findAll(farmId, paginationParams);
+            @RequestParam Long farmId,
+            @RequestParam(required = false) LocalDate transactionDateStart,
+            @RequestParam(required = false) LocalDate transactionDateEnd,
+            @RequestParam(required = false) LocalDate paidAtStart,
+            @RequestParam(required = false) LocalDate paidAtEnd,
+            @RequestParam(required = false) TransactionType type,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) PaymentStatus paymentStatus,
+            @RequestParam(required = false) PaymentMethod paymentMethod,
+            @RequestParam(required = false) FinancialRecordStatus recordStatus,
+            @RequestParam(required = false) String description,
+            @RequestParam(required = false) Long createdByUserId,
+            @RequestParam(required = false) BigDecimal minAmount,
+            @RequestParam(required = false) BigDecimal maxAmount,
+            @Valid @ModelAttribute PaginationParams paginationParams) {
+        FinancialTransactionFilterRequest filterRequest =
+                new FinancialTransactionFilterRequest(
+                        farmId,
+                        transactionDateStart,
+                        transactionDateEnd,
+                        paidAtStart,
+                        paidAtEnd,
+                        type,
+                        categoryId,
+                        paymentStatus,
+                        paymentMethod,
+                        recordStatus,
+                        description,
+                        createdByUserId,
+                        minAmount,
+                        maxAmount);
+
+        return financialTransactionService.findAll(filterRequest, paginationParams);
     }
 
     @GetMapping("/{id}")

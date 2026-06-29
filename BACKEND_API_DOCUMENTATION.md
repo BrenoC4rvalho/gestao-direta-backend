@@ -434,6 +434,19 @@ Lista usuários com paginação.
 - Nenhum.
 
 **Campos opcionais:**
+- `transactionDateStart`
+- `transactionDateEnd`
+- `paidAtStart`
+- `paidAtEnd`
+- `type`
+- `categoryId`
+- `paymentStatus`
+- `paymentMethod`
+- `recordStatus`
+- `description`
+- `createdByUserId`
+- `minAmount`
+- `maxAmount`
 - `page`
 - `size`
 - `sort`
@@ -2207,10 +2220,23 @@ Lista movimentações financeiras ativas de uma fazenda.
 ```json
 {
   "farmId": 1,
+  "transactionDateStart": "2026-06-01",
+  "transactionDateEnd": "2026-06-30",
+  "paidAtStart": "2026-06-01",
+  "paidAtEnd": "2026-06-30",
+  "type": "EXPENSE",
+  "categoryId": 1,
+  "paymentStatus": "PENDING",
+  "paymentMethod": "PIX",
+  "recordStatus": "ACTIVE",
+  "description": "soja",
+  "createdByUserId": 2,
+  "minAmount": 100.00,
+  "maxAmount": 5000.00,
   "page": 0,
   "size": 10,
-  "sort": "id",
-  "direction": "ASC"
+  "sort": "transactionDate",
+  "direction": "DESC"
 }
 ```
 
@@ -2271,7 +2297,13 @@ Lista movimentações financeiras ativas de uma fazenda.
 - `403 Forbidden` para usuário sem acesso financeiro à fazenda.
 
 **Observações de regra de negócio:**
-- Retorna somente movimentações com `recordStatus=ACTIVE`.
+- Por padrão, `recordStatus` é `ACTIVE` quando não informado.
+- Se `recordStatus` for informado, a listagem filtra pelo valor enviado.
+- Datas usam formato `YYYY-MM-DD`.
+- Filtros de intervalo são inclusivos.
+- `description` usa busca parcial e case-insensitive.
+- `paymentStatus` filtra o campo `status` da movimentação.
+- `categoryId` filtra a categoria vinculada à movimentação, mantendo o escopo da fazenda consultada.
 - `ACCOUNTANT` pode consultar movimentações.
 
 ### GET /api/financial/transactions/{id}

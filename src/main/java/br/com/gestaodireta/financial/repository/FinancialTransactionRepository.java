@@ -2,9 +2,11 @@ package br.com.gestaodireta.financial.repository;
 
 import br.com.gestaodireta.financial.entity.FinancialTransaction;
 import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
+import br.com.gestaodireta.financial.enumeration.PaymentMethod;
 import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -17,6 +19,45 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
 
     Page<FinancialTransaction> findByFarmIdAndRecordStatus(
             Long farmId, FinancialRecordStatus recordStatus, Pageable pageable);
+
+    @Query(
+            """
+            select transaction
+            from FinancialTransaction transaction
+            where transaction.farm.id = :farmId
+              and transaction.recordStatus = :recordStatus
+              and transaction.transactionDate >= :transactionDateStart
+              and transaction.transactionDate <= :transactionDateEnd
+              and (:filterPaidAt = false
+                or (transaction.paidAt >= :paidAtStart and transaction.paidAt <= :paidAtEnd))
+              and (:type is null or transaction.type = :type)
+              and (:categoryId is null or transaction.category.id = :categoryId)
+              and (:paymentStatus is null or transaction.status = :paymentStatus)
+              and (:paymentMethod is null or transaction.paymentMethod = :paymentMethod)
+              and (:description is null
+                or lower(transaction.description) like concat('%', cast(:description as string), '%'))
+              and (:createdByUserId is null
+                or transaction.createdByUser.id = :createdByUserId)
+              and transaction.amount >= :minAmount
+              and transaction.amount <= :maxAmount
+            """)
+    Page<FinancialTransaction> findAllFiltered(
+            @Param("farmId") Long farmId,
+            @Param("transactionDateStart") LocalDate transactionDateStart,
+            @Param("transactionDateEnd") LocalDate transactionDateEnd,
+            @Param("paidAtStart") LocalDate paidAtStart,
+            @Param("paidAtEnd") LocalDate paidAtEnd,
+            @Param("filterPaidAt") boolean filterPaidAt,
+            @Param("type") TransactionType type,
+            @Param("categoryId") Long categoryId,
+            @Param("paymentStatus") PaymentStatus paymentStatus,
+            @Param("paymentMethod") PaymentMethod paymentMethod,
+            @Param("recordStatus") FinancialRecordStatus recordStatus,
+            @Param("description") String description,
+            @Param("createdByUserId") Long createdByUserId,
+            @Param("minAmount") BigDecimal minAmount,
+            @Param("maxAmount") BigDecimal maxAmount,
+            Pageable pageable);
 
     @Query(
             """

@@ -7,6 +7,7 @@ import br.com.gestaodireta.farm.entity.Farm;
 import br.com.gestaodireta.farm.enumeration.FarmStatus;
 import br.com.gestaodireta.farm.repository.FarmRepository;
 import br.com.gestaodireta.farm.repository.FarmUserRepository;
+import br.com.gestaodireta.financial.dto.FinancialTransactionFilterRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionResponse;
 import br.com.gestaodireta.financial.dto.FinancialTransactionUpdateRequest;
@@ -14,11 +15,13 @@ import br.com.gestaodireta.financial.entity.FinancialCategory;
 import br.com.gestaodireta.financial.entity.FinancialTransaction;
 import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
 import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
+import br.com.gestaodireta.financial.enumeration.PaymentMethod;
 import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
 import br.com.gestaodireta.shared.exception.BusinessException;
+import br.com.gestaodireta.shared.exception.ValidationException;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.support.PostgresIntegrationTest;
 import br.com.gestaodireta.user.entity.User;
@@ -182,6 +185,503 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
                 .isEmpty();
     }
 
+    @Test
+    void shouldKeepCurrentListBehaviorWithoutExtraFilters() {
+        FilterScenario scenario = saveFilterScenario();
+
+        List<Long> ids = findIds(filter(scenario.farm.getId()));
+
+        assertThat(ids)
+                .containsExactlyInAnyOrder(
+                        scenario.income.getId(), scenario.expense.getId(), scenario.paid.getId());
+    }
+
+    @Test
+    void shouldFilterByTransactionDateStartEndAndRange() {
+        FilterScenario scenario = saveFilterScenario();
+
+        assertThat(
+                        findIds(
+                                filter(
+                                        scenario.farm.getId(),
+                                        LocalDate.of(2026, 6, 10),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)))
+                .containsExactlyInAnyOrder(scenario.expense.getId(), scenario.paid.getId());
+        assertThat(
+                        findIds(
+                                filter(
+                                        scenario.farm.getId(),
+                                        null,
+                                        LocalDate.of(2026, 6, 10),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)))
+                .containsExactlyInAnyOrder(scenario.income.getId(), scenario.expense.getId());
+        assertThat(
+                        findIds(
+                                filter(
+                                        scenario.farm.getId(),
+                                        LocalDate.of(2026, 6, 10),
+                                        LocalDate.of(2026, 6, 10),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)))
+                .containsExactly(scenario.expense.getId());
+    }
+
+    @Test
+    void shouldFilterByPaidAtStartEndAndRange() {
+        FilterScenario scenario = saveFilterScenario();
+
+        assertThat(
+                        findIds(
+                                filter(
+                                        scenario.farm.getId(),
+                                        null,
+                                        null,
+                                        LocalDate.of(2026, 6, 18),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)))
+                .containsExactlyInAnyOrder(scenario.expense.getId(), scenario.paid.getId());
+        assertThat(
+                        findIds(
+                                filter(
+                                        scenario.farm.getId(),
+                                        null,
+                                        null,
+                                        null,
+                                        LocalDate.of(2026, 6, 18),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)))
+                .containsExactly(scenario.expense.getId());
+        assertThat(
+                        findIds(
+                                filter(
+                                        scenario.farm.getId(),
+                                        null,
+                                        null,
+                                        LocalDate.of(2026, 6, 18),
+                                        LocalDate.of(2026, 6, 18),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)))
+                .containsExactly(scenario.expense.getId());
+    }
+
+    @Test
+    void shouldFilterByTypeCategoryPaymentStatusPaymentMethodAndRecordStatus() {
+        FilterScenario scenario = saveFilterScenario();
+
+        assertThat(
+                        findIds(
+                                filter(
+                                        scenario.farm.getId(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        TransactionType.INCOME,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)))
+                .containsExactly(scenario.income.getId());
+        assertThat(
+                        findIds(
+                                filter(
+                                        scenario.farm.getId(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        TransactionType.EXPENSE,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)))
+                .containsExactlyInAnyOrder(scenario.expense.getId(), scenario.paid.getId());
+        assertThat(
+                        findIds(
+                                filter(
+                                        scenario.farm.getId(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        scenario.expenseCategory.getId(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)))
+                .containsExactlyInAnyOrder(scenario.expense.getId(), scenario.paid.getId());
+        assertThat(
+                        findIds(
+                                filter(
+                                        scenario.farm.getId(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        PaymentStatus.PAID,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)))
+                .containsExactly(scenario.paid.getId());
+        assertThat(
+                        findIds(
+                                filter(
+                                        scenario.farm.getId(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        PaymentStatus.PENDING,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)))
+                .containsExactlyInAnyOrder(scenario.income.getId(), scenario.expense.getId());
+        assertThat(
+                        findIds(
+                                filter(
+                                        scenario.farm.getId(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        PaymentMethod.PIX,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)))
+                .containsExactlyInAnyOrder(scenario.income.getId(), scenario.paid.getId());
+        assertThat(
+                        findIds(
+                                filter(
+                                        scenario.farm.getId(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        FinancialRecordStatus.ACTIVE,
+                                        null,
+                                        null,
+                                        null,
+                                        null)))
+                .containsExactlyInAnyOrder(
+                        scenario.income.getId(), scenario.expense.getId(), scenario.paid.getId());
+        assertThat(
+                        findIds(
+                                filter(
+                                        scenario.farm.getId(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        FinancialRecordStatus.DELETED,
+                                        null,
+                                        null,
+                                        null,
+                                        null)))
+                .containsExactly(scenario.deleted.getId());
+    }
+
+    @Test
+    void shouldFilterByDescriptionCreatedByUserAndAmountRange() {
+        FilterScenario scenario = saveFilterScenario();
+
+        assertThat(
+                        findIds(
+                                filter(
+                                        scenario.farm.getId(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        "  SOJA ",
+                                        null,
+                                        null,
+                                        null)))
+                .containsExactlyInAnyOrder(scenario.income.getId(), scenario.expense.getId());
+        assertThat(
+                        findIds(
+                                filter(
+                                        scenario.farm.getId(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        scenario.otherUser.getId(),
+                                        null,
+                                        null)))
+                .containsExactly(scenario.paid.getId());
+        assertThat(
+                        findIds(
+                                filter(
+                                        scenario.farm.getId(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        new BigDecimal("100.00"),
+                                        null)))
+                .containsExactlyInAnyOrder(scenario.expense.getId(), scenario.paid.getId());
+        assertThat(
+                        findIds(
+                                filter(
+                                        scenario.farm.getId(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        new BigDecimal("100.00"))))
+                .containsExactlyInAnyOrder(scenario.income.getId(), scenario.expense.getId());
+        assertThat(
+                        findIds(
+                                filter(
+                                        scenario.farm.getId(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        new BigDecimal("100.00"),
+                                        new BigDecimal("5000.00"))))
+                .containsExactlyInAnyOrder(scenario.expense.getId(), scenario.paid.getId());
+    }
+
+    @Test
+    void shouldCombineFiltersAndNeverReturnTransactionsFromAnotherFarm() {
+        FilterScenario scenario = saveFilterScenario();
+
+        List<Long> ids =
+                findIds(
+                        filter(
+                                scenario.farm.getId(),
+                                LocalDate.of(2026, 6, 1),
+                                LocalDate.of(2026, 6, 30),
+                                null,
+                                null,
+                                TransactionType.EXPENSE,
+                                scenario.expenseCategory.getId(),
+                                PaymentStatus.PAID,
+                                PaymentMethod.PIX,
+                                FinancialRecordStatus.ACTIVE,
+                                "adubo",
+                                scenario.otherUser.getId(),
+                                new BigDecimal("100.00"),
+                                new BigDecimal("5000.00")));
+
+        assertThat(ids).containsExactly(scenario.paid.getId());
+        assertThat(ids).doesNotContain(scenario.otherFarmTransaction.getId());
+    }
+
+    @Test
+    void shouldRejectInvalidFilterRanges() {
+        FilterScenario scenario = saveFilterScenario();
+
+        assertThatThrownBy(
+                        () ->
+                                financialTransactionService.findAll(
+                                        filter(
+                                                scenario.farm.getId(),
+                                                LocalDate.of(2026, 6, 30),
+                                                LocalDate.of(2026, 6, 1),
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null),
+                                        new PaginationParams()))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Transaction date start cannot be after transaction date end");
+
+        assertThatThrownBy(
+                        () ->
+                                financialTransactionService.findAll(
+                                        filter(
+                                                scenario.farm.getId(),
+                                                null,
+                                                null,
+                                                LocalDate.of(2026, 6, 30),
+                                                LocalDate.of(2026, 6, 1),
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null),
+                                        new PaginationParams()))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Paid at start cannot be after paid at end");
+
+        assertThatThrownBy(
+                        () ->
+                                financialTransactionService.findAll(
+                                        filter(
+                                                scenario.farm.getId(),
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                new BigDecimal("5000.00"),
+                                                new BigDecimal("100.00")),
+                                        new PaginationParams()))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Minimum amount cannot be greater than maximum amount");
+
+        assertThatThrownBy(
+                        () ->
+                                financialTransactionService.findAll(
+                                        filter(
+                                                scenario.farm.getId(),
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                new BigDecimal("-1.00"),
+                                                null),
+                                        new PaginationParams()))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Minimum amount cannot be negative");
+    }
+
     private FinancialTransactionRequest transactionRequest(
             Farm farm, FinancialCategory category, BigDecimal amount) {
         return new FinancialTransactionRequest(
@@ -253,6 +753,169 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
         return financialCategoryRepository.save(category);
     }
 
+    private List<Long> findIds(FinancialTransactionFilterRequest filterRequest) {
+        return financialTransactionService
+                .findAll(filterRequest, new PaginationParams())
+                .content()
+                .stream()
+                .map(FinancialTransactionResponse::id)
+                .toList();
+    }
+
+    private FinancialTransactionFilterRequest filter(Long farmId) {
+        return filter(
+                farmId, null, null, null, null, null, null, null, null, null, null, null, null,
+                null);
+    }
+
+    private FinancialTransactionFilterRequest filter(
+            Long farmId,
+            LocalDate transactionDateStart,
+            LocalDate transactionDateEnd,
+            LocalDate paidAtStart,
+            LocalDate paidAtEnd,
+            TransactionType type,
+            Long categoryId,
+            PaymentStatus paymentStatus,
+            PaymentMethod paymentMethod,
+            FinancialRecordStatus recordStatus,
+            String description,
+            Long createdByUserId,
+            BigDecimal minAmount,
+            BigDecimal maxAmount) {
+        return new FinancialTransactionFilterRequest(
+                farmId,
+                transactionDateStart,
+                transactionDateEnd,
+                paidAtStart,
+                paidAtEnd,
+                type,
+                categoryId,
+                paymentStatus,
+                paymentMethod,
+                recordStatus,
+                description,
+                createdByUserId,
+                minAmount,
+                maxAmount);
+    }
+
+    private FilterScenario saveFilterScenario() {
+        User creator = saveUser("Creator", "creator-filter@example.com", UserType.ADMIN);
+        User otherUser = saveUser("Other", "other-filter@example.com", UserType.ADMIN);
+        Farm farm = saveFarm("Filter Farm", FarmStatus.ACTIVE);
+        Farm otherFarm = saveFarm("Other Farm", FarmStatus.ACTIVE);
+        FinancialCategory incomeCategory =
+                saveCategory("Sales", farm, TransactionType.INCOME, false);
+        FinancialCategory expenseCategory =
+                saveCategory("Inputs", farm, TransactionType.EXPENSE, false);
+
+        FinancialTransaction income =
+                saveTransaction(
+                        farm,
+                        incomeCategory,
+                        creator,
+                        "Venda de soja",
+                        new BigDecimal("50.00"),
+                        TransactionType.INCOME,
+                        PaymentStatus.PENDING,
+                        PaymentMethod.PIX,
+                        LocalDate.of(2026, 6, 1),
+                        null,
+                        FinancialRecordStatus.ACTIVE);
+        FinancialTransaction expense =
+                saveTransaction(
+                        farm,
+                        expenseCategory,
+                        creator,
+                        "Sementes de Soja",
+                        new BigDecimal("100.00"),
+                        TransactionType.EXPENSE,
+                        PaymentStatus.PENDING,
+                        PaymentMethod.CASH,
+                        LocalDate.of(2026, 6, 10),
+                        LocalDate.of(2026, 6, 18),
+                        FinancialRecordStatus.ACTIVE);
+        FinancialTransaction paid =
+                saveTransaction(
+                        farm,
+                        expenseCategory,
+                        otherUser,
+                        "Adubo premium",
+                        new BigDecimal("5000.00"),
+                        TransactionType.EXPENSE,
+                        PaymentStatus.PAID,
+                        PaymentMethod.PIX,
+                        LocalDate.of(2026, 6, 30),
+                        LocalDate.of(2026, 6, 20),
+                        FinancialRecordStatus.ACTIVE);
+        FinancialTransaction deleted =
+                saveTransaction(
+                        farm,
+                        expenseCategory,
+                        creator,
+                        "Deleted",
+                        new BigDecimal("200.00"),
+                        TransactionType.EXPENSE,
+                        PaymentStatus.PENDING,
+                        PaymentMethod.BOLETO,
+                        LocalDate.of(2026, 6, 15),
+                        null,
+                        FinancialRecordStatus.DELETED);
+        FinancialTransaction otherFarmTransaction =
+                saveTransaction(
+                        otherFarm,
+                        null,
+                        creator,
+                        "Adubo premium",
+                        new BigDecimal("5000.00"),
+                        TransactionType.EXPENSE,
+                        PaymentStatus.PAID,
+                        PaymentMethod.PIX,
+                        LocalDate.of(2026, 6, 30),
+                        LocalDate.of(2026, 6, 20),
+                        FinancialRecordStatus.ACTIVE);
+
+        return new FilterScenario(
+                farm,
+                expenseCategory,
+                otherUser,
+                income,
+                expense,
+                paid,
+                deleted,
+                otherFarmTransaction);
+    }
+
+    private FinancialTransaction saveTransaction(
+            Farm farm,
+            FinancialCategory category,
+            User user,
+            String description,
+            BigDecimal amount,
+            TransactionType type,
+            PaymentStatus status,
+            PaymentMethod paymentMethod,
+            LocalDate transactionDate,
+            LocalDate paidAt,
+            FinancialRecordStatus recordStatus) {
+        FinancialTransaction transaction = new FinancialTransaction();
+        transaction.setDescription(description);
+        transaction.setAmount(amount);
+        transaction.setType(type);
+        transaction.setStatus(status);
+        transaction.setPaymentMethod(paymentMethod);
+        transaction.setTransactionDate(transactionDate);
+        transaction.setDueDate(transactionDate.plusDays(5));
+        transaction.setPaidAt(paidAt);
+        transaction.setFarm(farm);
+        transaction.setCategory(category);
+        transaction.setCreatedByUser(user);
+        transaction.setRecordStatus(recordStatus);
+
+        return financialTransactionRepository.save(transaction);
+    }
+
     private FinancialTransaction saveTransaction(
             Farm farm, FinancialCategory category, User user, TransactionType type) {
         FinancialTransaction transaction = new FinancialTransaction();
@@ -278,4 +941,14 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
                         List.of(new SimpleGrantedAuthority(role)));
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
+
+    private record FilterScenario(
+            Farm farm,
+            FinancialCategory expenseCategory,
+            User otherUser,
+            FinancialTransaction income,
+            FinancialTransaction expense,
+            FinancialTransaction paid,
+            FinancialTransaction deleted,
+            FinancialTransaction otherFarmTransaction) {}
 }

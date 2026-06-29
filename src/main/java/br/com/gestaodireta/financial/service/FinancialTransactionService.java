@@ -3,6 +3,7 @@ package br.com.gestaodireta.financial.service;
 import br.com.gestaodireta.farm.entity.Farm;
 import br.com.gestaodireta.farm.enumeration.FarmStatus;
 import br.com.gestaodireta.farm.service.FarmService;
+import br.com.gestaodireta.financial.dto.FinancialTransactionFilterRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionResponse;
 import br.com.gestaodireta.financial.dto.FinancialTransactionUpdateRequest;
@@ -17,6 +18,7 @@ import br.com.gestaodireta.financial.mapper.FinancialTransactionMapper;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
 import br.com.gestaodireta.shared.exception.BusinessException;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
+import br.com.gestaodireta.shared.exception.ValidationException;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
 import br.com.gestaodireta.shared.security.SecurityUtils;
@@ -24,12 +26,19 @@ import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Locale;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FinancialTransactionService {
+
+    private static final LocalDate MIN_FILTER_DATE = LocalDate.of(1, 1, 1);
+
+    private static final LocalDate MAX_FILTER_DATE = LocalDate.of(9999, 12, 31);
+
+    private static final BigDecimal MAX_FILTER_AMOUNT = new BigDecimal("9999999999999.99");
 
     private final FinancialTransactionRepository financialTransactionRepository;
 
@@ -75,10 +84,34 @@ public class FinancialTransactionService {
     @Transactional(readOnly = true)
     public PageResponse<FinancialTransactionResponse> findAll(
             Long farmId, PaginationParams paginationParams) {
+        return findAll(defaultFilter(farmId), paginationParams);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<FinancialTransactionResponse> findAll(
+            FinancialTransactionFilterRequest filterRequest, PaginationParams paginationParams) {
+        FinancialTransactionFilterRequest normalizedFilter = normalizeFilter(filterRequest);
+        validateFilter(normalizedFilter);
+
         Page<FinancialTransactionResponse> transactions =
                 financialTransactionRepository
-                        .findByFarmIdAndRecordStatus(
-                                farmId, FinancialRecordStatus.ACTIVE, paginationParams.toPageable())
+                        .findAllFiltered(
+                                normalizedFilter.farmId(),
+                                startDateOrDefault(normalizedFilter.transactionDateStart()),
+                                endDateOrDefault(normalizedFilter.transactionDateEnd()),
+                                startDateOrDefault(normalizedFilter.paidAtStart()),
+                                endDateOrDefault(normalizedFilter.paidAtEnd()),
+                                shouldFilterPaidAt(normalizedFilter),
+                                normalizedFilter.type(),
+                                normalizedFilter.categoryId(),
+                                normalizedFilter.paymentStatus(),
+                                normalizedFilter.paymentMethod(),
+                                normalizedFilter.recordStatus(),
+                                normalizedFilter.description(),
+                                normalizedFilter.createdByUserId(),
+                                minAmountOrDefault(normalizedFilter.minAmount()),
+                                maxAmountOrDefault(normalizedFilter.maxAmount()),
+                                paginationParams.toPageable())
                         .map(financialTransactionMapper::toResponse);
 
         return PageResponse.from(transactions);
@@ -137,6 +170,106 @@ public class FinancialTransactionService {
                 .findById(id)
                 .orElseThrow(
                         () -> new ResourceNotFoundException("Financial transaction not found"));
+    }
+
+    private FinancialTransactionFilterRequest defaultFilter(Long farmId) {
+        return new FinancialTransactionFilterRequest(
+                farmId, null, null, null, null, null, null, null, null, null, null, null, null,
+                null);
+    }
+
+    private FinancialTransactionFilterRequest normalizeFilter(
+            FinancialTransactionFilterRequest filterRequest) {
+        if (filterRequest == null) {
+            return defaultFilter(null);
+        }
+
+        FinancialRecordStatus recordStatus =
+                filterRequest.recordStatus() == null
+                        ? FinancialRecordStatus.ACTIVE
+                        : filterRequest.recordStatus();
+
+        return new FinancialTransactionFilterRequest(
+                filterRequest.farmId(),
+                filterRequest.transactionDateStart(),
+                filterRequest.transactionDateEnd(),
+                filterRequest.paidAtStart(),
+                filterRequest.paidAtEnd(),
+                filterRequest.type(),
+                filterRequest.categoryId(),
+                filterRequest.paymentStatus(),
+                filterRequest.paymentMethod(),
+                recordStatus,
+                normalizeNullableLowercaseText(filterRequest.description()),
+                filterRequest.createdByUserId(),
+                filterRequest.minAmount(),
+                filterRequest.maxAmount());
+    }
+
+    private void validateFilter(FinancialTransactionFilterRequest filterRequest) {
+        if (filterRequest.transactionDateStart() != null
+                && filterRequest.transactionDateEnd() != null
+                && filterRequest
+                        .transactionDateStart()
+                        .isAfter(filterRequest.transactionDateEnd())) {
+            throw new ValidationException(
+                    "Transaction date start cannot be after transaction date end");
+        }
+
+        if (filterRequest.paidAtStart() != null
+                && filterRequest.paidAtEnd() != null
+                && filterRequest.paidAtStart().isAfter(filterRequest.paidAtEnd())) {
+            throw new ValidationException("Paid at start cannot be after paid at end");
+        }
+
+        ensureNonNegativeAmount(filterRequest.minAmount(), "Minimum amount cannot be negative");
+        ensureNonNegativeAmount(filterRequest.maxAmount(), "Maximum amount cannot be negative");
+
+        if (filterRequest.minAmount() != null
+                && filterRequest.maxAmount() != null
+                && filterRequest.minAmount().compareTo(filterRequest.maxAmount()) > 0) {
+            throw new ValidationException("Minimum amount cannot be greater than maximum amount");
+        }
+    }
+
+    private void ensureNonNegativeAmount(BigDecimal amount, String message) {
+        if (amount != null && amount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ValidationException(message);
+        }
+    }
+
+    private String normalizeNullableLowercaseText(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String normalizedValue = value.trim().toLowerCase(Locale.ROOT);
+
+        if (normalizedValue.isBlank()) {
+            return null;
+        }
+
+        return normalizedValue;
+    }
+
+    private LocalDate startDateOrDefault(LocalDate date) {
+        return date == null ? MIN_FILTER_DATE : date;
+    }
+
+    private LocalDate endDateOrDefault(LocalDate date) {
+        return date == null ? MAX_FILTER_DATE : date;
+    }
+
+    private boolean shouldFilterPaidAt(FinancialTransactionFilterRequest filterRequest) {
+        return filterRequest.paidAtStart() != null || filterRequest.paidAtEnd() != null;
+    }
+
+    private BigDecimal minAmountOrDefault(BigDecimal amount) {
+        return amount == null ? BigDecimal.ZERO : amount;
+    }
+
+    private BigDecimal maxAmountOrDefault(BigDecimal amount) {
+        return amount == null ? MAX_FILTER_AMOUNT : amount;
     }
 
     private void applyRequest(
