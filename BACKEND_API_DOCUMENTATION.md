@@ -1706,7 +1706,7 @@ Cria categoria financeira global ou vinculada a uma fazenda.
 
 **Possíveis erros/status HTTP:**
 - `201 Created` em caso de sucesso.
-- `400 Bad Request` para body inválido, categoria default com `farmId` ou categoria de fazenda sem `farmId`.
+- `400 Bad Request` para body inválido, categoria default com `farmId`, categoria de fazenda sem `farmId` ou nome duplicado no mesmo escopo.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
 - `403 Forbidden` para usuário sem permissão.
 - `404 Not Found` se a fazenda não existir.
@@ -1714,6 +1714,10 @@ Cria categoria financeira global ou vinculada a uma fazenda.
 **Observações de regra de negócio:**
 - Categoria default é global e não pode ter `farmId`.
 - Categoria não default deve ter `farmId`.
+- O nome é salvo sem espaços no início/fim e não pode duplicar outra categoria no mesmo escopo, comparando sem diferenciar maiúsculas/minúsculas.
+- Categorias `ACTIVE` e `INACTIVE` bloqueiam novo cadastro duplicado.
+- Categoria global e categoria de fazenda podem ter o mesmo nome.
+- Fazendas diferentes podem ter categorias com o mesmo nome.
 - Categoria é criada com status `ACTIVE`.
 
 ### GET /api/financial/categories
@@ -1983,7 +1987,7 @@ Atualiza uma categoria financeira.
 ```
 
 **Possíveis erros/status HTTP:**
-- `400 Bad Request` para body inválido, categoria default com `farmId` ou categoria de fazenda sem `farmId`.
+- `400 Bad Request` para body inválido, categoria default com `farmId`, categoria de fazenda sem `farmId` ou nome já usado por outra categoria no mesmo escopo.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
 - `403 Forbidden` para usuário sem permissão.
 - `404 Not Found` se categoria ou fazenda não existir.
@@ -1991,6 +1995,8 @@ Atualiza uma categoria financeira.
 **Observações de regra de negócio:**
 - `PRODUCER` não pode alterar categoria default.
 - Para `PRODUCER`, o `farmId` do body deve bater com a fazenda da categoria.
+- O nome é salvo sem espaços no início/fim e não pode ser atualizado para um nome usado por outra categoria no mesmo escopo, comparando sem diferenciar maiúsculas/minúsculas.
+- A própria categoria pode manter o mesmo nome normalizado.
 
 ### PATCH /api/financial/categories/{id}/activate
 

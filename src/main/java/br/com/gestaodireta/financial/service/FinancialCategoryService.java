@@ -12,6 +12,7 @@ import br.com.gestaodireta.shared.exception.BusinessException;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
+import java.util.Locale;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,7 +38,7 @@ public class FinancialCategoryService {
     @Transactional
     public FinancialCategoryResponse create(FinancialCategoryRequest request) {
         FinancialCategory category = new FinancialCategory();
-        applyRequest(category, request);
+        applyRequest(category, request, null);
         category.setStatus(FinancialCategoryStatus.ACTIVE);
 
         return financialCategoryMapper.toResponse(financialCategoryRepository.save(category));
@@ -73,7 +74,7 @@ public class FinancialCategoryService {
     @Transactional
     public FinancialCategoryResponse update(Long id, FinancialCategoryRequest request) {
         FinancialCategory category = findEntityById(id);
-        applyRequest(category, request);
+        applyRequest(category, request, id);
 
         return financialCategoryMapper.toResponse(financialCategoryRepository.save(category));
     }
@@ -99,13 +100,60 @@ public class FinancialCategoryService {
                 .orElseThrow(() -> new ResourceNotFoundException("Financial category not found"));
     }
 
-    private void applyRequest(FinancialCategory category, FinancialCategoryRequest request) {
-        category.setName(request.name());
+    private void applyRequest(
+            FinancialCategory category, FinancialCategoryRequest request, Long ignoredCategoryId) {
+        String name = sanitizeName(request.name());
+        Farm farm = resolveFarm(request);
+        validateUniqueName(name, farm, request.isDefault(), ignoredCategoryId);
+
+        category.setName(name);
         category.setType(request.type());
         category.setColor(request.color());
         category.setIcon(request.icon());
         category.setDefaultCategory(request.isDefault());
-        category.setFarm(resolveFarm(request));
+        category.setFarm(farm);
+    }
+
+    private String sanitizeName(String name) {
+        String sanitizedName = name == null ? "" : name.trim();
+
+        if (sanitizedName.isEmpty()) {
+            throw new BusinessException("Category name cannot be blank.");
+        }
+
+        return sanitizedName;
+    }
+
+    private void validateUniqueName(
+            String name, Farm farm, boolean defaultCategory, Long ignoredCategoryId) {
+        String normalizedName = name.toLowerCase(Locale.ROOT);
+        boolean duplicateExists =
+                defaultCategory
+                        ? existsGlobalDuplicate(normalizedName, ignoredCategoryId)
+                        : existsFarmDuplicate(farm.getId(), normalizedName, ignoredCategoryId);
+
+        if (duplicateExists) {
+            throw new BusinessException("A category with this name already exists.");
+        }
+    }
+
+    private boolean existsGlobalDuplicate(String normalizedName, Long ignoredCategoryId) {
+        if (ignoredCategoryId == null) {
+            return financialCategoryRepository.existsGlobalByNormalizedName(normalizedName);
+        }
+
+        return financialCategoryRepository.existsGlobalByNormalizedNameAndIdNot(
+                normalizedName, ignoredCategoryId);
+    }
+
+    private boolean existsFarmDuplicate(
+            Long farmId, String normalizedName, Long ignoredCategoryId) {
+        if (ignoredCategoryId == null) {
+            return financialCategoryRepository.existsFarmByNormalizedName(farmId, normalizedName);
+        }
+
+        return financialCategoryRepository.existsFarmByNormalizedNameAndIdNot(
+                farmId, normalizedName, ignoredCategoryId);
     }
 
     private Farm resolveFarm(FinancialCategoryRequest request) {

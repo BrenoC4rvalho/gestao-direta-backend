@@ -44,4 +44,49 @@ public interface FinancialCategoryRepository extends JpaRepository<FinancialCate
             where category.id = :categoryId
             """)
     Optional<Long> findFarmIdById(@Param("categoryId") Long categoryId);
+
+    @Query(
+            """
+            select count(category) > 0
+            from FinancialCategory category
+            where category.farm is null
+              and category.defaultCategory = true
+              and lower(trim(category.name)) = :normalizedName
+            """)
+    boolean existsGlobalByNormalizedName(@Param("normalizedName") String normalizedName);
+
+    @Query(
+            """
+            select count(category) > 0
+            from FinancialCategory category
+            where category.farm is null
+              and category.defaultCategory = true
+              and category.id <> :categoryId
+              and lower(trim(category.name)) = :normalizedName
+            """)
+    boolean existsGlobalByNormalizedNameAndIdNot(
+            @Param("normalizedName") String normalizedName, @Param("categoryId") Long categoryId);
+
+    @Query(
+            """
+            select count(category) > 0
+            from FinancialCategory category
+            where category.farm.id = :farmId
+              and lower(trim(category.name)) = :normalizedName
+            """)
+    boolean existsFarmByNormalizedName(
+            @Param("farmId") Long farmId, @Param("normalizedName") String normalizedName);
+
+    @Query(
+            """
+            select count(category) > 0
+            from FinancialCategory category
+            where category.farm.id = :farmId
+              and category.id <> :categoryId
+              and lower(trim(category.name)) = :normalizedName
+            """)
+    boolean existsFarmByNormalizedNameAndIdNot(
+            @Param("farmId") Long farmId,
+            @Param("normalizedName") String normalizedName,
+            @Param("categoryId") Long categoryId);
 }

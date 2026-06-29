@@ -44,6 +44,9 @@ class FinancialCategoryControllerTest extends PostgresIntegrationTest {
 
     private static final String CONTEXT_PATH = "/api";
 
+    private static final String DUPLICATE_CATEGORY_MESSAGE =
+            "A category with this name already exists.";
+
     @Autowired private MockMvc mockMvc;
 
     @Autowired private FinancialCategoryRepository financialCategoryRepository;
@@ -258,6 +261,40 @@ class FinancialCategoryControllerTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldReturnBadRequestWhenCreatingDuplicateCategoryName() throws Exception {
+        User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN);
+        saveCategory("Insumos", null, true, FinancialCategoryStatus.ACTIVE);
+
+        mockMvc.perform(
+                        post("/api/financial/categories")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(categoryBody(" insumos ", null, true)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(DUPLICATE_CATEGORY_MESSAGE));
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenUpdatingDuplicateCategoryName() throws Exception {
+        User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN);
+        FinancialCategory category =
+                saveCategory("Insumos", null, true, FinancialCategoryStatus.ACTIVE);
+        saveCategory("Frete", null, true, FinancialCategoryStatus.ACTIVE);
+
+        mockMvc.perform(
+                        put("/api/financial/categories/{id}", category.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(categoryBody(" frete ", null, true)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(DUPLICATE_CATEGORY_MESSAGE));
+    }
+
+    @Test
     void shouldDeleteCategoryLogicallyAsAdmin() throws Exception {
         User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN);
         FinancialCategory category =
@@ -423,15 +460,19 @@ class FinancialCategoryControllerTest extends PostgresIntegrationTest {
     }
 
     private String categoryBody(Long farmId, boolean defaultCategory) {
+        return categoryBody("Insumos", farmId, defaultCategory);
+    }
+
+    private String categoryBody(String name, Long farmId, boolean defaultCategory) {
         return """
                 {
-                  "name": "Insumos",
+                  "name": "%s",
                   "type": "EXPENSE",
                   "farmId": %s,
                   "isDefault": %s
                 }
                 """
-                .formatted(farmId == null ? "null" : farmId, defaultCategory);
+                .formatted(name, farmId == null ? "null" : farmId, defaultCategory);
     }
 
     private User saveUser(String name, String email, UserType userType) {
