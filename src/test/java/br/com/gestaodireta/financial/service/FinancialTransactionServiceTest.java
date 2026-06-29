@@ -129,6 +129,40 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldRejectInactiveCategoryWhenCreatingOrUpdatingTransaction() {
+        User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN);
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        FinancialCategory inactiveCategory =
+                saveCategory(
+                        "Inactive",
+                        farm,
+                        TransactionType.EXPENSE,
+                        false,
+                        FinancialCategoryStatus.INACTIVE);
+        FinancialTransaction transaction =
+                saveTransaction(farm, null, admin, TransactionType.EXPENSE);
+        authenticateAs(admin, "ROLE_ADMIN");
+
+        assertThatThrownBy(
+                        () ->
+                                financialTransactionService.create(
+                                        transactionRequest(farm, inactiveCategory, BigDecimal.TEN)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Financial category is inactive");
+
+        assertThatThrownBy(
+                        () ->
+                                financialTransactionService.update(
+                                        transaction.getId(),
+                                        updateRequest(
+                                                inactiveCategory,
+                                                BigDecimal.TEN,
+                                                TransactionType.EXPENSE)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Financial category is inactive");
+    }
+
+    @Test
     void shouldDeleteTransactionLogicallyAndHideFromList() {
         User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN);
         Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
@@ -200,12 +234,21 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
 
     private FinancialCategory saveCategory(
             String name, Farm farm, TransactionType type, boolean defaultCategory) {
+        return saveCategory(name, farm, type, defaultCategory, FinancialCategoryStatus.ACTIVE);
+    }
+
+    private FinancialCategory saveCategory(
+            String name,
+            Farm farm,
+            TransactionType type,
+            boolean defaultCategory,
+            FinancialCategoryStatus status) {
         FinancialCategory category = new FinancialCategory();
         category.setName(name);
         category.setFarm(defaultCategory ? null : farm);
         category.setType(type);
         category.setDefaultCategory(defaultCategory);
-        category.setStatus(FinancialCategoryStatus.ACTIVE);
+        category.setStatus(status);
 
         return financialCategoryRepository.save(category);
     }

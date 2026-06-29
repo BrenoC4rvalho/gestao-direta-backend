@@ -41,8 +41,10 @@ public class FinancialCategoryController {
     @GetMapping
     @PreAuthorize("@financialAccess.canViewFinancialData(#farmId)")
     public PageResponse<FinancialCategoryResponse> findAll(
-            @RequestParam Long farmId, @Valid @ModelAttribute PaginationParams paginationParams) {
-        return financialCategoryService.findAll(farmId, paginationParams);
+            @RequestParam Long farmId,
+            @RequestParam(defaultValue = "false") boolean includeInactive,
+            @Valid @ModelAttribute PaginationParams paginationParams) {
+        return financialCategoryService.findAll(farmId, includeInactive, paginationParams);
     }
 
     @GetMapping("/global")

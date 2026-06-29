@@ -1733,6 +1733,7 @@ Lista categorias visíveis para uma fazenda.
 ```json
 {
   "farmId": 1,
+  "includeInactive": true,
   "page": 0,
   "size": 10,
   "sort": "id",
@@ -1749,6 +1750,7 @@ Lista categorias visíveis para uma fazenda.
 - `farmId`
 
 **Campos opcionais:**
+- `includeInactive`
 - `page`
 - `size`
 - `sort`
@@ -1790,6 +1792,9 @@ Lista categorias visíveis para uma fazenda.
 **Observações de regra de negócio:**
 - Retorna categorias ativas visíveis para a fazenda informada.
 - `ACCOUNTANT` pode consultar, mas não gerenciar.
+- Por padrão, retorna apenas categorias `ACTIVE`.
+- Quando `includeInactive=true`, retorna categorias `ACTIVE` e `INACTIVE`, útil para telas de gestão.
+- O campo `status` permanece na resposta para diferenciar categorias ativas e inativas.
 
 ### GET /api/financial/categories/global
 

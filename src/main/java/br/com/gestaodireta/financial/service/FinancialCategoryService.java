@@ -45,14 +45,11 @@ public class FinancialCategoryService {
 
     @Transactional(readOnly = true)
     public PageResponse<FinancialCategoryResponse> findAll(
-            Long farmId, PaginationParams paginationParams) {
+            Long farmId, boolean includeInactive, PaginationParams paginationParams) {
         farmService.findEntityById(farmId);
         Page<FinancialCategoryResponse> categories =
                 financialCategoryRepository
-                        .findVisibleByFarmId(
-                                farmId,
-                                FinancialCategoryStatus.ACTIVE,
-                                paginationParams.toPageable())
+                        .findVisibleByFarmId(farmId, includeInactive, paginationParams.toPageable())
                         .map(financialCategoryMapper::toResponse);
 
         return PageResponse.from(categories);

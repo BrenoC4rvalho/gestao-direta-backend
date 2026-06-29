@@ -15,6 +15,7 @@ import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
+import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.support.PostgresIntegrationTest;
 import br.com.gestaodireta.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -153,6 +154,42 @@ class FinancialCategoryServiceTest extends PostgresIntegrationTest {
         assertThat(response.isDefault()).isFalse();
         assertThat(response.color()).isEqualTo("#ff0000");
         assertThat(response.icon()).isEqualTo("seedling");
+    }
+
+    @Test
+    void shouldListOnlyActiveVisibleCategoriesByDefault() {
+        Farm farm = saveFarm("Farm");
+        Farm otherFarm = saveFarm("Other Farm");
+        saveCategory("Global Active", null, true, FinancialCategoryStatus.ACTIVE);
+        saveCategory("Farm Active", farm, false, FinancialCategoryStatus.ACTIVE);
+        saveCategory("Global Inactive", null, true, FinancialCategoryStatus.INACTIVE);
+        saveCategory("Farm Inactive", farm, false, FinancialCategoryStatus.INACTIVE);
+        saveCategory("Other Farm Active", otherFarm, false, FinancialCategoryStatus.ACTIVE);
+
+        var response =
+                financialCategoryService.findAll(farm.getId(), false, new PaginationParams());
+
+        assertThat(response.content())
+                .extracting(FinancialCategoryResponse::name)
+                .containsExactlyInAnyOrder("Global Active", "Farm Active");
+    }
+
+    @Test
+    void shouldListActiveAndInactiveVisibleCategoriesWhenRequested() {
+        Farm farm = saveFarm("Farm");
+        Farm otherFarm = saveFarm("Other Farm");
+        saveCategory("Global Active", null, true, FinancialCategoryStatus.ACTIVE);
+        saveCategory("Farm Active", farm, false, FinancialCategoryStatus.ACTIVE);
+        saveCategory("Global Inactive", null, true, FinancialCategoryStatus.INACTIVE);
+        saveCategory("Farm Inactive", farm, false, FinancialCategoryStatus.INACTIVE);
+        saveCategory("Other Farm Inactive", otherFarm, false, FinancialCategoryStatus.INACTIVE);
+
+        var response = financialCategoryService.findAll(farm.getId(), true, new PaginationParams());
+
+        assertThat(response.content())
+                .extracting(FinancialCategoryResponse::name)
+                .containsExactlyInAnyOrder(
+                        "Global Active", "Farm Active", "Global Inactive", "Farm Inactive");
     }
 
     private Farm saveFarm(String name) {

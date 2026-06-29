@@ -1,7 +1,6 @@
 package br.com.gestaodireta.financial.repository;
 
 import br.com.gestaodireta.financial.entity.FinancialCategory;
-import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -15,7 +14,10 @@ public interface FinancialCategoryRepository extends JpaRepository<FinancialCate
             """
             select category
             from FinancialCategory category
-            where category.status = :status
+            where (
+                    :includeInactive = true
+                    or category.status = br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus.ACTIVE
+              )
               and (
                     (category.farm is null and category.defaultCategory = true)
                     or category.farm.id = :farmId
@@ -23,7 +25,7 @@ public interface FinancialCategoryRepository extends JpaRepository<FinancialCate
             """)
     Page<FinancialCategory> findVisibleByFarmId(
             @Param("farmId") Long farmId,
-            @Param("status") FinancialCategoryStatus status,
+            @Param("includeInactive") boolean includeInactive,
             Pageable pageable);
 
     @Query(

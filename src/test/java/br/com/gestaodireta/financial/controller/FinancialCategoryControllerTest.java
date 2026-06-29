@@ -130,6 +130,80 @@ class FinancialCategoryControllerTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldListActiveAndInactiveGlobalAndFarmCategoriesWhenIncludeInactiveIsTrue()
+            throws Exception {
+        Farm farm = saveFarm("Farm");
+        Farm otherFarm = saveFarm("Other Farm");
+        User producer = saveUser("Producer", "producer@example.com", UserType.USER);
+        saveFarmUser(farm, producer, FarmUserRole.PRODUCER);
+        saveCategory("Global Active", null, true, FinancialCategoryStatus.ACTIVE);
+        saveCategory("Farm Active", farm, false, FinancialCategoryStatus.ACTIVE);
+        saveCategory("Global Inactive", null, true, FinancialCategoryStatus.INACTIVE);
+        saveCategory("Farm Inactive", farm, false, FinancialCategoryStatus.INACTIVE);
+        saveCategory("Other Farm Inactive", otherFarm, false, FinancialCategoryStatus.INACTIVE);
+
+        mockMvc.perform(
+                        get("/api/financial/categories")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("includeInactive", "true")
+                                .with(user(String.valueOf(producer.getId())).roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.content[*].name")
+                                .value(
+                                        containsInAnyOrder(
+                                                "Global Active",
+                                                "Farm Active",
+                                                "Global Inactive",
+                                                "Farm Inactive")))
+                .andExpect(
+                        jsonPath("$.content[*].status")
+                                .value(
+                                        containsInAnyOrder(
+                                                "ACTIVE", "ACTIVE", "INACTIVE", "INACTIVE")))
+                .andExpect(jsonPath("$.totalElements").value(4));
+    }
+
+    @Test
+    void shouldAllowEmployeeAndAccountantToListCategoriesWithFinancialAccess() throws Exception {
+        Farm farm = saveFarm("Farm");
+        User employee = saveUser("Employee", "employee@example.com", UserType.USER);
+        User accountant = saveUser("Accountant", "accountant@example.com", UserType.USER);
+        saveFarmUser(farm, employee, FarmUserRole.EMPLOYEE);
+        saveFarmUser(farm, accountant, FarmUserRole.ACCOUNTANT);
+        saveCategory("Farm Active", farm, false, FinancialCategoryStatus.ACTIVE);
+
+        expectCanListCategories(employee, farm);
+        expectCanListCategories(accountant, farm);
+    }
+
+    @Test
+    void shouldDenyCategoryListWithoutAuthentication() throws Exception {
+        Farm farm = saveFarm("Farm");
+
+        mockMvc.perform(
+                        get("/api/financial/categories")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId())))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldDenyCategoryListForUserWithoutFinancialAccess() throws Exception {
+        Farm farm = saveFarm("Farm");
+        User unlinked = saveUser("Unlinked", "unlinked@example.com", UserType.USER);
+
+        mockMvc.perform(
+                        get("/api/financial/categories")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("includeInactive", "true")
+                                .with(user(String.valueOf(unlinked.getId())).roles("USER")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void shouldCreateGlobalCategoryAsAdminOnly() throws Exception {
         User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN);
         Farm farm = saveFarm("Farm");
@@ -310,6 +384,15 @@ class FinancialCategoryControllerTest extends PostgresIntegrationTest {
                 financialCategoryRepository.findById(category.getId()).orElseThrow();
         assertThat(savedCategory.getFarm().getId()).isEqualTo(farm.getId());
         assertThat(savedCategory.isDefaultCategory()).isFalse();
+    }
+
+    private void expectCanListCategories(User user, Farm farm) throws Exception {
+        mockMvc.perform(
+                        get("/api/financial/categories")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .with(user(String.valueOf(user.getId())).roles("USER")))
+                .andExpect(status().isOk());
     }
 
     private void expectCannotListGlobalCategories(User user) throws Exception {
