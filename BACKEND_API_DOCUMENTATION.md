@@ -1900,6 +1900,71 @@ GET /api/financial/categories/used-in-transactions?farmId=1
 - Não considera movimentações deletadas logicamente (`recordStatus=DELETED`).
 - Ordena por nome.
 
+### GET /api/farms/{farmId}/users/options
+
+**Descrição:**
+Lista usuários para o filtro **Criado por** da tela de movimentações financeiras. A resposta é enxuta e contém apenas usuários elegíveis para o filtro.
+
+**Autenticação:** Sim
+**Permissão:** `ADMIN`, `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com acesso financeiro à fazenda.
+
+**Path params:**
+```json
+{
+  "farmId": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `farmId`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Exemplo:**
+```http
+GET /api/farms/1/users/options
+```
+
+**Resposta de sucesso:**
+```json
+[
+  {
+    "id": 2,
+    "name": "Maria Silva"
+  },
+  {
+    "id": 5,
+    "name": "Pedro Souza"
+  }
+]
+```
+
+**Possíveis erros/status HTTP:**
+- `400 Bad Request` para path params inválidos.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem acesso financeiro à fazenda.
+- `404 Not Found` se a fazenda não existir.
+
+**Observações de regra de negócio:**
+- Retorna usuários `ACTIVE` com vínculo ativo na fazenda (`PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT`), mesmo sem movimentações.
+- Retorna usuários que criaram movimentação `ACTIVE` na fazenda, mesmo que hoje estejam `INACTIVE`, `BLOCKED` ou com vínculo `INACTIVE`.
+- Não retorna usuários `INACTIVE` ou `BLOCKED` apenas por vínculo ativo.
+- Não retorna vínculo `INACTIVE` sem movimentação ativa.
+- Não considera movimentações deletadas logicamente (`recordStatus=DELETED`).
+- Remove duplicidades e ordena por nome.
+- Não retorna `email`, `document`, `userType`, `status` ou dados do vínculo com a fazenda.
+
 ### GET /api/financial/categories/global
 
 **Descrição:**
