@@ -20,7 +20,10 @@ import br.com.gestaodireta.farm.enumeration.FarmUserRole;
 import br.com.gestaodireta.farm.repository.FarmRepository;
 import br.com.gestaodireta.farm.repository.FarmUserRepository;
 import br.com.gestaodireta.financial.entity.FinancialCategory;
+import br.com.gestaodireta.financial.entity.FinancialTransaction;
 import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
+import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
+import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
@@ -29,6 +32,8 @@ import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.enumeration.UserStatus;
 import br.com.gestaodireta.user.enumeration.UserType;
 import br.com.gestaodireta.user.repository.UserRepository;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -166,6 +171,123 @@ class FinancialCategoryControllerTest extends PostgresIntegrationTest {
                                         containsInAnyOrder(
                                                 "ACTIVE", "ACTIVE", "INACTIVE", "INACTIVE")))
                 .andExpect(jsonPath("$.totalElements").value(4));
+    }
+
+    @Test
+    void shouldListCategoriesUsedInActiveTransactionsFilter() throws Exception {
+        Farm farm = saveFarm("Farm");
+        Farm otherFarm = saveFarm("Other Farm");
+        User producer = saveUser("Producer", "producer@example.com", UserType.USER);
+        saveFarmUser(farm, producer, FarmUserRole.PRODUCER);
+        FinancialCategory globalUsed =
+                saveCategory("A Global Used", null, true, FinancialCategoryStatus.ACTIVE);
+        FinancialCategory farmUsed =
+                saveCategory("B Farm Used", farm, false, FinancialCategoryStatus.ACTIVE);
+        FinancialCategory inactiveUsed =
+                saveCategory("C Inactive Used", farm, false, FinancialCategoryStatus.INACTIVE);
+        FinancialCategory deletedOnly =
+                saveCategory("Deleted Only", farm, false, FinancialCategoryStatus.ACTIVE);
+        saveCategory("Unused", farm, false, FinancialCategoryStatus.ACTIVE);
+        FinancialCategory otherFarmUsed =
+                saveCategory("Other Farm Used", otherFarm, false, FinancialCategoryStatus.ACTIVE);
+        saveTransaction(farm, globalUsed, producer, FinancialRecordStatus.ACTIVE);
+        saveTransaction(farm, farmUsed, producer, FinancialRecordStatus.ACTIVE);
+        saveTransaction(farm, inactiveUsed, producer, FinancialRecordStatus.ACTIVE);
+        saveTransaction(farm, deletedOnly, producer, FinancialRecordStatus.DELETED);
+        saveTransaction(otherFarm, otherFarmUsed, producer, FinancialRecordStatus.ACTIVE);
+
+        mockMvc.perform(
+                        get("/api/financial/categories/used-in-transactions")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .with(user(String.valueOf(producer.getId())).roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$[*].name")
+                                .value(
+                                        containsInAnyOrder(
+                                                "A Global Used", "B Farm Used", "C Inactive Used")))
+                .andExpect(
+                        jsonPath("$[*].status")
+                                .value(containsInAnyOrder("ACTIVE", "ACTIVE", "INACTIVE")))
+                .andExpect(jsonPath("$[0].farmId").value(nullValue()))
+                .andExpect(jsonPath("$[0].isDefault").value(true));
+    }
+
+    @Test
+    void shouldDenyUsedCategoriesFilterWithoutAuthentication() throws Exception {
+        Farm farm = saveFarm("Farm");
+
+        mockMvc.perform(
+                        get("/api/financial/categories/used-in-transactions")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId())))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldDenyUsedCategoriesFilterForUserWithoutFinancialAccess() throws Exception {
+        Farm farm = saveFarm("Farm");
+        User unlinked = saveUser("Unlinked", "unlinked@example.com", UserType.USER);
+
+        mockMvc.perform(
+                        get("/api/financial/categories/used-in-transactions")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .with(user(String.valueOf(unlinked.getId())).roles("USER")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldDenyUsedCategoriesFilterForInactiveLinkAndInactiveFarm() throws Exception {
+        Farm farm = saveFarm("Farm");
+        Farm inactiveFarm = saveFarm("Inactive Farm");
+        inactiveFarm.setStatus(FarmStatus.INACTIVE);
+        farmRepository.save(inactiveFarm);
+        User inactiveLinkUser =
+                saveUser("Inactive Link", "inactive-link@example.com", UserType.USER);
+        User inactiveFarmUser =
+                saveUser("Inactive Farm User", "inactive-farm@example.com", UserType.USER);
+        saveFarmUser(farm, inactiveLinkUser, FarmUserRole.INACTIVE);
+        saveFarmUser(inactiveFarm, inactiveFarmUser, FarmUserRole.PRODUCER);
+
+        expectCannotListUsedCategories(inactiveLinkUser, farm);
+        expectCannotListUsedCategories(inactiveFarmUser, inactiveFarm);
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenUsedCategoriesFarmIdIsMissing() throws Exception {
+        User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN);
+
+        mockMvc.perform(
+                        get("/api/financial/categories/used-in-transactions")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenUsedCategoriesFarmIdIsInvalid() throws Exception {
+        User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN);
+
+        mockMvc.perform(
+                        get("/api/financial/categories/used-in-transactions")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", "invalid")
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenUsedCategoriesFarmDoesNotExist() throws Exception {
+        User user = saveUser("User", "user@example.com", UserType.USER);
+
+        mockMvc.perform(
+                        get("/api/financial/categories/used-in-transactions")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", "999")
+                                .with(user(String.valueOf(user.getId())).roles("USER")))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -423,6 +545,15 @@ class FinancialCategoryControllerTest extends PostgresIntegrationTest {
         assertThat(savedCategory.isDefaultCategory()).isFalse();
     }
 
+    private void expectCannotListUsedCategories(User user, Farm farm) throws Exception {
+        mockMvc.perform(
+                        get("/api/financial/categories/used-in-transactions")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .with(user(String.valueOf(user.getId())).roles("USER")))
+                .andExpect(status().isForbidden());
+    }
+
     private void expectCanListCategories(User user, Farm farm) throws Exception {
         mockMvc.perform(
                         get("/api/financial/categories")
@@ -501,6 +632,22 @@ class FinancialCategoryControllerTest extends PostgresIntegrationTest {
         farmUser.setRole(role);
 
         return farmUserRepository.save(farmUser);
+    }
+
+    private FinancialTransaction saveTransaction(
+            Farm farm, FinancialCategory category, User user, FinancialRecordStatus recordStatus) {
+        FinancialTransaction transaction = new FinancialTransaction();
+        transaction.setDescription("Transaction " + category.getName());
+        transaction.setAmount(BigDecimal.TEN);
+        transaction.setType(category.getType());
+        transaction.setStatus(PaymentStatus.PENDING);
+        transaction.setTransactionDate(LocalDate.now());
+        transaction.setFarm(farm);
+        transaction.setCategory(category);
+        transaction.setCreatedByUser(user);
+        transaction.setRecordStatus(recordStatus);
+
+        return financialTransactionRepository.save(transaction);
     }
 
     private FinancialCategory saveCategory(

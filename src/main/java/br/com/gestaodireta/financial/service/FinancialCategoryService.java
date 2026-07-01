@@ -6,12 +6,14 @@ import br.com.gestaodireta.financial.dto.FinancialCategoryRequest;
 import br.com.gestaodireta.financial.dto.FinancialCategoryResponse;
 import br.com.gestaodireta.financial.entity.FinancialCategory;
 import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
+import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
 import br.com.gestaodireta.financial.mapper.FinancialCategoryMapper;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.shared.exception.BusinessException;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
+import java.util.List;
 import java.util.Locale;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
@@ -54,6 +56,17 @@ public class FinancialCategoryService {
                         .map(financialCategoryMapper::toResponse);
 
         return PageResponse.from(categories);
+    }
+
+    @Transactional(readOnly = true)
+    public List<FinancialCategoryResponse> findUsedInTransactions(Long farmId) {
+        farmService.findEntityById(farmId);
+
+        return financialCategoryRepository
+                .findUsedInTransactionsByFarmId(farmId, FinancialRecordStatus.ACTIVE)
+                .stream()
+                .map(financialCategoryMapper::toResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)

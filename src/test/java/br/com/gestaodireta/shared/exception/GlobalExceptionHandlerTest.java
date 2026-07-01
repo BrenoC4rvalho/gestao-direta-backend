@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 class GlobalExceptionHandlerTest {
@@ -66,6 +67,14 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message").value("Invalid data"));
+    }
+
+    @Test
+    void shouldHandleMissingRequestParameterAsBadRequest() throws Exception {
+        mockMvc.perform(get("/test/required-param"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Required request parameter is missing"));
     }
 
     @Test
@@ -118,6 +127,9 @@ class GlobalExceptionHandlerTest {
         void validation() {
             throw new ValidationException("Invalid data");
         }
+
+        @GetMapping("/required-param")
+        void requiredParam(@RequestParam Long farmId) {}
 
         @PostMapping("/body-validation")
         void bodyValidation(@Valid @RequestBody TestRequest request) {}

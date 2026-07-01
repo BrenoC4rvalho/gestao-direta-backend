@@ -58,6 +58,22 @@ public class FinancialAccess {
                 && role.filter(this::canViewByRole).isPresent();
     }
 
+    public boolean canViewFinancialDataOrMissingFarm(Long farmId) {
+        if (SecurityUtils.isAdmin()) {
+            return true;
+        }
+
+        if (farmId == null || !isCurrentUserActive()) {
+            return false;
+        }
+
+        if (!farmRepository.existsById(farmId)) {
+            return true;
+        }
+
+        return canViewFinancialData(farmId);
+    }
+
     public boolean canManageFinancialData(Long farmId) {
         if (SecurityUtils.isAdmin()) {
             return true;

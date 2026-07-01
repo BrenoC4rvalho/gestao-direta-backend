@@ -1,6 +1,8 @@
 package br.com.gestaodireta.financial.repository;
 
 import br.com.gestaodireta.financial.entity.FinancialCategory;
+import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,6 +29,20 @@ public interface FinancialCategoryRepository extends JpaRepository<FinancialCate
             @Param("farmId") Long farmId,
             @Param("includeInactive") boolean includeInactive,
             Pageable pageable);
+
+    @Query(
+            """
+            select distinct category
+            from FinancialTransaction transaction
+            join transaction.category category
+            left join fetch category.farm
+            where transaction.farm.id = :farmId
+              and transaction.recordStatus = :recordStatus
+            order by category.name asc
+            """)
+    List<FinancialCategory> findUsedInTransactionsByFarmId(
+            @Param("farmId") Long farmId,
+            @Param("recordStatus") FinancialRecordStatus recordStatus);
 
     @Query(
             """

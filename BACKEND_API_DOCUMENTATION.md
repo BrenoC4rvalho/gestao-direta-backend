@@ -1818,6 +1818,88 @@ Lista categorias visíveis para uma fazenda.
 - Quando `includeInactive=true`, retorna categorias `ACTIVE` e `INACTIVE`, útil para telas de gestão.
 - O campo `status` permanece na resposta para diferenciar categorias ativas e inativas.
 
+### GET /api/financial/categories/used-in-transactions
+
+**Descrição:**
+Lista as categorias utilizadas em movimentações ativas de uma fazenda, incluindo categorias ativas e inativas, locais e globais/default. Este endpoint deve ser usado para filtros de categoria na tela de movimentações.
+
+**Autenticação:** Sim
+**Permissão:** `ADMIN`, `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com acesso financeiro à fazenda.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{
+  "farmId": 1
+}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `farmId`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Exemplo:**
+```http
+GET /api/financial/categories/used-in-transactions?farmId=1
+```
+
+**Resposta de sucesso:**
+```json
+[
+  {
+    "id": 1,
+    "name": "Venda de soja",
+    "type": "INCOME",
+    "color": "#00AA00",
+    "icon": "sprout",
+    "farmId": null,
+    "farmName": null,
+    "isDefault": true,
+    "status": "ACTIVE",
+    "createdAt": "2026-06-21T10:00:00",
+    "updatedAt": "2026-06-21T10:00:00"
+  },
+  {
+    "id": 8,
+    "name": "Combustível",
+    "type": "EXPENSE",
+    "color": "#FF0000",
+    "icon": "fuel",
+    "farmId": 1,
+    "farmName": "Fazenda Boa Safra",
+    "isDefault": false,
+    "status": "INACTIVE",
+    "createdAt": "2026-06-21T10:00:00",
+    "updatedAt": "2026-06-21T10:00:00"
+  }
+]
+```
+
+**Possíveis erros/status HTTP:**
+- `400 Bad Request` para query params inválidos ou `farmId` ausente.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem acesso financeiro à fazenda.
+- `404 Not Found` se a fazenda não existir.
+
+**Observações de regra de negócio:**
+- Retorna somente categorias que possuem pelo menos uma movimentação `ACTIVE` na fazenda.
+- Inclui categorias `ACTIVE` e `INACTIVE`.
+- Inclui categorias da fazenda e globais/default.
+- Não retorna categorias sem movimentações.
+- Não considera movimentações deletadas logicamente (`recordStatus=DELETED`).
+- Ordena por nome.
+
 ### GET /api/financial/categories/global
 
 **Descrição:**

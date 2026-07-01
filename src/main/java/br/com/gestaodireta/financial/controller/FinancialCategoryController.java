@@ -6,6 +6,7 @@ import br.com.gestaodireta.financial.service.FinancialCategoryService;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -45,6 +46,12 @@ public class FinancialCategoryController {
             @RequestParam(defaultValue = "false") boolean includeInactive,
             @Valid @ModelAttribute PaginationParams paginationParams) {
         return financialCategoryService.findAll(farmId, includeInactive, paginationParams);
+    }
+
+    @GetMapping("/used-in-transactions")
+    @PreAuthorize("@financialAccess.canViewFinancialDataOrMissingFarm(#farmId)")
+    public List<FinancialCategoryResponse> findUsedInTransactions(@RequestParam Long farmId) {
+        return financialCategoryService.findUsedInTransactions(farmId);
     }
 
     @GetMapping("/global")

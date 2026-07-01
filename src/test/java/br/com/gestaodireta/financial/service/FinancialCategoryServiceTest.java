@@ -10,7 +10,10 @@ import br.com.gestaodireta.farm.repository.FarmUserRepository;
 import br.com.gestaodireta.financial.dto.FinancialCategoryRequest;
 import br.com.gestaodireta.financial.dto.FinancialCategoryResponse;
 import br.com.gestaodireta.financial.entity.FinancialCategory;
+import br.com.gestaodireta.financial.entity.FinancialTransaction;
 import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
+import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
+import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
@@ -18,7 +21,12 @@ import br.com.gestaodireta.shared.exception.BusinessException;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.support.PostgresIntegrationTest;
+import br.com.gestaodireta.user.entity.User;
+import br.com.gestaodireta.user.enumeration.UserStatus;
+import br.com.gestaodireta.user.enumeration.UserType;
 import br.com.gestaodireta.user.repository.UserRepository;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -194,6 +202,72 @@ class FinancialCategoryServiceTest extends PostgresIntegrationTest {
                 .extracting(FinancialCategoryResponse::name)
                 .containsExactlyInAnyOrder(
                         "Global Active", "Farm Active", "Global Inactive", "Farm Inactive");
+    }
+
+    @Test
+    void shouldListOnlyCategoriesUsedInActiveTransactionsByFarmOrderedByName() {
+        Farm farm = saveFarm("Farm");
+        Farm otherFarm = saveFarm("Other Farm");
+        User user = saveUser("User", "user@example.com");
+        FinancialCategory globalUsed =
+                saveCategory("A Global Used", null, true, FinancialCategoryStatus.ACTIVE);
+        FinancialCategory farmUsed =
+                saveCategory("B Farm Used", farm, false, FinancialCategoryStatus.ACTIVE);
+        FinancialCategory inactiveUsed =
+                saveCategory("C Inactive Used", farm, false, FinancialCategoryStatus.INACTIVE);
+        FinancialCategory unusedActive =
+                saveCategory("D Unused Active", farm, false, FinancialCategoryStatus.ACTIVE);
+        FinancialCategory unusedInactive =
+                saveCategory("E Unused Inactive", farm, false, FinancialCategoryStatus.INACTIVE);
+        FinancialCategory deletedOnly =
+                saveCategory("F Deleted Only", farm, false, FinancialCategoryStatus.ACTIVE);
+        FinancialCategory otherFarmUsed =
+                saveCategory("G Other Farm Used", otherFarm, false, FinancialCategoryStatus.ACTIVE);
+
+        saveTransaction(farm, farmUsed, user, FinancialRecordStatus.ACTIVE);
+        saveTransaction(farm, farmUsed, user, FinancialRecordStatus.ACTIVE);
+        saveTransaction(farm, globalUsed, user, FinancialRecordStatus.ACTIVE);
+        saveTransaction(farm, inactiveUsed, user, FinancialRecordStatus.ACTIVE);
+        saveTransaction(farm, deletedOnly, user, FinancialRecordStatus.DELETED);
+        saveTransaction(otherFarm, otherFarmUsed, user, FinancialRecordStatus.ACTIVE);
+
+        var response = financialCategoryService.findUsedInTransactions(farm.getId());
+
+        assertThat(response)
+                .extracting(FinancialCategoryResponse::name)
+                .containsExactly("A Global Used", "B Farm Used", "C Inactive Used");
+        assertThat(response)
+                .extracting(FinancialCategoryResponse::id)
+                .doesNotContain(
+                        unusedActive.getId(),
+                        unusedInactive.getId(),
+                        deletedOnly.getId(),
+                        otherFarmUsed.getId());
+        assertThat(response)
+                .filteredOn(category -> category.name().equals("A Global Used"))
+                .singleElement()
+                .satisfies(
+                        category -> {
+                            assertThat(category.farmId()).isNull();
+                            assertThat(category.isDefault()).isTrue();
+                            assertThat(category.status()).isEqualTo(FinancialCategoryStatus.ACTIVE);
+                        });
+        assertThat(response)
+                .filteredOn(category -> category.name().equals("C Inactive Used"))
+                .singleElement()
+                .satisfies(
+                        category -> {
+                            assertThat(category.farmId()).isEqualTo(farm.getId());
+                            assertThat(category.status())
+                                    .isEqualTo(FinancialCategoryStatus.INACTIVE);
+                        });
+    }
+
+    @Test
+    void shouldThrowResourceNotFoundWhenListingUsedCategoriesForMissingFarm() {
+        assertThatThrownBy(() -> financialCategoryService.findUsedInTransactions(999L))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Farm not found");
     }
 
     @Test
@@ -394,6 +468,33 @@ class FinancialCategoryServiceTest extends PostgresIntegrationTest {
     private FinancialCategoryRequest farmCategoryRequest(String name, Farm farm) {
         return new FinancialCategoryRequest(
                 name, TransactionType.EXPENSE, "#ff0000", "package", farm.getId(), false);
+    }
+
+    private User saveUser(String name, String email) {
+        User user = new User();
+        user.setName(name);
+        user.setEmail(email);
+        user.setPassword("Strong1!");
+        user.setUserType(UserType.USER);
+        user.setStatus(UserStatus.ACTIVE);
+
+        return userRepository.save(user);
+    }
+
+    private FinancialTransaction saveTransaction(
+            Farm farm, FinancialCategory category, User user, FinancialRecordStatus recordStatus) {
+        FinancialTransaction transaction = new FinancialTransaction();
+        transaction.setDescription("Transaction " + category.getName());
+        transaction.setAmount(BigDecimal.TEN);
+        transaction.setType(category.getType());
+        transaction.setStatus(PaymentStatus.PENDING);
+        transaction.setTransactionDate(LocalDate.now());
+        transaction.setFarm(farm);
+        transaction.setCategory(category);
+        transaction.setCreatedByUser(user);
+        transaction.setRecordStatus(recordStatus);
+
+        return financialTransactionRepository.save(transaction);
     }
 
     private Farm saveFarm(String name) {
