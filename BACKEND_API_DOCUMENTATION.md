@@ -22,7 +22,7 @@ Respostas paginadas usam o formato:
 }
 ```
 
-Não há controllers encontrados para Safras, Relatórios, Crédito Rural ou WhatsApp/Webhook no código atual.
+Não há controllers encontrados para Relatórios, Crédito Rural ou WhatsApp/Webhook no código atual.
 
 ## Autenticação
 
@@ -77,6 +77,8 @@ Defaults:
 - `FarmStatus`: `ACTIVE`, `INACTIVE`
 - `FarmUserRole`: `PRODUCER`, `EMPLOYEE`, `ACCOUNTANT`, `INACTIVE`
 - `ProductionType`: `AGRICULTURE`, `LIVESTOCK`, `MIXED`, `OTHER`
+- `ProductionActivityStatus`: `ACTIVE`, `INACTIVE`
+- `HarvestSeasonStatus`: `PLANNED`, `IN_PROGRESS`, `FINISHED`, `INACTIVE`
 - `TransactionType`: `INCOME`, `EXPENSE`
 - `PaymentStatus`: `PENDING`, `PAID`, `OVERDUE`, `CANCELED`
 - `PaymentMethod`: `PIX`, `CASH`, `CREDIT_CARD`, `DEBIT_CARD`, `BANK_TRANSFER`, `BOLETO`, `CHECK`, `OTHER`
@@ -92,12 +94,19 @@ Defaults:
 - `PRODUCER` gerencia fazenda, vínculos de usuários e categorias da fazenda.
 - `EMPLOYEE` pode gerenciar movimentações financeiras.
 - `ACCOUNTANT` pode consultar dados financeiros, mas não gerenciar.
+- `ADMIN` gerencia atividades produtivas globais.
+- `PRODUCER` gerencia safras apenas em fazenda ativa onde possui vínculo ativo.
+- `EMPLOYEE` e `ACCOUNTANT` apenas consultam safras.
 - Categorias default são globais e só `ADMIN` pode criar ou alterar.
 - Categoria não default exige `farmId`.
+- Fazenda inativa não pode receber nova safra.
+- Atividade produtiva inativa não pode ser usada em nova safra.
 - Transações exigem fazenda ativa.
 - Transações registram o usuário autenticado como criador no backend.
 - `createdByUserId` e `updatedByUserId` não são aceitos no request.
 - Exclusão de fazenda é lógica por status `INACTIVE`.
+- Exclusão de atividade produtiva é lógica por status `INACTIVE`.
+- Exclusão de safra é lógica por status `INACTIVE`.
 - Exclusão de transação é lógica por `recordStatus=DELETED`.
 - Exclusão de categoria é lógica por status `INACTIVE`.
 
@@ -1664,6 +1673,878 @@ Inativa o vínculo de um usuário com uma fazenda.
 **Observações de regra de negócio:**
 - A exclusão é lógica: o papel do vínculo passa para `INACTIVE`.
 - `PRODUCER` só pode remover vínculos de `EMPLOYEE` ou `ACCOUNTANT`.
+
+
+### POST /api/harvest/production-activities
+
+**Descrição:**
+Cria uma atividade produtiva global para uso em safras.
+
+**Autenticação:** Sim
+**Permissão:** Apenas `ADMIN`.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "name": "Soja",
+  "description": "Cultivo de soja"
+}
+```
+
+**Campos obrigatórios:**
+- `name`
+
+**Campos opcionais:**
+- `description`
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "name": "Soja",
+  "description": "Cultivo de soja",
+  "status": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `201 Created` em caso de sucesso.
+- `400 Bad Request` para body inválido, nome em branco ou nome duplicado.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem papel `ADMIN`.
+
+**Observações de regra de negócio:**
+- A atividade produtiva é global e não pertence a uma fazenda.
+- O status inicial é `ACTIVE`.
+- O nome é único globalmente por comparação normalizada.
+
+### GET /api/harvest/production-activities
+
+**Descrição:**
+Lista atividades produtivas globais, com filtro opcional por status.
+
+**Autenticação:** Sim
+**Permissão:** Apenas `ADMIN`.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{
+  "status": "ACTIVE",
+  "page": 0,
+  "size": 10,
+  "sort": "id",
+  "direction": "ASC"
+}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- Nenhum.
+
+**Campos opcionais:**
+- `status`
+- `page`
+- `size`
+- `sort`
+- `direction`
+
+**Resposta de sucesso:**
+```json
+{
+  "content": [
+    {
+      "id": 1,
+      "name": "Soja",
+      "description": "Cultivo de soja",
+      "status": "ACTIVE",
+      "createdAt": "2026-06-21T10:00:00",
+      "updatedAt": "2026-06-21T10:00:00"
+    }
+  ],
+  "page": 0,
+  "size": 10,
+  "totalElements": 1,
+  "totalPages": 1,
+  "first": true,
+  "last": true
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `200 OK` em caso de sucesso.
+- `400 Bad Request` para parâmetro `status` inválido.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem papel `ADMIN`.
+
+**Observações de regra de negócio:**
+- Sem `status`, retorna atividades `ACTIVE` e `INACTIVE` paginadas.
+- Com `status`, retorna apenas atividades no status informado.
+
+### GET /api/harvest/production-activities/active
+
+**Descrição:**
+Lista atividades produtivas ativas para seleção em safras.
+
+**Autenticação:** Sim
+**Permissão:** `ADMIN` ou usuário `USER` ativo com vínculo ativo em pelo menos uma fazenda ativa.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- Nenhum.
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+[
+  {
+    "id": 1,
+    "name": "Soja",
+    "description": "Cultivo de soja",
+    "status": "ACTIVE",
+    "createdAt": "2026-06-21T10:00:00",
+    "updatedAt": "2026-06-21T10:00:00"
+  }
+]
+```
+
+**Possíveis erros/status HTTP:**
+- `200 OK` em caso de sucesso.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem vínculo ativo em fazenda ativa.
+
+**Observações de regra de negócio:**
+- Retorna apenas atividades com status `ACTIVE`.
+- A resposta não é paginada.
+- Usuário com vínculo `INACTIVE` não tem acesso.
+
+### GET /api/harvest/production-activities/{id}
+
+**Descrição:**
+Busca uma atividade produtiva global por id.
+
+**Autenticação:** Sim
+**Permissão:** Apenas `ADMIN`.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `id`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "name": "Soja",
+  "description": "Cultivo de soja",
+  "status": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `200 OK` em caso de sucesso.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem papel `ADMIN`.
+- `404 Not Found` se a atividade produtiva não existir.
+
+**Observações de regra de negócio:**
+- Retorna atividades `ACTIVE` ou `INACTIVE`, desde que o usuário seja `ADMIN`.
+
+### PUT /api/harvest/production-activities/{id}
+
+**Descrição:**
+Atualiza uma atividade produtiva global.
+
+**Autenticação:** Sim
+**Permissão:** Apenas `ADMIN`.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "name": "Soja verão",
+  "description": "Cultivo de soja no verão"
+}
+```
+
+**Campos obrigatórios:**
+- `id`
+- `name`
+
+**Campos opcionais:**
+- `description`
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "name": "Soja verão",
+  "description": "Cultivo de soja no verão",
+  "status": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T11:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `200 OK` em caso de sucesso.
+- `400 Bad Request` para body inválido, nome em branco ou nome duplicado.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem papel `ADMIN`.
+- `404 Not Found` se a atividade produtiva não existir.
+
+**Observações de regra de negócio:**
+- A atualização não altera o status.
+- O nome continua único globalmente.
+
+### PATCH /api/harvest/production-activities/{id}/activate
+
+**Descrição:**
+Ativa uma atividade produtiva inativa.
+
+**Autenticação:** Sim
+**Permissão:** Apenas `ADMIN`.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `id`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "name": "Soja",
+  "description": "Cultivo de soja",
+  "status": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T11:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `200 OK` em caso de sucesso.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem papel `ADMIN`.
+- `404 Not Found` se a atividade produtiva não existir.
+
+**Observações de regra de negócio:**
+- Define `status=ACTIVE`.
+
+### DELETE /api/harvest/production-activities/{id}
+
+**Descrição:**
+Inativa uma atividade produtiva global.
+
+**Autenticação:** Sim
+**Permissão:** Apenas `ADMIN`.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `id`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{}
+```
+
+**Possíveis erros/status HTTP:**
+- `204 No Content` em caso de sucesso.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem papel `ADMIN`.
+- `404 Not Found` se a atividade produtiva não existir.
+
+**Observações de regra de negócio:**
+- A exclusão é lógica: define `status=INACTIVE`.
+- Não há delete físico.
+- Atividade produtiva inativa não pode ser usada em nova safra.
+
+### POST /api/harvest/seasons
+
+**Descrição:**
+Cria uma safra/ciclo produtivo vinculado a uma fazenda e a uma atividade produtiva.
+
+**Autenticação:** Sim
+**Permissão:** `ADMIN` para fazenda ativa; `PRODUCER` da fazenda ativa com vínculo ativo.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "farmId": 1,
+  "productionActivityId": 1,
+  "name": "Safra Soja 2026",
+  "description": "Safra de verão",
+  "startDate": "2026-01-01",
+  "endDate": "2026-06-30",
+  "expectedRevenue": 150000.00,
+  "expectedCost": 90000.00,
+  "areaHectares": 120.50
+}
+```
+
+**Campos obrigatórios:**
+- `farmId`
+- `productionActivityId`
+- `name`
+- `startDate`
+
+**Campos opcionais:**
+- `description`
+- `endDate`
+- `expectedRevenue`
+- `expectedCost`
+- `areaHectares`
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "productionActivityId": 1,
+  "productionActivityName": "Soja",
+  "name": "Safra Soja 2026",
+  "description": "Safra de verão",
+  "startDate": "2026-01-01",
+  "endDate": "2026-06-30",
+  "expectedRevenue": 150000.00,
+  "expectedCost": 90000.00,
+  "areaHectares": 120.50,
+  "status": "PLANNED",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `201 Created` em caso de sucesso.
+- `400 Bad Request` para body inválido, datas inválidas, valores negativos, nome duplicado na fazenda ou atividade produtiva inativa.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão ou fazenda inativa.
+- `404 Not Found` se fazenda ou atividade produtiva não existir.
+
+**Observações de regra de negócio:**
+- A safra sempre pertence a uma fazenda.
+- A safra sempre possui uma atividade produtiva.
+- O status inicial é `PLANNED`.
+- Fazenda inativa não pode receber nova safra, inclusive para `ADMIN`.
+- Atividade produtiva inativa não pode ser usada em nova safra.
+- `endDate` não pode ser anterior a `startDate`.
+- `expectedRevenue`, `expectedCost` e `areaHectares` não podem ser negativos.
+- `areaHectares=0` é aceito.
+- Nome de safra é único por fazenda entre safras não inativas.
+
+### GET /api/harvest/seasons
+
+**Descrição:**
+Lista safras de uma fazenda.
+
+**Autenticação:** Sim
+**Permissão:** `ADMIN`; `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com vínculo ativo na fazenda ativa.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{
+  "farmId": 1,
+  "includeInactive": false,
+  "page": 0,
+  "size": 10,
+  "sort": "id",
+  "direction": "ASC"
+}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `farmId`
+
+**Campos opcionais:**
+- `includeInactive`
+- `page`
+- `size`
+- `sort`
+- `direction`
+
+**Resposta de sucesso:**
+```json
+{
+  "content": [
+    {
+      "id": 1,
+      "farmId": 1,
+      "farmName": "Fazenda Boa Safra",
+      "productionActivityId": 1,
+      "productionActivityName": "Soja",
+      "name": "Safra Soja 2026",
+      "description": "Safra de verão",
+      "startDate": "2026-01-01",
+      "endDate": "2026-06-30",
+      "expectedRevenue": 150000.00,
+      "expectedCost": 90000.00,
+      "areaHectares": 120.50,
+      "status": "PLANNED",
+      "createdAt": "2026-06-21T10:00:00",
+      "updatedAt": "2026-06-21T10:00:00"
+    }
+  ],
+  "page": 0,
+  "size": 10,
+  "totalElements": 1,
+  "totalPages": 1,
+  "first": true,
+  "last": true
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `200 OK` em caso de sucesso.
+- `400 Bad Request` para `farmId` ausente ou parâmetro inválido.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão.
+- `404 Not Found` se a fazenda não existir.
+
+**Observações de regra de negócio:**
+- `farmId` é obrigatório.
+- `includeInactive=false` é o default e oculta safras com status `INACTIVE`.
+- `includeInactive=true` inclui safras inativas.
+- Usuário com vínculo `INACTIVE` não acessa a listagem.
+
+### GET /api/harvest/seasons/{id}
+
+**Descrição:**
+Busca uma safra por id.
+
+**Autenticação:** Sim
+**Permissão:** `ADMIN`; `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com vínculo ativo na fazenda ativa da safra.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `id`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "productionActivityId": 1,
+  "productionActivityName": "Soja",
+  "name": "Safra Soja 2026",
+  "description": "Safra de verão",
+  "startDate": "2026-01-01",
+  "endDate": "2026-06-30",
+  "expectedRevenue": 150000.00,
+  "expectedCost": 90000.00,
+  "areaHectares": 120.50,
+  "status": "PLANNED",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `200 OK` em caso de sucesso.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão ou quando a safra não for encontrada na checagem de autorização.
+
+**Observações de regra de negócio:**
+- A autorização é calculada a partir da fazenda da safra.
+
+### PUT /api/harvest/seasons/{id}
+
+**Descrição:**
+Atualiza os dados de uma safra.
+
+**Autenticação:** Sim
+**Permissão:** `ADMIN`; `PRODUCER` com vínculo ativo na fazenda ativa da safra.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "productionActivityId": 1,
+  "name": "Safra Soja 2026 Atualizada",
+  "description": "Safra atualizada",
+  "startDate": "2026-01-01",
+  "endDate": "2026-07-15",
+  "expectedRevenue": 160000.00,
+  "expectedCost": 95000.00,
+  "areaHectares": 120.50
+}
+```
+
+**Campos obrigatórios:**
+- `id`
+- `productionActivityId`
+- `name`
+- `startDate`
+
+**Campos opcionais:**
+- `description`
+- `endDate`
+- `expectedRevenue`
+- `expectedCost`
+- `areaHectares`
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "productionActivityId": 1,
+  "productionActivityName": "Soja",
+  "name": "Safra Soja 2026 Atualizada",
+  "description": "Safra atualizada",
+  "startDate": "2026-01-01",
+  "endDate": "2026-07-15",
+  "expectedRevenue": 160000.00,
+  "expectedCost": 95000.00,
+  "areaHectares": 120.50,
+  "status": "PLANNED",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T11:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `200 OK` em caso de sucesso.
+- `400 Bad Request` para body inválido, datas inválidas, valores negativos, nome duplicado, safra inativa ou atividade produtiva inativa.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão ou quando a safra não for encontrada na checagem de autorização.
+- `404 Not Found` se a atividade produtiva não existir após a autorização.
+
+**Observações de regra de negócio:**
+- Não permite alterar `farmId`.
+- Safra com status `INACTIVE` não pode ser editada por esta operação.
+- `EMPLOYEE` e `ACCOUNTANT` não podem editar safra.
+- A atividade produtiva informada deve estar `ACTIVE`.
+
+### PATCH /api/harvest/seasons/{id}/status
+
+**Descrição:**
+Altera o status de uma safra.
+
+**Autenticação:** Sim
+**Permissão:** `ADMIN`; `PRODUCER` com vínculo ativo na fazenda ativa da safra.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{
+  "status": "IN_PROGRESS"
+}
+```
+
+**Campos obrigatórios:**
+- `id`
+- `status`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "productionActivityId": 1,
+  "productionActivityName": "Soja",
+  "name": "Safra Soja 2026",
+  "description": "Safra de verão",
+  "startDate": "2026-01-01",
+  "endDate": "2026-06-30",
+  "expectedRevenue": 150000.00,
+  "expectedCost": 90000.00,
+  "areaHectares": 120.50,
+  "status": "IN_PROGRESS",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T11:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `200 OK` em caso de sucesso.
+- `400 Bad Request` para body inválido ou status inválido.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão ou quando a safra não for encontrada na checagem de autorização.
+
+**Observações de regra de negócio:**
+- Status aceitos: `PLANNED`, `IN_PROGRESS`, `FINISHED`, `INACTIVE`.
+- Para status diferente de `INACTIVE`, a fazenda da safra deve estar ativa.
+
+### PATCH /api/harvest/seasons/{id}/activate
+
+**Descrição:**
+Reativa uma safra inativa.
+
+**Autenticação:** Sim
+**Permissão:** `ADMIN`; `PRODUCER` com vínculo ativo na fazenda ativa da safra.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `id`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "productionActivityId": 1,
+  "productionActivityName": "Soja",
+  "name": "Safra Soja 2026",
+  "description": "Safra de verão",
+  "startDate": "2026-01-01",
+  "endDate": "2026-06-30",
+  "expectedRevenue": 150000.00,
+  "expectedCost": 90000.00,
+  "areaHectares": 120.50,
+  "status": "PLANNED",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T11:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `200 OK` em caso de sucesso.
+- `400 Bad Request` se a fazenda da safra estiver inativa.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão ou quando a safra não for encontrada na checagem de autorização.
+
+**Observações de regra de negócio:**
+- Define `status=PLANNED`.
+- A fazenda da safra deve estar ativa.
+
+### DELETE /api/harvest/seasons/{id}
+
+**Descrição:**
+Inativa uma safra.
+
+**Autenticação:** Sim
+**Permissão:** `ADMIN`; `PRODUCER` com vínculo ativo na fazenda ativa da safra.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `id`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{}
+```
+
+**Possíveis erros/status HTTP:**
+- `204 No Content` em caso de sucesso.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão ou quando a safra não for encontrada na checagem de autorização.
+
+**Observações de regra de negócio:**
+- A exclusão é lógica: define `status=INACTIVE`.
+- Não há delete físico.
+- `EMPLOYEE`, `ACCOUNTANT`, vínculo `INACTIVE` e usuário sem vínculo não podem inativar safras.
 
 ### POST /api/financial/categories
 
