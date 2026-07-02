@@ -1,0 +1,84 @@
+package br.com.gestaodireta.harvest.controller;
+
+import br.com.gestaodireta.harvest.dto.HarvestSeasonRequest;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonResponse;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonStatusUpdateRequest;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonUpdateRequest;
+import br.com.gestaodireta.harvest.service.HarvestSeasonService;
+import br.com.gestaodireta.shared.pagination.PaginationParams;
+import br.com.gestaodireta.shared.response.PageResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/harvest/seasons")
+public class HarvestSeasonController {
+
+    private final HarvestSeasonService harvestSeasonService;
+
+    public HarvestSeasonController(HarvestSeasonService harvestSeasonService) {
+        this.harvestSeasonService = harvestSeasonService;
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("@harvestAccess.canCreateSeason(#request)")
+    public HarvestSeasonResponse create(@Valid @RequestBody HarvestSeasonRequest request) {
+        return harvestSeasonService.create(request);
+    }
+
+    @GetMapping
+    @PreAuthorize("@harvestAccess.canViewSeasons(#farmId)")
+    public PageResponse<HarvestSeasonResponse> findAll(
+            @RequestParam Long farmId,
+            @RequestParam(defaultValue = "false") boolean includeInactive,
+            @Valid @ModelAttribute PaginationParams paginationParams) {
+        return harvestSeasonService.findAll(farmId, includeInactive, paginationParams);
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("@harvestAccess.canViewSeason(#id)")
+    public HarvestSeasonResponse findById(@PathVariable Long id) {
+        return harvestSeasonService.findById(id);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("@harvestAccess.canManageSeason(#id)")
+    public HarvestSeasonResponse update(
+            @PathVariable Long id, @Valid @RequestBody HarvestSeasonUpdateRequest request) {
+        return harvestSeasonService.update(id, request);
+    }
+
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("@harvestAccess.canChangeSeasonStatus(#id)")
+    public HarvestSeasonResponse updateStatus(
+            @PathVariable Long id, @Valid @RequestBody HarvestSeasonStatusUpdateRequest request) {
+        return harvestSeasonService.updateStatus(id, request);
+    }
+
+    @PatchMapping("/{id}/activate")
+    @PreAuthorize("@harvestAccess.canChangeSeasonStatus(#id)")
+    public HarvestSeasonResponse activate(@PathVariable Long id) {
+        return harvestSeasonService.activate(id);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("@harvestAccess.canChangeSeasonStatus(#id)")
+    public void inactivate(@PathVariable Long id) {
+        harvestSeasonService.inactivate(id);
+    }
+}
