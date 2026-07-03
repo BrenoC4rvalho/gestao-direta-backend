@@ -17,6 +17,9 @@ import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.mapper.FinancialTransactionMapper;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
+import br.com.gestaodireta.harvest.entity.HarvestSeason;
+import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
+import br.com.gestaodireta.harvest.repository.HarvestSeasonRepository;
 import br.com.gestaodireta.shared.exception.BusinessException;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
 import br.com.gestaodireta.shared.exception.ValidationException;
@@ -53,6 +56,8 @@ public class FinancialTransactionService {
 
     private final UserRepository userRepository;
 
+    private final HarvestSeasonRepository harvestSeasonRepository;
+
     private final FinancialTransactionMapper financialTransactionMapper;
 
     private final Clock clock;
@@ -62,12 +67,14 @@ public class FinancialTransactionService {
             FarmService farmService,
             FinancialCategoryService financialCategoryService,
             UserRepository userRepository,
+            HarvestSeasonRepository harvestSeasonRepository,
             FinancialTransactionMapper financialTransactionMapper,
             Clock clock) {
         this.financialTransactionRepository = financialTransactionRepository;
         this.farmService = farmService;
         this.financialCategoryService = financialCategoryService;
         this.userRepository = userRepository;
+        this.harvestSeasonRepository = harvestSeasonRepository;
         this.financialTransactionMapper = financialTransactionMapper;
         this.clock = clock;
     }
@@ -77,6 +84,7 @@ public class FinancialTransactionService {
         Farm farm = farmService.findEntityById(request.farmId());
         ensureFarmIsActive(farm);
         FinancialCategory category = resolveCategory(request.categoryId(), farm, request.type());
+        HarvestSeason harvestSeason = resolveHarvestSeasonForWrite(request.harvestSeasonId(), farm);
         User currentUser = getCurrentUser();
 
         FinancialTransaction transaction = new FinancialTransaction();
@@ -84,7 +92,7 @@ public class FinancialTransactionService {
         transaction.setCreatedByUser(currentUser);
         transaction.setRecordStatus(FinancialRecordStatus.ACTIVE);
         transaction.setStatus(request.status() == null ? PaymentStatus.PENDING : request.status());
-        applyRequest(transaction, request, category);
+        applyRequest(transaction, request, category, harvestSeason);
 
         return financialTransactionMapper.toResponse(
                 financialTransactionRepository.save(transaction));
@@ -101,6 +109,7 @@ public class FinancialTransactionService {
             FinancialTransactionFilterRequest filterRequest, PaginationParams paginationParams) {
         FinancialTransactionFilterRequest normalizedFilter = normalizeFilter(filterRequest);
         validateFilter(normalizedFilter);
+        validateHarvestSeasonFilter(normalizedFilter);
 
         Page<FinancialTransactionResponse> transactions =
                 financialTransactionRepository
@@ -114,6 +123,7 @@ public class FinancialTransactionService {
                                 normalizedFilter.type(),
                                 hasCategoryIds(normalizedFilter),
                                 categoryIdsOrPlaceholder(normalizedFilter),
+                                normalizedFilter.harvestSeasonId(),
                                 hasPaymentStatuses(normalizedFilter),
                                 paymentStatusesOrPlaceholder(normalizedFilter),
                                 hasPaymentMethods(normalizedFilter),
@@ -139,9 +149,11 @@ public class FinancialTransactionService {
         FinancialTransaction transaction = findEntityById(id);
         FinancialCategory category =
                 resolveCategory(request.categoryId(), transaction.getFarm(), request.type());
+        HarvestSeason harvestSeason =
+                resolveHarvestSeasonForWrite(request.harvestSeasonId(), transaction.getFarm());
         transaction.setUpdatedByUser(getCurrentUser());
         transaction.setStatus(request.status());
-        applyRequest(transaction, request, category);
+        applyRequest(transaction, request, category, harvestSeason);
 
         return financialTransactionMapper.toResponse(
                 financialTransactionRepository.save(transaction));
@@ -201,7 +213,7 @@ public class FinancialTransactionService {
     private FinancialTransactionFilterRequest defaultFilter(Long farmId) {
         return new FinancialTransactionFilterRequest(
                 farmId, null, null, null, null, null, null, null, null, null, null, null, null,
-                null);
+                null, null);
     }
 
     private FinancialTransactionFilterRequest normalizeFilter(
@@ -224,6 +236,7 @@ public class FinancialTransactionService {
                 filterRequest.type(),
                 filterRequest.categoryId(),
                 effectiveValues(filterRequest.categoryId(), filterRequest.categoryIds()),
+                filterRequest.harvestSeasonId(),
                 filterRequest.paymentStatus(),
                 effectiveValues(filterRequest.paymentStatus(), filterRequest.paymentStatuses()),
                 filterRequest.paymentMethod(),
@@ -370,7 +383,8 @@ public class FinancialTransactionService {
     private void applyRequest(
             FinancialTransaction transaction,
             FinancialTransactionRequest request,
-            FinancialCategory category) {
+            FinancialCategory category,
+            HarvestSeason harvestSeason) {
         ensurePositiveAmount(request.amount());
         transaction.setDescription(request.description());
         transaction.setAmount(request.amount());
@@ -381,12 +395,14 @@ public class FinancialTransactionService {
         transaction.setPaidAt(request.paidAt());
         transaction.setNotes(request.notes());
         transaction.setCategory(category);
+        transaction.setHarvestSeason(harvestSeason);
     }
 
     private void applyRequest(
             FinancialTransaction transaction,
             FinancialTransactionUpdateRequest request,
-            FinancialCategory category) {
+            FinancialCategory category,
+            HarvestSeason harvestSeason) {
         ensurePositiveAmount(request.amount());
         transaction.setDescription(request.description());
         transaction.setAmount(request.amount());
@@ -397,6 +413,7 @@ public class FinancialTransactionService {
         transaction.setPaidAt(request.paidAt());
         transaction.setNotes(request.notes());
         transaction.setCategory(category);
+        transaction.setHarvestSeason(harvestSeason);
     }
 
     private FinancialCategory resolveCategory(
@@ -420,6 +437,44 @@ public class FinancialTransactionService {
         }
 
         return category;
+    }
+
+    private HarvestSeason resolveHarvestSeasonForWrite(Long harvestSeasonId, Farm farm) {
+        if (harvestSeasonId == null) {
+            return null;
+        }
+
+        HarvestSeason harvestSeason = findHarvestSeasonById(harvestSeasonId);
+        ensureHarvestSeasonBelongsToFarm(harvestSeason, farm);
+
+        if (HarvestSeasonStatus.INACTIVE.equals(harvestSeason.getStatus())) {
+            throw new BusinessException(
+                    "Inactive harvest season cannot be linked to financial transaction");
+        }
+
+        return harvestSeason;
+    }
+
+    private void validateHarvestSeasonFilter(FinancialTransactionFilterRequest filterRequest) {
+        if (filterRequest.harvestSeasonId() == null) {
+            return;
+        }
+
+        Farm farm = farmService.findEntityById(filterRequest.farmId());
+        HarvestSeason harvestSeason = findHarvestSeasonById(filterRequest.harvestSeasonId());
+        ensureHarvestSeasonBelongsToFarm(harvestSeason, farm);
+    }
+
+    private HarvestSeason findHarvestSeasonById(Long harvestSeasonId) {
+        return harvestSeasonRepository
+                .findByIdWithRelations(harvestSeasonId)
+                .orElseThrow(() -> new ResourceNotFoundException("Harvest season not found"));
+    }
+
+    private void ensureHarvestSeasonBelongsToFarm(HarvestSeason harvestSeason, Farm farm) {
+        if (!harvestSeason.getFarm().getId().equals(farm.getId())) {
+            throw new BusinessException("Harvest season does not belong to transaction farm");
+        }
     }
 
     private void ensureFarmIsActive(Farm farm) {

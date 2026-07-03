@@ -23,6 +23,8 @@ public record FinancialTransactionResponse(
         String farmName,
         Long categoryId,
         String categoryName,
+        Long harvestSeasonId,
+        String harvestSeasonName,
         Long createdByUserId,
         String createdByUserName,
         Long updatedByUserId,

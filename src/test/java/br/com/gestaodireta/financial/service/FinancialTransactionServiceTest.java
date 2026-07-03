@@ -20,7 +20,14 @@ import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
+import br.com.gestaodireta.harvest.entity.HarvestSeason;
+import br.com.gestaodireta.harvest.entity.ProductionActivity;
+import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
+import br.com.gestaodireta.harvest.enumeration.ProductionActivityStatus;
+import br.com.gestaodireta.harvest.repository.HarvestSeasonRepository;
+import br.com.gestaodireta.harvest.repository.ProductionActivityRepository;
 import br.com.gestaodireta.shared.exception.BusinessException;
+import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
 import br.com.gestaodireta.shared.exception.ValidationException;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.support.PostgresIntegrationTest;
@@ -58,6 +65,10 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
 
     @Autowired private FarmUserRepository farmUserRepository;
 
+    @Autowired private HarvestSeasonRepository harvestSeasonRepository;
+
+    @Autowired private ProductionActivityRepository productionActivityRepository;
+
     @Autowired private FarmRepository farmRepository;
 
     @Autowired private UserRepository userRepository;
@@ -69,6 +80,8 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
         SecurityContextHolder.clearContext();
         financialTransactionRepository.deleteAll();
         financialCategoryRepository.deleteAll();
+        harvestSeasonRepository.deleteAll();
+        productionActivityRepository.deleteAll();
         farmUserRepository.deleteAll();
         farmRepository.deleteAll();
         userRepository.deleteAll();
@@ -170,6 +183,202 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
                                                 TransactionType.EXPENSE)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("Financial category is inactive");
+    }
+
+    @Test
+    void shouldCreateTransactionWithOptionalHarvestSeason() {
+        User admin = saveUser("Admin", "admin-harvest@example.com", UserType.ADMIN);
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        HarvestSeason harvestSeason = saveSeason(farm, "Safra Soja", HarvestSeasonStatus.PLANNED);
+        authenticateAs(admin, "ROLE_ADMIN");
+
+        FinancialTransactionResponse withoutSeason =
+                financialTransactionService.create(transactionRequest(farm, null, BigDecimal.TEN));
+        FinancialTransactionResponse withSeason =
+                financialTransactionService.create(
+                        transactionRequest(farm, null, BigDecimal.TEN, harvestSeason));
+
+        assertThat(withoutSeason.harvestSeasonId()).isNull();
+        assertThat(withoutSeason.harvestSeasonName()).isNull();
+        assertThat(withSeason.harvestSeasonId()).isEqualTo(harvestSeason.getId());
+        assertThat(withSeason.harvestSeasonName()).isEqualTo("Safra Soja");
+    }
+
+    @Test
+    void shouldRejectInvalidHarvestSeasonWhenCreatingTransaction() {
+        User admin = saveUser("Admin", "admin-invalid-harvest@example.com", UserType.ADMIN);
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        Farm otherFarm = saveFarm("Other Farm", FarmStatus.ACTIVE);
+        HarvestSeason otherFarmSeason =
+                saveSeason(otherFarm, "Safra Milho", HarvestSeasonStatus.PLANNED);
+        HarvestSeason inactiveSeason =
+                saveSeason(farm, "Safra Inativa", HarvestSeasonStatus.INACTIVE);
+        authenticateAs(admin, "ROLE_ADMIN");
+
+        assertThatThrownBy(
+                        () ->
+                                financialTransactionService.create(
+                                        transactionRequestWithHarvestSeasonId(farm, 999999L)))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Harvest season not found");
+
+        assertThatThrownBy(
+                        () ->
+                                financialTransactionService.create(
+                                        transactionRequest(
+                                                farm, null, BigDecimal.TEN, otherFarmSeason)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Harvest season does not belong to transaction farm");
+
+        assertThatThrownBy(
+                        () ->
+                                financialTransactionService.create(
+                                        transactionRequest(
+                                                farm, null, BigDecimal.TEN, inactiveSeason)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Inactive harvest season cannot be linked to financial transaction");
+    }
+
+    @Test
+    void shouldUpdateTransactionHarvestSeason() {
+        User admin = saveUser("Admin", "admin-update-harvest@example.com", UserType.ADMIN);
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        HarvestSeason firstSeason = saveSeason(farm, "Safra Soja", HarvestSeasonStatus.PLANNED);
+        HarvestSeason secondSeason = saveSeason(farm, "Safra Milho", HarvestSeasonStatus.PLANNED);
+        FinancialTransaction transaction =
+                saveTransaction(farm, null, admin, TransactionType.EXPENSE, firstSeason);
+        authenticateAs(admin, "ROLE_ADMIN");
+
+        FinancialTransactionResponse keptSeason =
+                financialTransactionService.update(
+                        transaction.getId(),
+                        updateRequest(null, BigDecimal.TEN, TransactionType.EXPENSE, firstSeason));
+        FinancialTransactionResponse changedSeason =
+                financialTransactionService.update(
+                        transaction.getId(),
+                        updateRequest(null, BigDecimal.TEN, TransactionType.EXPENSE, secondSeason));
+        FinancialTransactionResponse removedSeason =
+                financialTransactionService.update(
+                        transaction.getId(),
+                        updateRequest(null, BigDecimal.TEN, TransactionType.EXPENSE));
+
+        assertThat(keptSeason.harvestSeasonId()).isEqualTo(firstSeason.getId());
+        assertThat(changedSeason.harvestSeasonId()).isEqualTo(secondSeason.getId());
+        assertThat(removedSeason.harvestSeasonId()).isNull();
+        assertThat(removedSeason.harvestSeasonName()).isNull();
+    }
+
+    @Test
+    void shouldRejectInvalidHarvestSeasonWhenUpdatingTransaction() {
+        User admin = saveUser("Admin", "admin-invalid-update-harvest@example.com", UserType.ADMIN);
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        Farm otherFarm = saveFarm("Other Farm", FarmStatus.ACTIVE);
+        HarvestSeason otherFarmSeason =
+                saveSeason(otherFarm, "Safra Milho", HarvestSeasonStatus.PLANNED);
+        HarvestSeason inactiveSeason =
+                saveSeason(farm, "Safra Inativa", HarvestSeasonStatus.INACTIVE);
+        FinancialTransaction transaction =
+                saveTransaction(farm, null, admin, TransactionType.EXPENSE);
+        authenticateAs(admin, "ROLE_ADMIN");
+
+        assertThatThrownBy(
+                        () ->
+                                financialTransactionService.update(
+                                        transaction.getId(),
+                                        updateRequestWithHarvestSeasonId(999999L)))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Harvest season not found");
+
+        assertThatThrownBy(
+                        () ->
+                                financialTransactionService.update(
+                                        transaction.getId(),
+                                        updateRequest(
+                                                null,
+                                                BigDecimal.TEN,
+                                                TransactionType.EXPENSE,
+                                                otherFarmSeason)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Harvest season does not belong to transaction farm");
+
+        assertThatThrownBy(
+                        () ->
+                                financialTransactionService.update(
+                                        transaction.getId(),
+                                        updateRequest(
+                                                null,
+                                                BigDecimal.TEN,
+                                                TransactionType.EXPENSE,
+                                                inactiveSeason)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Inactive harvest season cannot be linked to financial transaction");
+    }
+
+    @Test
+    void shouldFilterTransactionsByHarvestSeason() {
+        User admin = saveUser("Admin", "admin-filter-harvest@example.com", UserType.ADMIN);
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        Farm otherFarm = saveFarm("Other Farm", FarmStatus.ACTIVE);
+        HarvestSeason firstSeason = saveSeason(farm, "Safra Soja", HarvestSeasonStatus.PLANNED);
+        HarvestSeason secondSeason = saveSeason(farm, "Safra Milho", HarvestSeasonStatus.PLANNED);
+        HarvestSeason otherFarmSeason =
+                saveSeason(otherFarm, "Safra Outra", HarvestSeasonStatus.PLANNED);
+        FinancialTransaction firstTransaction =
+                saveTransaction(farm, null, admin, TransactionType.EXPENSE, firstSeason);
+        FinancialTransaction secondTransaction =
+                saveTransaction(farm, null, admin, TransactionType.EXPENSE, secondSeason);
+        FinancialTransaction withoutSeason =
+                saveTransaction(farm, null, admin, TransactionType.EXPENSE);
+        FinancialTransaction otherFarmTransaction =
+                saveTransaction(otherFarm, null, admin, TransactionType.EXPENSE, otherFarmSeason);
+
+        List<FinancialTransactionResponse> allTransactions =
+                financialTransactionService
+                        .findAll(filter(farm.getId()), new PaginationParams())
+                        .content();
+        List<FinancialTransactionResponse> filteredTransactions =
+                financialTransactionService
+                        .findAll(
+                                filterByHarvestSeason(farm.getId(), firstSeason.getId()),
+                                new PaginationParams())
+                        .content();
+
+        assertThat(allTransactions)
+                .extracting(FinancialTransactionResponse::id)
+                .contains(
+                        firstTransaction.getId(), secondTransaction.getId(), withoutSeason.getId())
+                .doesNotContain(otherFarmTransaction.getId());
+        assertThat(filteredTransactions)
+                .extracting(FinancialTransactionResponse::id)
+                .containsExactly(firstTransaction.getId());
+        assertThat(filteredTransactions.getFirst().harvestSeasonId())
+                .isEqualTo(firstSeason.getId());
+        assertThat(filteredTransactions.getFirst().harvestSeasonName()).isEqualTo("Safra Soja");
+
+        assertThatThrownBy(
+                        () ->
+                                financialTransactionService.findAll(
+                                        filterByHarvestSeason(
+                                                farm.getId(), otherFarmSeason.getId()),
+                                        new PaginationParams()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Harvest season does not belong to transaction farm");
+    }
+
+    @Test
+    void shouldShowInactiveHarvestSeasonAlreadyLinkedToTransaction() {
+        User admin = saveUser("Admin", "admin-historical-harvest@example.com", UserType.ADMIN);
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        HarvestSeason inactiveSeason =
+                saveSeason(farm, "Safra Histórica", HarvestSeasonStatus.INACTIVE);
+        FinancialTransaction transaction =
+                saveTransaction(farm, null, admin, TransactionType.EXPENSE, inactiveSeason);
+
+        FinancialTransactionResponse response =
+                financialTransactionService.findById(transaction.getId());
+
+        assertThat(response.harvestSeasonId()).isEqualTo(inactiveSeason.getId());
+        assertThat(response.harvestSeasonName()).isEqualTo("Safra Histórica");
     }
 
     @Test
@@ -901,7 +1110,8 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
                 null,
                 null,
                 farm.getId(),
-                category == null ? null : category.getId());
+                category == null ? null : category.getId(),
+                null);
     }
 
     private FinancialTransactionUpdateRequest updateRequest(
@@ -916,7 +1126,77 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
                 LocalDate.now().plusDays(10),
                 null,
                 null,
-                category == null ? null : category.getId());
+                category == null ? null : category.getId(),
+                null);
+    }
+
+    private FinancialTransactionRequest transactionRequest(
+            Farm farm, FinancialCategory category, BigDecimal amount, HarvestSeason harvestSeason) {
+        return new FinancialTransactionRequest(
+                "Compra de insumos",
+                amount,
+                TransactionType.EXPENSE,
+                null,
+                null,
+                LocalDate.now(),
+                LocalDate.now().plusDays(10),
+                null,
+                null,
+                farm.getId(),
+                category == null ? null : category.getId(),
+                harvestSeason == null ? null : harvestSeason.getId());
+    }
+
+    private FinancialTransactionRequest transactionRequestWithHarvestSeasonId(
+            Farm farm, Long harvestSeasonId) {
+        return new FinancialTransactionRequest(
+                "Compra de insumos",
+                BigDecimal.TEN,
+                TransactionType.EXPENSE,
+                null,
+                null,
+                LocalDate.now(),
+                LocalDate.now().plusDays(10),
+                null,
+                null,
+                farm.getId(),
+                null,
+                harvestSeasonId);
+    }
+
+    private FinancialTransactionUpdateRequest updateRequest(
+            FinancialCategory category,
+            BigDecimal amount,
+            TransactionType type,
+            HarvestSeason harvestSeason) {
+        return new FinancialTransactionUpdateRequest(
+                "Atualizada",
+                amount,
+                type,
+                PaymentStatus.PENDING,
+                null,
+                LocalDate.now(),
+                LocalDate.now().plusDays(10),
+                null,
+                null,
+                category == null ? null : category.getId(),
+                harvestSeason == null ? null : harvestSeason.getId());
+    }
+
+    private FinancialTransactionUpdateRequest updateRequestWithHarvestSeasonId(
+            Long harvestSeasonId) {
+        return new FinancialTransactionUpdateRequest(
+                "Atualizada",
+                BigDecimal.TEN,
+                TransactionType.EXPENSE,
+                PaymentStatus.PENDING,
+                null,
+                LocalDate.now(),
+                LocalDate.now().plusDays(10),
+                null,
+                null,
+                null,
+                harvestSeasonId);
     }
 
     private User saveUser(String name, String email, UserType userType) {
@@ -1036,6 +1316,7 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
                 type,
                 categoryId,
                 categoryIds,
+                null,
                 paymentStatus,
                 paymentStatuses,
                 paymentMethod,
@@ -1045,6 +1326,29 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
                 createdByUserId,
                 minAmount,
                 maxAmount);
+    }
+
+    private FinancialTransactionFilterRequest filterByHarvestSeason(
+            Long farmId, Long harvestSeasonId) {
+        return new FinancialTransactionFilterRequest(
+                farmId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                harvestSeasonId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     private FilterScenario saveFilterScenario() {
@@ -1135,6 +1439,28 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
                 otherFarmTransaction);
     }
 
+    private ProductionActivity saveActivity(String name) {
+        ProductionActivity activity = new ProductionActivity();
+        activity.setName(name);
+        activity.setStatus(ProductionActivityStatus.ACTIVE);
+
+        return productionActivityRepository.save(activity);
+    }
+
+    private HarvestSeason saveSeason(Farm farm, String name, HarvestSeasonStatus status) {
+        HarvestSeason season = new HarvestSeason();
+        season.setFarm(farm);
+        season.setProductionActivity(saveActivity(name + " Activity"));
+        season.setName(name);
+        season.setStartDate(LocalDate.of(2026, 1, 1));
+        season.setExpectedRevenue(BigDecimal.ZERO);
+        season.setExpectedCost(BigDecimal.ZERO);
+        season.setAreaHectares(BigDecimal.ZERO);
+        season.setStatus(status);
+
+        return harvestSeasonRepository.save(season);
+    }
+
     private FinancialTransaction saveTransaction(
             Farm farm,
             FinancialCategory category,
@@ -1166,6 +1492,15 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
 
     private FinancialTransaction saveTransaction(
             Farm farm, FinancialCategory category, User user, TransactionType type) {
+        return saveTransaction(farm, category, user, type, null);
+    }
+
+    private FinancialTransaction saveTransaction(
+            Farm farm,
+            FinancialCategory category,
+            User user,
+            TransactionType type,
+            HarvestSeason harvestSeason) {
         FinancialTransaction transaction = new FinancialTransaction();
         transaction.setDescription("Transaction");
         transaction.setAmount(BigDecimal.TEN);
@@ -1175,6 +1510,7 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
         transaction.setDueDate(LocalDate.now().plusDays(5));
         transaction.setFarm(farm);
         transaction.setCategory(category);
+        transaction.setHarvestSeason(harvestSeason);
         transaction.setCreatedByUser(user);
         transaction.setRecordStatus(FinancialRecordStatus.ACTIVE);
 

@@ -2687,7 +2687,7 @@ Lista categorias visíveis para uma fazenda.
 ```
 
 **Possíveis erros/status HTTP:**
-- `400 Bad Request` para query params inválidos.
+- `400 Bad Request` para query params inválidos ou `harvestSeasonId` de outra fazenda.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
 - `403 Forbidden` para usuário sem acesso financeiro à fazenda.
 - `404 Not Found` se a fazenda não existir.
@@ -3178,7 +3178,8 @@ Cria uma movimentação financeira.
   "paidAt": null,
   "notes": "Compra para safra",
   "farmId": 1,
-  "categoryId": 1
+  "categoryId": 1,
+  "harvestSeasonId": 10
 }
 ```
 
@@ -3196,6 +3197,7 @@ Cria uma movimentação financeira.
 - `paidAt`
 - `notes`
 - `categoryId`
+- `harvestSeasonId`
 
 **Resposta de sucesso:**
 ```json
@@ -3214,6 +3216,8 @@ Cria uma movimentação financeira.
   "farmName": "Fazenda Boa Safra",
   "categoryId": 1,
   "categoryName": "Insumos",
+  "harvestSeasonId": 10,
+  "harvestSeasonName": "Safra Soja 2025/26",
   "createdByUserId": 2,
   "createdByUserName": "User",
   "updatedByUserId": null,
@@ -3226,13 +3230,15 @@ Cria uma movimentação financeira.
 
 **Possíveis erros/status HTTP:**
 - `201 Created` em caso de sucesso.
-- `400 Bad Request` para body inválido, valor não positivo, fazenda inativa, categoria inativa, categoria de outra fazenda ou tipo de categoria incompatível.
+- `400 Bad Request` para body inválido, valor não positivo, fazenda inativa, categoria inativa, categoria de outra fazenda, tipo de categoria incompatível, safra inativa ou safra de outra fazenda.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
 - `403 Forbidden` para usuário sem permissão de gestão financeira.
-- `404 Not Found` se fazenda, categoria ou usuário autenticado não existir.
+- `404 Not Found` se fazenda, categoria, safra ou usuário autenticado não existir.
 
 **Observações de regra de negócio:**
 - Se `status` não for informado, o backend usa `PENDING`.
+- `harvestSeasonId` é opcional; quando informado, a safra deve pertencer à mesma fazenda da movimentação.
+- Não é permitido criar movimentação vinculada a uma safra inativa.
 - `createdByUserId` é definido pelo backend a partir do usuário autenticado.
 - `ACCOUNTANT` pode consultar dados financeiros, mas não criar movimentações.
 
@@ -3260,6 +3266,7 @@ Lista movimentações financeiras ativas de uma fazenda.
   "type": "EXPENSE",
   "categoryId": 1,
   "categoryIds": [1, 2],
+  "harvestSeasonId": 10,
   "paymentStatus": "PENDING",
   "paymentStatuses": ["PENDING", "PAID"],
   "paymentMethod": "PIX",
@@ -3296,6 +3303,7 @@ Lista movimentações financeiras ativas de uma fazenda.
 - `type`
 - `categoryId`
 - `categoryIds`
+- `harvestSeasonId`
 - `paymentStatus`
 - `paymentStatuses`
 - `paymentMethod`
@@ -3325,6 +3333,8 @@ Lista movimentações financeiras ativas de uma fazenda.
       "farmName": "Fazenda Boa Safra",
       "categoryId": 1,
       "categoryName": "Insumos",
+      "harvestSeasonId": 10,
+      "harvestSeasonName": "Safra Soja 2025/26",
       "createdByUserId": 2,
       "createdByUserName": "User",
       "updatedByUserId": null,
@@ -3347,6 +3357,7 @@ Lista movimentações financeiras ativas de uma fazenda.
 - `400 Bad Request` para query params inválidos.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
 - `403 Forbidden` para usuário sem acesso financeiro à fazenda.
+- `404 Not Found` se a safra informada no filtro não existir.
 
 **Observações de regra de negócio:**
 - Por padrão, `recordStatus` é `ACTIVE` quando não informado.
@@ -3358,6 +3369,8 @@ Lista movimentações financeiras ativas de uma fazenda.
 - `paymentMethod` filtra a forma de pagamento da movimentação.
 - `paymentStatuses`: aceita query params repetidos, por exemplo `paymentStatuses=PENDING&paymentStatuses=PAID`. Quando informado com valores válidos, tem prioridade sobre `paymentStatus`.
 - `categoryId` filtra a categoria vinculada à movimentação, mantendo o escopo da fazenda consultada.
+- `harvestSeasonId` filtra movimentações vinculadas à safra informada; a safra deve existir e pertencer à fazenda consultada.
+- Exemplo: `GET /api/financial/transactions?farmId=1&harvestSeasonId=10`.
 - `categoryIds`: aceita query params repetidos, por exemplo `categoryIds=1&categoryIds=2`. Quando informado com valores válidos, tem prioridade sobre `categoryId`.
 - `paymentMethods`: aceita query params repetidos, por exemplo `paymentMethods=PIX&paymentMethods=CASH`. Quando informado com valores válidos, tem prioridade sobre `paymentMethod`.
 - `ACCOUNTANT` pode consultar movimentações.
@@ -3410,6 +3423,8 @@ Busca uma movimentação financeira por id.
   "farmName": "Fazenda Boa Safra",
   "categoryId": 1,
   "categoryName": "Insumos",
+  "harvestSeasonId": 10,
+  "harvestSeasonName": "Safra Soja 2025/26",
   "createdByUserId": 2,
   "createdByUserName": "User",
   "updatedByUserId": null,
@@ -3427,6 +3442,7 @@ Busca uma movimentação financeira por id.
 
 **Observações de regra de negócio:**
 - A autorização usa a fazenda associada à movimentação.
+- `harvestSeasonId` e `harvestSeasonName` são retornados como `null` quando a movimentação não tem safra vinculada.
 
 ### PUT /api/financial/transactions/{id}
 
@@ -3460,7 +3476,8 @@ Atualiza uma movimentação financeira.
   "dueDate": "2026-06-30",
   "paidAt": null,
   "notes": "Valor corrigido",
-  "categoryId": 1
+  "categoryId": 1,
+  "harvestSeasonId": 10
 }
 ```
 
@@ -3478,6 +3495,7 @@ Atualiza uma movimentação financeira.
 - `paidAt`
 - `notes`
 - `categoryId`
+- `harvestSeasonId`
 
 **Resposta de sucesso:**
 ```json
@@ -3496,6 +3514,8 @@ Atualiza uma movimentação financeira.
   "farmName": "Fazenda Boa Safra",
   "categoryId": 1,
   "categoryName": "Insumos",
+  "harvestSeasonId": 10,
+  "harvestSeasonName": "Safra Soja 2025/26",
   "createdByUserId": 2,
   "createdByUserName": "User",
   "updatedByUserId": 2,
@@ -3507,10 +3527,10 @@ Atualiza uma movimentação financeira.
 ```
 
 **Possíveis erros/status HTTP:**
-- `400 Bad Request` para body inválido, valor não positivo, categoria inativa, categoria de outra fazenda ou tipo de categoria incompatível.
+- `400 Bad Request` para body inválido, valor não positivo, categoria inativa, categoria de outra fazenda, tipo de categoria incompatível, safra inativa ou safra de outra fazenda.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
 - `403 Forbidden` para usuário sem permissão de gestão financeira.
-- `404 Not Found` se movimentação ou categoria não existir.
+- `404 Not Found` se movimentação, categoria ou safra não existir.
 
 **Observações de regra de negócio:**
 - `farmId` não é aceito no request de atualização; a fazenda vem da movimentação existente.
@@ -3614,6 +3634,8 @@ Marca uma movimentação como paga.
   "farmName": "Fazenda Boa Safra",
   "categoryId": 1,
   "categoryName": "Insumos",
+  "harvestSeasonId": 10,
+  "harvestSeasonName": "Safra Soja 2025/26",
   "createdByUserId": 2,
   "createdByUserName": "User",
   "updatedByUserId": 2,
@@ -3681,6 +3703,8 @@ Cancela uma movimentação financeira.
   "farmName": "Fazenda Boa Safra",
   "categoryId": 1,
   "categoryName": "Insumos",
+  "harvestSeasonId": 10,
+  "harvestSeasonName": "Safra Soja 2025/26",
   "createdByUserId": 2,
   "createdByUserName": "User",
   "updatedByUserId": 2,

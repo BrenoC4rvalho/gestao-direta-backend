@@ -23,6 +23,12 @@ import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
+import br.com.gestaodireta.harvest.entity.HarvestSeason;
+import br.com.gestaodireta.harvest.entity.ProductionActivity;
+import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
+import br.com.gestaodireta.harvest.enumeration.ProductionActivityStatus;
+import br.com.gestaodireta.harvest.repository.HarvestSeasonRepository;
+import br.com.gestaodireta.harvest.repository.ProductionActivityRepository;
 import br.com.gestaodireta.support.PostgresIntegrationTest;
 import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.enumeration.UserStatus;
@@ -51,6 +57,10 @@ class FinancialTransactionControllerTest extends PostgresIntegrationTest {
 
     @Autowired private FinancialCategoryRepository financialCategoryRepository;
 
+    @Autowired private HarvestSeasonRepository harvestSeasonRepository;
+
+    @Autowired private ProductionActivityRepository productionActivityRepository;
+
     @Autowired private FarmUserRepository farmUserRepository;
 
     @Autowired private FarmRepository farmRepository;
@@ -63,6 +73,8 @@ class FinancialTransactionControllerTest extends PostgresIntegrationTest {
     void setUp() {
         financialTransactionRepository.deleteAll();
         financialCategoryRepository.deleteAll();
+        harvestSeasonRepository.deleteAll();
+        productionActivityRepository.deleteAll();
         farmUserRepository.deleteAll();
         farmRepository.deleteAll();
         userRepository.deleteAll();
@@ -122,6 +134,29 @@ class FinancialTransactionControllerTest extends PostgresIntegrationTest {
                 financialTransactionRepository.findById(transaction.getId()).orElseThrow();
         org.assertj.core.api.Assertions.assertThat(savedTransaction.getRecordStatus())
                 .isEqualTo(FinancialRecordStatus.DELETED);
+    }
+
+    @Test
+    void shouldCreateTransactionWithHarvestSeason() throws Exception {
+        Farm farm = saveFarm(FarmStatus.ACTIVE);
+        User admin = saveUser("Admin", "admin-harvest-create@example.com", UserType.ADMIN);
+        HarvestSeason harvestSeason = saveSeason(farm, "Safra Soja", HarvestSeasonStatus.PLANNED);
+
+        mockMvc.perform(
+                        post("/api/financial/transactions")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        transactionBody(
+                                                farm.getId(),
+                                                "Compra de sementes",
+                                                harvestSeason.getId())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.farmId").value(farm.getId()))
+                .andExpect(jsonPath("$.harvestSeasonId").value(harvestSeason.getId()))
+                .andExpect(jsonPath("$.harvestSeasonName").value("Safra Soja"));
     }
 
     @Test
@@ -201,6 +236,58 @@ class FinancialTransactionControllerTest extends PostgresIntegrationTest {
                                 .param("paymentMethods", "PIX"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(transaction.getId()));
+    }
+
+    @Test
+    void shouldListTransactionsFilteringByHarvestSeason() throws Exception {
+        Farm farm = saveFarm(FarmStatus.ACTIVE);
+        User admin = saveUser("Admin", "harvest-filter-admin@example.com", UserType.ADMIN);
+        HarvestSeason firstSeason = saveSeason(farm, "Safra Soja", HarvestSeasonStatus.PLANNED);
+        HarvestSeason secondSeason = saveSeason(farm, "Safra Milho", HarvestSeasonStatus.PLANNED);
+        FinancialTransaction firstTransaction = saveTransaction(farm, admin, firstSeason);
+        FinancialTransaction secondTransaction = saveTransaction(farm, admin, secondSeason);
+        saveTransaction(farm, admin);
+
+        mockMvc.perform(
+                        get("/api/financial/transactions")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN"))
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("harvestSeasonId", String.valueOf(firstSeason.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(firstTransaction.getId()))
+                .andExpect(jsonPath("$.content[0].harvestSeasonId").value(firstSeason.getId()))
+                .andExpect(jsonPath("$.content[0].harvestSeasonName").value("Safra Soja"))
+                .andExpect(jsonPath("$.content[1]").doesNotExist());
+
+        mockMvc.perform(
+                        get("/api/financial/transactions")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN"))
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("harvestSeasonId", String.valueOf(secondSeason.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(secondTransaction.getId()));
+    }
+
+    @Test
+    void shouldRejectHarvestSeasonFromAnotherFarmWhenListingTransactions() throws Exception {
+        Farm farm = saveFarm(FarmStatus.ACTIVE);
+        Farm otherFarm = saveFarm(FarmStatus.ACTIVE);
+        User admin = saveUser("Admin", "harvest-invalid-filter-admin@example.com", UserType.ADMIN);
+        HarvestSeason otherFarmSeason =
+                saveSeason(otherFarm, "Safra Outra", HarvestSeasonStatus.PLANNED);
+
+        mockMvc.perform(
+                        get("/api/financial/transactions")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN"))
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("harvestSeasonId", String.valueOf(otherFarmSeason.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(
+                        jsonPath("$.message")
+                                .value("Harvest season does not belong to transaction farm"));
     }
 
     @Test
@@ -298,6 +385,20 @@ class FinancialTransactionControllerTest extends PostgresIntegrationTest {
                 .formatted(description, LocalDate.now(), farmId);
     }
 
+    private String transactionBody(Long farmId, String description, Long harvestSeasonId) {
+        return """
+                {
+                  "description": "%s",
+                  "amount": 10.00,
+                  "type": "EXPENSE",
+                  "transactionDate": "%s",
+                  "farmId": %d,
+                  "harvestSeasonId": %d
+                }
+                """
+                .formatted(description, LocalDate.now(), farmId, harvestSeasonId);
+    }
+
     private User saveUser(String name, String email, UserType userType) {
         User user = new User();
         user.setName(name);
@@ -337,6 +438,28 @@ class FinancialTransactionControllerTest extends PostgresIntegrationTest {
         return financialCategoryRepository.save(category);
     }
 
+    private ProductionActivity saveActivity(String name) {
+        ProductionActivity activity = new ProductionActivity();
+        activity.setName(name);
+        activity.setStatus(ProductionActivityStatus.ACTIVE);
+
+        return productionActivityRepository.save(activity);
+    }
+
+    private HarvestSeason saveSeason(Farm farm, String name, HarvestSeasonStatus status) {
+        HarvestSeason season = new HarvestSeason();
+        season.setFarm(farm);
+        season.setProductionActivity(saveActivity(name + " Activity"));
+        season.setName(name);
+        season.setStartDate(LocalDate.of(2026, 1, 1));
+        season.setExpectedRevenue(BigDecimal.ZERO);
+        season.setExpectedCost(BigDecimal.ZERO);
+        season.setAreaHectares(BigDecimal.ZERO);
+        season.setStatus(status);
+
+        return harvestSeasonRepository.save(season);
+    }
+
     private FinancialTransaction saveTransaction(Farm farm, User user) {
         return saveTransaction(
                 farm,
@@ -348,7 +471,24 @@ class FinancialTransactionControllerTest extends PostgresIntegrationTest {
                 PaymentStatus.PENDING,
                 null,
                 LocalDate.now(),
+                null,
                 null);
+    }
+
+    private FinancialTransaction saveTransaction(
+            Farm farm, User user, HarvestSeason harvestSeason) {
+        return saveTransaction(
+                farm,
+                null,
+                user,
+                "Transaction",
+                BigDecimal.TEN,
+                TransactionType.EXPENSE,
+                PaymentStatus.PENDING,
+                null,
+                LocalDate.now(),
+                null,
+                harvestSeason);
     }
 
     private FinancialTransaction saveTransaction(
@@ -362,6 +502,32 @@ class FinancialTransactionControllerTest extends PostgresIntegrationTest {
             PaymentMethod paymentMethod,
             LocalDate transactionDate,
             LocalDate paidAt) {
+        return saveTransaction(
+                farm,
+                category,
+                user,
+                description,
+                amount,
+                type,
+                status,
+                paymentMethod,
+                transactionDate,
+                paidAt,
+                null);
+    }
+
+    private FinancialTransaction saveTransaction(
+            Farm farm,
+            FinancialCategory category,
+            User user,
+            String description,
+            BigDecimal amount,
+            TransactionType type,
+            PaymentStatus status,
+            PaymentMethod paymentMethod,
+            LocalDate transactionDate,
+            LocalDate paidAt,
+            HarvestSeason harvestSeason) {
         FinancialTransaction transaction = new FinancialTransaction();
         transaction.setDescription(description);
         transaction.setAmount(amount);
@@ -372,6 +538,7 @@ class FinancialTransactionControllerTest extends PostgresIntegrationTest {
         transaction.setPaidAt(paidAt);
         transaction.setFarm(farm);
         transaction.setCategory(category);
+        transaction.setHarvestSeason(harvestSeason);
         transaction.setCreatedByUser(user);
         transaction.setRecordStatus(FinancialRecordStatus.ACTIVE);
 

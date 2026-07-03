@@ -12,6 +12,7 @@ import java.util.Collection;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -22,6 +23,7 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
     Page<FinancialTransaction> findByFarmIdAndRecordStatus(
             Long farmId, FinancialRecordStatus recordStatus, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"harvestSeason"})
     @Query(
             """
             select transaction
@@ -34,6 +36,8 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
                 or (transaction.paidAt >= :paidAtStart and transaction.paidAt <= :paidAtEnd))
               and (:type is null or transaction.type = :type)
               and (:filterCategoryIds = false or transaction.category.id in :categoryIds)
+              and (:harvestSeasonId is null
+                or transaction.harvestSeason.id = :harvestSeasonId)
               and (:filterPaymentStatuses = false or transaction.status in :paymentStatuses)
               and (:filterPaymentMethods = false or transaction.paymentMethod in :paymentMethods)
               and (:description is null
@@ -53,6 +57,7 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
             @Param("type") TransactionType type,
             @Param("filterCategoryIds") boolean filterCategoryIds,
             @Param("categoryIds") Collection<Long> categoryIds,
+            @Param("harvestSeasonId") Long harvestSeasonId,
             @Param("filterPaymentStatuses") boolean filterPaymentStatuses,
             @Param("paymentStatuses") Collection<PaymentStatus> paymentStatuses,
             @Param("filterPaymentMethods") boolean filterPaymentMethods,

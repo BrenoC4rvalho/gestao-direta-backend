@@ -20,4 +20,5 @@ public record FinancialTransactionUpdateRequest(
         LocalDate dueDate,
         LocalDate paidAt,
         @Size(max = 500) String notes,
-        Long categoryId) {}
+        Long categoryId,
+        Long harvestSeasonId) {}

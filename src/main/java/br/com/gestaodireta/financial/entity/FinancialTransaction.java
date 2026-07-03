@@ -5,6 +5,7 @@ import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
 import br.com.gestaodireta.financial.enumeration.PaymentMethod;
 import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
+import br.com.gestaodireta.harvest.entity.HarvestSeason;
 import br.com.gestaodireta.shared.audit.BaseEntity;
 import br.com.gestaodireta.user.entity.User;
 import jakarta.persistence.Column;
@@ -66,6 +67,10 @@ public class FinancialTransaction extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
     private FinancialCategory category;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "harvest_season_id")
+    private HarvestSeason harvestSeason;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by_user_id", nullable = false)
@@ -169,6 +174,14 @@ public class FinancialTransaction extends BaseEntity {
 
     public void setCategory(FinancialCategory category) {
         this.category = category;
+    }
+
+    public HarvestSeason getHarvestSeason() {
+        return harvestSeason;
+    }
+
+    public void setHarvestSeason(HarvestSeason harvestSeason) {
+        this.harvestSeason = harvestSeason;
     }
 
     public User getCreatedByUser() {

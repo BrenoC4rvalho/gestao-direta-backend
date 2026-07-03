@@ -21,4 +21,5 @@ public record FinancialTransactionRequest(
         LocalDate paidAt,
         @Size(max = 500) String notes,
         @NotNull Long farmId,
-        Long categoryId) {}
+        Long categoryId,
+        Long harvestSeasonId) {}
