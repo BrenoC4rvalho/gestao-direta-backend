@@ -105,6 +105,62 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
             @Param("recordStatus") FinancialRecordStatus recordStatus,
             @Param("status") PaymentStatus status);
 
+    @Query(
+            """
+            select
+              coalesce(sum(case
+                when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PAID
+                then transaction.amount
+                else 0
+              end), 0) as realizedCost,
+              coalesce(sum(case
+                when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME
+                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PAID
+                then transaction.amount
+                else 0
+              end), 0) as realizedRevenue,
+              coalesce(sum(case
+                when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                then transaction.amount
+                else 0
+              end), 0) as pendingExpenses,
+              coalesce(sum(case
+                when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                then transaction.amount
+                else 0
+              end), 0) as overdueExpenses,
+              coalesce(sum(case
+                when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME
+                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                then transaction.amount
+                else 0
+              end), 0) as pendingRevenue,
+              count(transaction) as transactionCount,
+              coalesce(sum(case
+                when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME
+                then 1
+                else 0
+              end), 0) as incomeCount,
+              coalesce(sum(case
+                when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+                then 1
+                else 0
+              end), 0) as expenseCount
+            from FinancialTransaction transaction
+            where transaction.harvestSeason.id = :harvestSeasonId
+              and transaction.recordStatus = br.com.gestaodireta.financial.enumeration.FinancialRecordStatus.ACTIVE
+              and transaction.status in (
+                br.com.gestaodireta.financial.enumeration.PaymentStatus.PAID,
+                br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING,
+                br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+              )
+            """)
+    HarvestSeasonFinancialSummaryProjection summarizeByHarvestSeasonId(
+            @Param("harvestSeasonId") Long harvestSeasonId);
+
     Page<FinancialTransaction> findByFarmIdAndTypeAndRecordStatusAndStatusInAndDueDateIsNotNull(
             Long farmId,
             TransactionType type,

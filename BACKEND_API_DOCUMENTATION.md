@@ -2287,10 +2287,92 @@ Busca uma safra por id.
 **Possíveis erros/status HTTP:**
 - `200 OK` em caso de sucesso.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
-- `403 Forbidden` para usuário sem permissão ou quando a safra não for encontrada na checagem de autorização.
+- `403 Forbidden` para usuário sem permissão.
+- `404 Not Found` se a safra não existir.
 
 **Observações de regra de negócio:**
 - A autorização é calculada a partir da fazenda da safra.
+
+### GET /api/harvest/seasons/{id}/summary
+
+**Descrição:**
+Retorna o resumo financeiro consolidado de uma safra com base nas movimentações financeiras vinculadas.
+
+**Autenticação:** Sim
+**Permissão:** `ADMIN`; `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com vínculo ativo na fazenda ativa da safra.
+
+**Path params:**
+```json
+{
+  "id": 1
+}
+```
+
+**Query params:**
+```json
+{}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `id`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "harvestSeasonId": 1,
+  "harvestSeasonName": "Safra Soja 2025/26",
+  "productionActivityId": 1,
+  "productionActivityName": "Soja",
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "expectedCost": 96500.00,
+  "expectedRevenue": 210000.00,
+  "expectedProfit": 113500.00,
+  "realizedCost": 72500.00,
+  "realizedRevenue": 150000.00,
+  "realizedProfit": 77500.00,
+  "pendingExpenses": 18000.00,
+  "overdueExpenses": 6000.00,
+  "pendingRevenue": 25000.00,
+  "transactionCount": 42,
+  "incomeCount": 8,
+  "expenseCount": 34,
+  "areaHectares": 120.00,
+  "costPerHectare": 604.17,
+  "revenuePerHectare": 1250.00,
+  "profitPerHectare": 645.83
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `200 OK` em caso de sucesso.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão.
+- `404 Not Found` se a safra não existir.
+
+**Regras de cálculo:**
+- Considera apenas movimentações com `harvestSeasonId` igual ao `id` da safra e `recordStatus=ACTIVE`.
+- Movimentações com `status=CANCELED` não entram em valores nem contadores.
+- Movimentações com `recordStatus=DELETED` são ignoradas.
+- `realizedRevenue` soma `INCOME` com `PAID`.
+- `realizedCost` soma `EXPENSE` com `PAID`.
+- `realizedProfit = realizedRevenue - realizedCost`.
+- `pendingExpenses` soma `EXPENSE` com `PENDING`.
+- `overdueExpenses` soma `EXPENSE` com `OVERDUE`.
+- `pendingRevenue` soma `INCOME` com `PENDING`.
+- `transactionCount`, `incomeCount` e `expenseCount` contam apenas movimentações `PAID`, `PENDING` ou `OVERDUE` vinculadas à safra.
+- `expectedCost`, `expectedRevenue` e `areaHectares` vêm da própria safra.
+- `expectedProfit = expectedRevenue - expectedCost`, tratando valores nulos como zero.
+- Indicadores por hectare usam valores realizados: `realizedCost / areaHectares`, `realizedRevenue / areaHectares` e `realizedProfit / areaHectares`.
+- `costPerHectare`, `revenuePerHectare` e `profitPerHectare` retornam `null` quando `areaHectares` é nulo ou zero.
 
 ### PUT /api/harvest/seasons/{id}
 

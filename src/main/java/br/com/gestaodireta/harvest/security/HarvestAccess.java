@@ -61,8 +61,8 @@ public class HarvestAccess {
     public boolean canViewSeason(Long seasonId) {
         return harvestSeasonRepository
                 .findAccessById(seasonId)
-                .filter(access -> canViewFarmHarvestData(access.getFarmId()))
-                .isPresent();
+                .map(access -> canViewFarmHarvestData(access.getFarmId()))
+                .orElse(true);
     }
 
     public boolean canManageSeason(Long seasonId) {

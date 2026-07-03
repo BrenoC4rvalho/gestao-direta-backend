@@ -3,9 +3,12 @@ package br.com.gestaodireta.harvest.service;
 import br.com.gestaodireta.farm.entity.Farm;
 import br.com.gestaodireta.farm.enumeration.FarmStatus;
 import br.com.gestaodireta.farm.service.FarmService;
+import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
+import br.com.gestaodireta.financial.repository.HarvestSeasonFinancialSummaryProjection;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonStatusUpdateRequest;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonUpdateRequest;
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
 import br.com.gestaodireta.harvest.entity.ProductionActivity;
@@ -18,6 +21,7 @@ import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.Locale;
 import org.springframework.data.domain.Page;
@@ -31,6 +35,8 @@ public class HarvestSeasonService {
 
     private final FarmService farmService;
 
+    private final FinancialTransactionRepository financialTransactionRepository;
+
     private final ProductionActivityService productionActivityService;
 
     private final HarvestSeasonMapper harvestSeasonMapper;
@@ -38,10 +44,12 @@ public class HarvestSeasonService {
     public HarvestSeasonService(
             HarvestSeasonRepository harvestSeasonRepository,
             FarmService farmService,
+            FinancialTransactionRepository financialTransactionRepository,
             ProductionActivityService productionActivityService,
             HarvestSeasonMapper harvestSeasonMapper) {
         this.harvestSeasonRepository = harvestSeasonRepository;
         this.farmService = farmService;
+        this.financialTransactionRepository = financialTransactionRepository;
         this.productionActivityService = productionActivityService;
         this.harvestSeasonMapper = harvestSeasonMapper;
     }
@@ -83,6 +91,45 @@ public class HarvestSeasonService {
     @Transactional(readOnly = true)
     public HarvestSeasonResponse findById(Long id) {
         return harvestSeasonMapper.toResponse(findEntityById(id));
+    }
+
+    @Transactional(readOnly = true)
+    public HarvestSeasonSummaryResponse getSummary(Long id) {
+        HarvestSeason harvestSeason = findEntityById(id);
+        HarvestSeasonFinancialSummaryProjection summary =
+                financialTransactionRepository.summarizeByHarvestSeasonId(id);
+
+        BigDecimal expectedCost = zeroIfNull(harvestSeason.getExpectedCost());
+        BigDecimal expectedRevenue = zeroIfNull(harvestSeason.getExpectedRevenue());
+        BigDecimal expectedProfit = expectedRevenue.subtract(expectedCost);
+        BigDecimal realizedCost = zeroIfNull(summary.getRealizedCost());
+        BigDecimal realizedRevenue = zeroIfNull(summary.getRealizedRevenue());
+        BigDecimal realizedProfit = realizedRevenue.subtract(realizedCost);
+        BigDecimal areaHectares = harvestSeason.getAreaHectares();
+
+        return new HarvestSeasonSummaryResponse(
+                harvestSeason.getId(),
+                harvestSeason.getName(),
+                harvestSeason.getProductionActivity().getId(),
+                harvestSeason.getProductionActivity().getName(),
+                harvestSeason.getFarm().getId(),
+                harvestSeason.getFarm().getName(),
+                expectedCost,
+                expectedRevenue,
+                expectedProfit,
+                realizedCost,
+                realizedRevenue,
+                realizedProfit,
+                zeroIfNull(summary.getPendingExpenses()),
+                zeroIfNull(summary.getOverdueExpenses()),
+                zeroIfNull(summary.getPendingRevenue()),
+                zeroIfNull(summary.getTransactionCount()),
+                zeroIfNull(summary.getIncomeCount()),
+                zeroIfNull(summary.getExpenseCount()),
+                areaHectares,
+                amountPerHectare(realizedCost, areaHectares),
+                amountPerHectare(realizedRevenue, areaHectares),
+                amountPerHectare(realizedProfit, areaHectares));
     }
 
     @Transactional
@@ -217,5 +264,21 @@ public class HarvestSeasonService {
             throw new BusinessException(
                     "Inactive production activity cannot be used in a harvest season.");
         }
+    }
+
+    private BigDecimal zeroIfNull(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private Long zeroIfNull(Long value) {
+        return value == null ? 0L : value;
+    }
+
+    private BigDecimal amountPerHectare(BigDecimal amount, BigDecimal areaHectares) {
+        if (areaHectares == null || BigDecimal.ZERO.compareTo(areaHectares) == 0) {
+            return null;
+        }
+
+        return amount.divide(areaHectares, 2, RoundingMode.HALF_UP);
     }
 }

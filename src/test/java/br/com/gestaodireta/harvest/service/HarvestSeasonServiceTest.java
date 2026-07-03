@@ -1,0 +1,272 @@
+package br.com.gestaodireta.harvest.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import br.com.gestaodireta.farm.entity.Farm;
+import br.com.gestaodireta.farm.enumeration.FarmStatus;
+import br.com.gestaodireta.farm.repository.FarmRepository;
+import br.com.gestaodireta.farm.repository.FarmUserRepository;
+import br.com.gestaodireta.financial.entity.FinancialTransaction;
+import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
+import br.com.gestaodireta.financial.enumeration.PaymentStatus;
+import br.com.gestaodireta.financial.enumeration.TransactionType;
+import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
+import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryResponse;
+import br.com.gestaodireta.harvest.entity.HarvestSeason;
+import br.com.gestaodireta.harvest.entity.ProductionActivity;
+import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
+import br.com.gestaodireta.harvest.enumeration.ProductionActivityStatus;
+import br.com.gestaodireta.harvest.repository.HarvestSeasonRepository;
+import br.com.gestaodireta.harvest.repository.ProductionActivityRepository;
+import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
+import br.com.gestaodireta.support.PostgresIntegrationTest;
+import br.com.gestaodireta.user.entity.User;
+import br.com.gestaodireta.user.enumeration.UserStatus;
+import br.com.gestaodireta.user.enumeration.UserType;
+import br.com.gestaodireta.user.repository.UserRepository;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+@SpringBootTest
+class HarvestSeasonServiceTest extends PostgresIntegrationTest {
+
+    @Autowired private HarvestSeasonService harvestSeasonService;
+
+    @Autowired private FinancialTransactionRepository financialTransactionRepository;
+
+    @Autowired private FinancialCategoryRepository financialCategoryRepository;
+
+    @Autowired private HarvestSeasonRepository harvestSeasonRepository;
+
+    @Autowired private ProductionActivityRepository productionActivityRepository;
+
+    @Autowired private FarmUserRepository farmUserRepository;
+
+    @Autowired private FarmRepository farmRepository;
+
+    @Autowired private UserRepository userRepository;
+
+    @Autowired private PasswordEncoder passwordEncoder;
+
+    @BeforeEach
+    void setUp() {
+        SecurityContextHolder.clearContext();
+        financialTransactionRepository.deleteAll();
+        financialCategoryRepository.deleteAll();
+        harvestSeasonRepository.deleteAll();
+        productionActivityRepository.deleteAll();
+        farmUserRepository.deleteAll();
+        farmRepository.deleteAll();
+        userRepository.deleteAll();
+    }
+
+    @Test
+    void shouldReturnZeroSummaryWhenHarvestSeasonHasNoTransactions() {
+        Farm farm = saveFarm("Farm");
+        ProductionActivity activity = saveActivity("Soja");
+        HarvestSeason season = saveSeason(farm, activity, null, null, null, "Safra Soja");
+
+        HarvestSeasonSummaryResponse response = harvestSeasonService.getSummary(season.getId());
+
+        assertThat(response.harvestSeasonId()).isEqualTo(season.getId());
+        assertThat(response.harvestSeasonName()).isEqualTo("Safra Soja");
+        assertThat(response.productionActivityId()).isEqualTo(activity.getId());
+        assertThat(response.productionActivityName()).isEqualTo("Soja");
+        assertThat(response.farmId()).isEqualTo(farm.getId());
+        assertThat(response.farmName()).isEqualTo("Farm");
+        assertThat(response.expectedCost()).isEqualByComparingTo("0.00");
+        assertThat(response.expectedRevenue()).isEqualByComparingTo("0.00");
+        assertThat(response.expectedProfit()).isEqualByComparingTo("0.00");
+        assertThat(response.realizedCost()).isEqualByComparingTo("0.00");
+        assertThat(response.realizedRevenue()).isEqualByComparingTo("0.00");
+        assertThat(response.realizedProfit()).isEqualByComparingTo("0.00");
+        assertThat(response.pendingExpenses()).isEqualByComparingTo("0.00");
+        assertThat(response.overdueExpenses()).isEqualByComparingTo("0.00");
+        assertThat(response.pendingRevenue()).isEqualByComparingTo("0.00");
+        assertThat(response.transactionCount()).isZero();
+        assertThat(response.incomeCount()).isZero();
+        assertThat(response.expenseCount()).isZero();
+        assertThat(response.costPerHectare()).isNull();
+        assertThat(response.revenuePerHectare()).isNull();
+        assertThat(response.profitPerHectare()).isNull();
+    }
+
+    @Test
+    void shouldCalculateFinancialSummaryForHarvestSeason() {
+        Farm farm = saveFarm("Farm");
+        Farm otherFarm = saveFarm("Other Farm");
+        ProductionActivity activity = saveActivity("Soja");
+        HarvestSeason season =
+                saveSeason(farm, activity, "210000.00", "96500.00", "120.00", "Safra Soja");
+        HarvestSeason otherSeason =
+                saveSeason(otherFarm, activity, "1.00", "1.00", "1.00", "Safra Milho");
+        User user = saveUser();
+
+        saveTransaction(
+                farm, user, season, TransactionType.INCOME, PaymentStatus.PAID, "100000.00");
+        saveTransaction(farm, user, season, TransactionType.INCOME, PaymentStatus.PAID, "50000.00");
+        saveTransaction(
+                farm, user, season, TransactionType.EXPENSE, PaymentStatus.PAID, "70000.00");
+        saveTransaction(farm, user, season, TransactionType.EXPENSE, PaymentStatus.PAID, "2500.00");
+        saveTransaction(
+                farm, user, season, TransactionType.EXPENSE, PaymentStatus.PENDING, "18000.00");
+        saveTransaction(
+                farm, user, season, TransactionType.EXPENSE, PaymentStatus.OVERDUE, "6000.00");
+        saveTransaction(
+                farm, user, season, TransactionType.INCOME, PaymentStatus.PENDING, "25000.00");
+        saveTransaction(
+                farm, user, season, TransactionType.INCOME, PaymentStatus.CANCELED, "999.00");
+        FinancialTransaction deleted =
+                saveTransaction(
+                        farm, user, season, TransactionType.EXPENSE, PaymentStatus.PAID, "999.00");
+        deleted.setRecordStatus(FinancialRecordStatus.DELETED);
+        financialTransactionRepository.save(deleted);
+        saveTransaction(farm, user, null, TransactionType.INCOME, PaymentStatus.PAID, "999.00");
+        saveTransaction(
+                otherFarm, user, otherSeason, TransactionType.INCOME, PaymentStatus.PAID, "999.00");
+
+        HarvestSeasonSummaryResponse response = harvestSeasonService.getSummary(season.getId());
+
+        assertThat(response.expectedCost()).isEqualByComparingTo("96500.00");
+        assertThat(response.expectedRevenue()).isEqualByComparingTo("210000.00");
+        assertThat(response.expectedProfit()).isEqualByComparingTo("113500.00");
+        assertThat(response.realizedRevenue()).isEqualByComparingTo("150000.00");
+        assertThat(response.realizedCost()).isEqualByComparingTo("72500.00");
+        assertThat(response.realizedProfit()).isEqualByComparingTo("77500.00");
+        assertThat(response.pendingExpenses()).isEqualByComparingTo("18000.00");
+        assertThat(response.overdueExpenses()).isEqualByComparingTo("6000.00");
+        assertThat(response.pendingRevenue()).isEqualByComparingTo("25000.00");
+        assertThat(response.transactionCount()).isEqualTo(7L);
+        assertThat(response.incomeCount()).isEqualTo(3L);
+        assertThat(response.expenseCount()).isEqualTo(4L);
+        assertThat(response.areaHectares()).isEqualByComparingTo("120.00");
+        assertThat(response.costPerHectare()).isEqualByComparingTo("604.17");
+        assertThat(response.revenuePerHectare()).isEqualByComparingTo("1250.00");
+        assertThat(response.profitPerHectare()).isEqualByComparingTo("645.83");
+    }
+
+    @Test
+    void shouldReturnPerHectareIndicatorsNullWhenAreaIsNullOrZero() {
+        Farm farm = saveFarm("Farm");
+        ProductionActivity activity = saveActivity("Soja");
+        User user = saveUser();
+        HarvestSeason seasonWithoutArea =
+                saveSeason(farm, activity, "100.00", "50.00", null, "Safra Sem Area");
+        HarvestSeason seasonWithZeroArea =
+                saveSeason(farm, activity, "100.00", "50.00", "0.00", "Safra Zero");
+        saveTransaction(
+                farm,
+                user,
+                seasonWithoutArea,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                "100.00");
+        saveTransaction(
+                farm,
+                user,
+                seasonWithZeroArea,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                "100.00");
+
+        HarvestSeasonSummaryResponse withoutArea =
+                harvestSeasonService.getSummary(seasonWithoutArea.getId());
+        HarvestSeasonSummaryResponse withZeroArea =
+                harvestSeasonService.getSummary(seasonWithZeroArea.getId());
+
+        assertThat(withoutArea.costPerHectare()).isNull();
+        assertThat(withoutArea.revenuePerHectare()).isNull();
+        assertThat(withoutArea.profitPerHectare()).isNull();
+        assertThat(withZeroArea.costPerHectare()).isNull();
+        assertThat(withZeroArea.revenuePerHectare()).isNull();
+        assertThat(withZeroArea.profitPerHectare()).isNull();
+    }
+
+    @Test
+    void shouldThrowNotFoundWhenHarvestSeasonDoesNotExist() {
+        assertThatThrownBy(() -> harvestSeasonService.getSummary(999L))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Harvest season not found");
+    }
+
+    private Farm saveFarm(String name) {
+        Farm farm = new Farm();
+        farm.setName(name);
+        farm.setStatus(FarmStatus.ACTIVE);
+
+        return farmRepository.save(farm);
+    }
+
+    private ProductionActivity saveActivity(String name) {
+        ProductionActivity activity = new ProductionActivity();
+        activity.setName(name);
+        activity.setStatus(ProductionActivityStatus.ACTIVE);
+
+        return productionActivityRepository.save(activity);
+    }
+
+    private HarvestSeason saveSeason(
+            Farm farm,
+            ProductionActivity activity,
+            String expectedRevenue,
+            String expectedCost,
+            String areaHectares,
+            String name) {
+        HarvestSeason season = new HarvestSeason();
+        season.setFarm(farm);
+        season.setProductionActivity(activity);
+        season.setName(name);
+        season.setStartDate(LocalDate.of(2026, 1, 1));
+        season.setExpectedRevenue(toBigDecimal(expectedRevenue));
+        season.setExpectedCost(toBigDecimal(expectedCost));
+        season.setAreaHectares(toBigDecimal(areaHectares));
+        season.setStatus(HarvestSeasonStatus.PLANNED);
+
+        return harvestSeasonRepository.save(season);
+    }
+
+    private User saveUser() {
+        User user = new User();
+        user.setName("User");
+        user.setEmail("user@example.com");
+        user.setPassword(passwordEncoder.encode("Strong1!"));
+        user.setUserType(UserType.USER);
+        user.setStatus(UserStatus.ACTIVE);
+
+        return userRepository.save(user);
+    }
+
+    private FinancialTransaction saveTransaction(
+            Farm farm,
+            User user,
+            HarvestSeason harvestSeason,
+            TransactionType type,
+            PaymentStatus status,
+            String amount) {
+        FinancialTransaction transaction = new FinancialTransaction();
+        transaction.setDescription("Transaction");
+        transaction.setAmount(new BigDecimal(amount));
+        transaction.setType(type);
+        transaction.setStatus(status);
+        transaction.setTransactionDate(LocalDate.now());
+        transaction.setDueDate(LocalDate.now().plusDays(5));
+        transaction.setFarm(farm);
+        transaction.setHarvestSeason(harvestSeason);
+        transaction.setCreatedByUser(user);
+        transaction.setRecordStatus(FinancialRecordStatus.ACTIVE);
+
+        return financialTransactionRepository.save(transaction);
+    }
+
+    private BigDecimal toBigDecimal(String value) {
+        return value == null ? null : new BigDecimal(value);
+    }
+}

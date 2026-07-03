@@ -3,6 +3,7 @@ package br.com.gestaodireta.harvest.controller;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonStatusUpdateRequest;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonUpdateRequest;
 import br.com.gestaodireta.harvest.service.HarvestSeasonService;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
@@ -53,6 +54,12 @@ public class HarvestSeasonController {
     @PreAuthorize("@harvestAccess.canViewSeason(#id)")
     public HarvestSeasonResponse findById(@PathVariable Long id) {
         return harvestSeasonService.findById(id);
+    }
+
+    @GetMapping("/{id}/summary")
+    @PreAuthorize("@harvestAccess.canViewSeason(#id)")
+    public HarvestSeasonSummaryResponse getSummary(@PathVariable Long id) {
+        return harvestSeasonService.getSummary(id);
     }
 
     @PutMapping("/{id}")

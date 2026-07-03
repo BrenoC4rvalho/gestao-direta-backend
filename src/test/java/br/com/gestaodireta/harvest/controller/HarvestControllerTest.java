@@ -17,6 +17,11 @@ import br.com.gestaodireta.farm.enumeration.FarmStatus;
 import br.com.gestaodireta.farm.enumeration.FarmUserRole;
 import br.com.gestaodireta.farm.repository.FarmRepository;
 import br.com.gestaodireta.farm.repository.FarmUserRepository;
+import br.com.gestaodireta.financial.entity.FinancialTransaction;
+import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
+import br.com.gestaodireta.financial.enumeration.PaymentStatus;
+import br.com.gestaodireta.financial.enumeration.TransactionType;
+import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
 import br.com.gestaodireta.harvest.entity.ProductionActivity;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
@@ -47,6 +52,8 @@ class HarvestControllerTest extends PostgresIntegrationTest {
 
     @Autowired private MockMvc mockMvc;
 
+    @Autowired private FinancialTransactionRepository financialTransactionRepository;
+
     @Autowired private HarvestSeasonRepository harvestSeasonRepository;
 
     @Autowired private ProductionActivityRepository productionActivityRepository;
@@ -61,6 +68,7 @@ class HarvestControllerTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        financialTransactionRepository.deleteAll();
         harvestSeasonRepository.deleteAll();
         productionActivityRepository.deleteAll();
         farmUserRepository.deleteAll();
@@ -288,6 +296,92 @@ class HarvestControllerTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldReturnHarvestSeasonSummaryForAuthorizedUser() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        ProductionActivity activity = saveActivity("Soja", ProductionActivityStatus.ACTIVE);
+        User accountant = saveUser("Accountant", "accountant@example.com", UserType.USER);
+        saveFarmUser(farm, accountant, FarmUserRole.ACCOUNTANT);
+        HarvestSeason season =
+                saveSeason(farm, activity, "Safra Soja", HarvestSeasonStatus.PLANNED);
+        season.setExpectedRevenue(new BigDecimal("210000.00"));
+        season.setExpectedCost(new BigDecimal("96500.00"));
+        season.setAreaHectares(new BigDecimal("120.00"));
+        harvestSeasonRepository.save(season);
+        saveTransaction(
+                farm, accountant, season, TransactionType.INCOME, PaymentStatus.PAID, "150000.00");
+        saveTransaction(
+                farm, accountant, season, TransactionType.EXPENSE, PaymentStatus.PAID, "72500.00");
+        saveTransaction(
+                farm,
+                accountant,
+                season,
+                TransactionType.EXPENSE,
+                PaymentStatus.PENDING,
+                "18000.00");
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/{id}/summary", season.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(accountant.getId())).roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.harvestSeasonId").value(season.getId()))
+                .andExpect(jsonPath("$.harvestSeasonName").value("Safra Soja"))
+                .andExpect(jsonPath("$.productionActivityId").value(activity.getId()))
+                .andExpect(jsonPath("$.productionActivityName").value("Soja"))
+                .andExpect(jsonPath("$.farmId").value(farm.getId()))
+                .andExpect(jsonPath("$.farmName").value("Farm"))
+                .andExpect(jsonPath("$.expectedCost").value(96500.00))
+                .andExpect(jsonPath("$.expectedRevenue").value(210000.00))
+                .andExpect(jsonPath("$.expectedProfit").value(113500.00))
+                .andExpect(jsonPath("$.realizedCost").value(72500.00))
+                .andExpect(jsonPath("$.realizedRevenue").value(150000.00))
+                .andExpect(jsonPath("$.realizedProfit").value(77500.00))
+                .andExpect(jsonPath("$.pendingExpenses").value(18000.00))
+                .andExpect(jsonPath("$.transactionCount").value(3))
+                .andExpect(jsonPath("$.incomeCount").value(1))
+                .andExpect(jsonPath("$.expenseCount").value(2))
+                .andExpect(jsonPath("$.costPerHectare").value(604.17))
+                .andExpect(jsonPath("$.revenuePerHectare").value(1250.00))
+                .andExpect(jsonPath("$.profitPerHectare").value(645.83));
+    }
+
+    @Test
+    void shouldProtectHarvestSeasonSummaryEndpoint() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        ProductionActivity activity = saveActivity("Soja", ProductionActivityStatus.ACTIVE);
+        User producer = saveUser("Producer", "producer@example.com", UserType.USER);
+        User unlinked = saveUser("Unlinked", "unlinked@example.com", UserType.USER);
+        User inactive = saveUser("Inactive", "inactive@example.com", UserType.USER);
+        saveFarmUser(farm, producer, FarmUserRole.PRODUCER);
+        saveFarmUser(farm, inactive, FarmUserRole.INACTIVE);
+        HarvestSeason season =
+                saveSeason(farm, activity, "Safra Soja", HarvestSeasonStatus.PLANNED);
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/{id}/summary", season.getId())
+                                .contextPath(CONTEXT_PATH))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/{id}/summary", season.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(unlinked.getId())).roles("USER")))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/{id}/summary", season.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(inactive.getId())).roles("USER")))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/{id}/summary", 999L)
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(producer.getId())).roles("USER")))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void shouldInactivateHarvestSeasonAndDenyCommonUserUpdate() throws Exception {
         Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
         ProductionActivity activity = saveActivity("Soja", ProductionActivityStatus.ACTIVE);
@@ -419,5 +513,27 @@ class HarvestControllerTest extends PostgresIntegrationTest {
         season.setStatus(status);
 
         return harvestSeasonRepository.save(season);
+    }
+
+    private FinancialTransaction saveTransaction(
+            Farm farm,
+            User user,
+            HarvestSeason harvestSeason,
+            TransactionType type,
+            PaymentStatus status,
+            String amount) {
+        FinancialTransaction transaction = new FinancialTransaction();
+        transaction.setDescription("Transaction");
+        transaction.setAmount(new BigDecimal(amount));
+        transaction.setType(type);
+        transaction.setStatus(status);
+        transaction.setTransactionDate(LocalDate.now());
+        transaction.setDueDate(LocalDate.now().plusDays(5));
+        transaction.setFarm(farm);
+        transaction.setHarvestSeason(harvestSeason);
+        transaction.setCreatedByUser(user);
+        transaction.setRecordStatus(FinancialRecordStatus.ACTIVE);
+
+        return financialTransactionRepository.save(transaction);
     }
 }
