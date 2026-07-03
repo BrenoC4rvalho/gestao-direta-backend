@@ -2232,6 +2232,113 @@ Lista safras de uma fazenda.
 - `includeInactive=true` inclui safras inativas.
 - Usuário com vínculo `INACTIVE` não acessa a listagem.
 
+### GET /api/harvest/seasons/summary-list
+
+**Descrição:**
+Lista safras de uma fazenda com dados cadastrais e resumo financeiro agregado por safra.
+
+**Autenticação:** Sim
+**Permissão:** `ADMIN`; `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com vínculo ativo na fazenda ativa.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{
+  "farmId": 1,
+  "status": "PLANNED",
+  "search": "soja",
+  "page": 0,
+  "size": 10,
+  "sort": "id",
+  "direction": "ASC"
+}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `farmId`
+
+**Campos opcionais:**
+- `status`
+- `search`
+- `page`
+- `size`
+- `sort`
+- `direction`
+
+**Resposta de sucesso:**
+```json
+{
+  "content": [
+    {
+      "id": 1,
+      "farmId": 1,
+      "farmName": "Fazenda Boa Safra",
+      "productionActivityId": 1,
+      "productionActivityName": "Soja",
+      "name": "Safra Soja 2026",
+      "description": "Safra de verão",
+      "startDate": "2026-01-01",
+      "endDate": "2026-06-30",
+      "expectedCost": 90000.00,
+      "expectedRevenue": 150000.00,
+      "expectedProfit": 60000.00,
+      "areaHectares": 120.50,
+      "status": "PLANNED",
+      "realizedCost": 72500.00,
+      "realizedRevenue": 150000.00,
+      "realizedProfit": 77500.00,
+      "pendingExpenses": 18000.00,
+      "overdueExpenses": 6000.00,
+      "pendingRevenue": 25000.00,
+      "transactionCount": 6,
+      "incomeCount": 3,
+      "expenseCount": 3,
+      "createdAt": "2026-06-21T10:00:00",
+      "updatedAt": "2026-06-21T10:00:00"
+    }
+  ],
+  "page": 0,
+  "size": 10,
+  "totalElements": 1,
+  "totalPages": 1,
+  "first": true,
+  "last": true
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `200 OK` em caso de sucesso.
+- `400 Bad Request` para `farmId` ausente ou parâmetro inválido.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão.
+- `404 Not Found` se a fazenda não existir.
+
+**Observações de regra de negócio:**
+- `farmId` é obrigatório.
+- Sem `status`, safras com status `INACTIVE` não são retornadas.
+- Com `status=INACTIVE`, somente safras inativas são retornadas.
+- `search` é normalizado com `trim` e busca, sem diferenciar maiúsculas e minúsculas, por nome da safra, descrição da safra e nome da atividade produtiva.
+- O retorno é paginado com o mesmo formato de `PageResponse`.
+- `expectedProfit` é calculado como `expectedRevenue - expectedCost`.
+- `realizedRevenue` soma receitas pagas vinculadas à safra.
+- `realizedCost` soma despesas pagas vinculadas à safra.
+- `realizedProfit` é calculado como `realizedRevenue - realizedCost`.
+- `pendingExpenses` soma despesas pendentes.
+- `overdueExpenses` soma despesas atrasadas.
+- `pendingRevenue` soma receitas pendentes.
+- `transactionCount`, `incomeCount` e `expenseCount` consideram somente movimentações válidas vinculadas à safra.
+- Movimentações com `recordStatus=DELETED`, `status=CANCELED`, sem safra ou vinculadas a outra safra não entram nos totais nem nos contadores.
+- Safras sem movimentações aparecem na lista com totais e contadores zerados.
+
 ### GET /api/harvest/seasons/{id}
 
 **Descrição:**

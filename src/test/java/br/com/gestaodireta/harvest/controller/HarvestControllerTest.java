@@ -346,6 +346,98 @@ class HarvestControllerTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldReturnHarvestSeasonSummaryListForAuthorizedUser() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        ProductionActivity activity = saveActivity("Soja", ProductionActivityStatus.ACTIVE);
+        User accountant = saveUser("Accountant", "accountant@example.com", UserType.USER);
+        saveFarmUser(farm, accountant, FarmUserRole.ACCOUNTANT);
+        HarvestSeason season =
+                saveSeason(farm, activity, "Safra Soja", HarvestSeasonStatus.PLANNED);
+        season.setExpectedRevenue(new BigDecimal("210000.00"));
+        season.setExpectedCost(new BigDecimal("96500.00"));
+        season.setAreaHectares(new BigDecimal("120.00"));
+        harvestSeasonRepository.save(season);
+        saveTransaction(
+                farm, accountant, season, TransactionType.INCOME, PaymentStatus.PAID, "150000.00");
+        saveTransaction(
+                farm, accountant, season, TransactionType.EXPENSE, PaymentStatus.PAID, "72500.00");
+        saveTransaction(
+                farm,
+                accountant,
+                season,
+                TransactionType.EXPENSE,
+                PaymentStatus.PENDING,
+                "18000.00");
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/summary-list")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .with(user(String.valueOf(accountant.getId())).roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(season.getId()))
+                .andExpect(jsonPath("$.content[0].name").value("Safra Soja"))
+                .andExpect(jsonPath("$.content[0].farmId").value(farm.getId()))
+                .andExpect(jsonPath("$.content[0].productionActivityName").value("Soja"))
+                .andExpect(jsonPath("$.content[0].expectedCost").value(96500.00))
+                .andExpect(jsonPath("$.content[0].expectedRevenue").value(210000.00))
+                .andExpect(jsonPath("$.content[0].expectedProfit").value(113500.00))
+                .andExpect(jsonPath("$.content[0].realizedCost").value(72500.00))
+                .andExpect(jsonPath("$.content[0].realizedRevenue").value(150000.00))
+                .andExpect(jsonPath("$.content[0].realizedProfit").value(77500.00))
+                .andExpect(jsonPath("$.content[0].pendingExpenses").value(18000.00))
+                .andExpect(jsonPath("$.content[0].transactionCount").value(3))
+                .andExpect(jsonPath("$.content[0].incomeCount").value(1))
+                .andExpect(jsonPath("$.content[0].expenseCount").value(2))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    void shouldProtectHarvestSeasonSummaryListEndpoint() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        ProductionActivity activity = saveActivity("Soja", ProductionActivityStatus.ACTIVE);
+        User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN);
+        User unlinked = saveUser("Unlinked", "unlinked@example.com", UserType.USER);
+        User inactive = saveUser("Inactive", "inactive@example.com", UserType.USER);
+        saveFarmUser(farm, inactive, FarmUserRole.INACTIVE);
+        saveSeason(farm, activity, "Safra Soja", HarvestSeasonStatus.PLANNED);
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/summary-list")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId())))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/summary-list")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .with(user(String.valueOf(unlinked.getId())).roles("USER")))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/summary-list")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .with(user(String.valueOf(inactive.getId())).roles("USER")))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/summary-list")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/summary-list")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].name").value("Safra Soja"));
+    }
+
+    @Test
     void shouldProtectHarvestSeasonSummaryEndpoint() throws Exception {
         Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
         ProductionActivity activity = saveActivity("Soja", ProductionActivityStatus.ACTIVE);

@@ -8,6 +8,7 @@ import br.com.gestaodireta.financial.repository.HarvestSeasonFinancialSummaryPro
 import br.com.gestaodireta.harvest.dto.HarvestSeasonRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonStatusUpdateRequest;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryListResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonUpdateRequest;
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
@@ -16,6 +17,7 @@ import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
 import br.com.gestaodireta.harvest.enumeration.ProductionActivityStatus;
 import br.com.gestaodireta.harvest.mapper.HarvestSeasonMapper;
 import br.com.gestaodireta.harvest.repository.HarvestSeasonRepository;
+import br.com.gestaodireta.harvest.repository.HarvestSeasonSummaryListProjection;
 import br.com.gestaodireta.shared.exception.BusinessException;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
@@ -86,6 +88,20 @@ public class HarvestSeasonService {
                         farmId, includeInactive, paginationParams.toPageable());
 
         return PageResponse.from(seasons.map(harvestSeasonMapper::toResponse));
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<HarvestSeasonSummaryListResponse> findSummaryList(
+            Long farmId,
+            HarvestSeasonStatus status,
+            String search,
+            PaginationParams paginationParams) {
+        farmService.findEntityById(farmId);
+        Page<HarvestSeasonSummaryListProjection> seasons =
+                harvestSeasonRepository.findSummaryList(
+                        farmId, status, normalizeSearch(search), paginationParams.toPageable());
+
+        return PageResponse.from(seasons.map(this::toSummaryListResponse));
     }
 
     @Transactional(readOnly = true)
@@ -264,6 +280,51 @@ public class HarvestSeasonService {
             throw new BusinessException(
                     "Inactive production activity cannot be used in a harvest season.");
         }
+    }
+
+    private HarvestSeasonSummaryListResponse toSummaryListResponse(
+            HarvestSeasonSummaryListProjection projection) {
+        BigDecimal expectedCost = zeroIfNull(projection.getExpectedCost());
+        BigDecimal expectedRevenue = zeroIfNull(projection.getExpectedRevenue());
+        BigDecimal realizedCost = zeroIfNull(projection.getRealizedCost());
+        BigDecimal realizedRevenue = zeroIfNull(projection.getRealizedRevenue());
+
+        return new HarvestSeasonSummaryListResponse(
+                projection.getId(),
+                projection.getFarmId(),
+                projection.getFarmName(),
+                projection.getProductionActivityId(),
+                projection.getProductionActivityName(),
+                projection.getName(),
+                projection.getDescription(),
+                projection.getStartDate(),
+                projection.getEndDate(),
+                expectedCost,
+                expectedRevenue,
+                expectedRevenue.subtract(expectedCost),
+                projection.getAreaHectares(),
+                projection.getStatus(),
+                realizedCost,
+                realizedRevenue,
+                realizedRevenue.subtract(realizedCost),
+                zeroIfNull(projection.getPendingExpenses()),
+                zeroIfNull(projection.getOverdueExpenses()),
+                zeroIfNull(projection.getPendingRevenue()),
+                zeroIfNull(projection.getTransactionCount()),
+                zeroIfNull(projection.getIncomeCount()),
+                zeroIfNull(projection.getExpenseCount()),
+                projection.getCreatedAt(),
+                projection.getUpdatedAt());
+    }
+
+    private String normalizeSearch(String search) {
+        if (search == null) {
+            return null;
+        }
+
+        String normalizedSearch = search.trim().toLowerCase(Locale.ROOT);
+
+        return normalizedSearch.isEmpty() ? null : normalizedSearch;
     }
 
     private BigDecimal zeroIfNull(BigDecimal value) {

@@ -36,6 +36,122 @@ public interface HarvestSeasonRepository extends JpaRepository<HarvestSeason, Lo
             Pageable pageable);
 
     @Query(
+            value =
+                    """
+                    select
+                      season.id as id,
+                      farm.id as farmId,
+                      farm.name as farmName,
+                      productionActivity.id as productionActivityId,
+                      productionActivity.name as productionActivityName,
+                      season.name as name,
+                      season.description as description,
+                      season.startDate as startDate,
+                      season.endDate as endDate,
+                      season.expectedCost as expectedCost,
+                      season.expectedRevenue as expectedRevenue,
+                      season.areaHectares as areaHectares,
+                      season.status as status,
+                      season.createdAt as createdAt,
+                      season.updatedAt as updatedAt,
+                      coalesce(sum(case
+                        when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+                          and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PAID
+                        then transaction.amount
+                        else 0
+                      end), 0) as realizedCost,
+                      coalesce(sum(case
+                        when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME
+                          and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PAID
+                        then transaction.amount
+                        else 0
+                      end), 0) as realizedRevenue,
+                      coalesce(sum(case
+                        when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+                          and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                        then transaction.amount
+                        else 0
+                      end), 0) as pendingExpenses,
+                      coalesce(sum(case
+                        when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+                          and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                        then transaction.amount
+                        else 0
+                      end), 0) as overdueExpenses,
+                      coalesce(sum(case
+                        when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME
+                          and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                        then transaction.amount
+                        else 0
+                      end), 0) as pendingRevenue,
+                      count(transaction) as transactionCount,
+                      coalesce(sum(case
+                        when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME
+                        then 1
+                        else 0
+                      end), 0) as incomeCount,
+                      coalesce(sum(case
+                        when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+                        then 1
+                        else 0
+                      end), 0) as expenseCount
+                    from HarvestSeason season
+                    join season.farm farm
+                    join season.productionActivity productionActivity
+                    left join br.com.gestaodireta.financial.entity.FinancialTransaction transaction
+                      on transaction.harvestSeason.id = season.id
+                      and transaction.recordStatus = br.com.gestaodireta.financial.enumeration.FinancialRecordStatus.ACTIVE
+                      and transaction.status in (
+                        br.com.gestaodireta.financial.enumeration.PaymentStatus.PAID,
+                        br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING,
+                        br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                      )
+                    where farm.id = :farmId
+                      and (:status is null or season.status = :status)
+                      and (:status is not null
+                        or season.status <> br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus.INACTIVE)
+                      and (:search is null
+                        or lower(season.name) like concat('%', cast(:search as string), '%')
+                        or lower(coalesce(season.description, ' ')) like concat('%', cast(:search as string), '%')
+                        or lower(productionActivity.name) like concat('%', cast(:search as string), '%'))
+                    group by
+                      season.id,
+                      farm.id,
+                      farm.name,
+                      productionActivity.id,
+                      productionActivity.name,
+                      season.name,
+                      season.description,
+                      season.startDate,
+                      season.endDate,
+                      season.expectedCost,
+                      season.expectedRevenue,
+                      season.areaHectares,
+                      season.status,
+                      season.createdAt,
+                      season.updatedAt
+                    """,
+            countQuery =
+                    """
+                    select count(season)
+                    from HarvestSeason season
+                    join season.productionActivity productionActivity
+                    where season.farm.id = :farmId
+                      and (:status is null or season.status = :status)
+                      and (:status is not null
+                        or season.status <> br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus.INACTIVE)
+                      and (:search is null
+                        or lower(season.name) like concat('%', cast(:search as string), '%')
+                        or lower(coalesce(season.description, ' ')) like concat('%', cast(:search as string), '%')
+                        or lower(productionActivity.name) like concat('%', cast(:search as string), '%'))
+                    """)
+    Page<HarvestSeasonSummaryListProjection> findSummaryList(
+            @Param("farmId") Long farmId,
+            @Param("status") HarvestSeasonStatus status,
+            @Param("search") String search,
+            Pageable pageable);
+
+    @Query(
             """
             select season
             from HarvestSeason season

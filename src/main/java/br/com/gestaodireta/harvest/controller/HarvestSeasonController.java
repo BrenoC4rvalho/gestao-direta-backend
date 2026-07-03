@@ -3,8 +3,10 @@ package br.com.gestaodireta.harvest.controller;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonStatusUpdateRequest;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryListResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonUpdateRequest;
+import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
 import br.com.gestaodireta.harvest.service.HarvestSeasonService;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
@@ -48,6 +50,16 @@ public class HarvestSeasonController {
             @RequestParam(defaultValue = "false") boolean includeInactive,
             @Valid @ModelAttribute PaginationParams paginationParams) {
         return harvestSeasonService.findAll(farmId, includeInactive, paginationParams);
+    }
+
+    @GetMapping("/summary-list")
+    @PreAuthorize("@harvestAccess.canViewSeasons(#farmId)")
+    public PageResponse<HarvestSeasonSummaryListResponse> findSummaryList(
+            @RequestParam Long farmId,
+            @RequestParam(required = false) HarvestSeasonStatus status,
+            @RequestParam(required = false) String search,
+            @Valid @ModelAttribute PaginationParams paginationParams) {
+        return harvestSeasonService.findSummaryList(farmId, status, search, paginationParams);
     }
 
     @GetMapping("/{id}")

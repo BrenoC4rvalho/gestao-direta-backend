@@ -13,6 +13,7 @@ import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryListResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryResponse;
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
 import br.com.gestaodireta.harvest.entity.ProductionActivity;
@@ -21,6 +22,8 @@ import br.com.gestaodireta.harvest.enumeration.ProductionActivityStatus;
 import br.com.gestaodireta.harvest.repository.HarvestSeasonRepository;
 import br.com.gestaodireta.harvest.repository.ProductionActivityRepository;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
+import br.com.gestaodireta.shared.pagination.PaginationParams;
+import br.com.gestaodireta.shared.response.PageResponse;
 import br.com.gestaodireta.support.PostgresIntegrationTest;
 import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.enumeration.UserStatus;
@@ -154,6 +157,121 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldListHarvestSeasonsWithFinancialSummary() {
+        Farm farm = saveFarm("Farm");
+        Farm otherFarm = saveFarm("Other Farm");
+        ProductionActivity activity = saveActivity("Soja");
+        HarvestSeason season =
+                saveSeason(farm, activity, "210000.00", "96500.00", "120.00", "Safra Soja");
+        HarvestSeason emptySeason =
+                saveSeason(farm, activity, null, null, null, "Safra Sem Movimentos");
+        HarvestSeason inactiveSeason =
+                saveSeason(farm, activity, "1.00", "1.00", "1.00", "Safra Inativa");
+        HarvestSeason otherSeason =
+                saveSeason(otherFarm, activity, "1.00", "1.00", "1.00", "Safra Outra");
+        inactiveSeason.setStatus(HarvestSeasonStatus.INACTIVE);
+        harvestSeasonRepository.save(inactiveSeason);
+        User user = saveUser();
+
+        saveTransaction(
+                farm, user, season, TransactionType.INCOME, PaymentStatus.PAID, "100000.00");
+        saveTransaction(farm, user, season, TransactionType.INCOME, PaymentStatus.PAID, "50000.00");
+        saveTransaction(
+                farm, user, season, TransactionType.EXPENSE, PaymentStatus.PAID, "72500.00");
+        saveTransaction(
+                farm, user, season, TransactionType.EXPENSE, PaymentStatus.PENDING, "18000.00");
+        saveTransaction(
+                farm, user, season, TransactionType.EXPENSE, PaymentStatus.OVERDUE, "6000.00");
+        saveTransaction(
+                farm, user, season, TransactionType.INCOME, PaymentStatus.PENDING, "25000.00");
+        saveTransaction(
+                farm, user, season, TransactionType.INCOME, PaymentStatus.CANCELED, "999.00");
+        FinancialTransaction deleted =
+                saveTransaction(
+                        farm, user, season, TransactionType.EXPENSE, PaymentStatus.PAID, "999.00");
+        deleted.setRecordStatus(FinancialRecordStatus.DELETED);
+        financialTransactionRepository.save(deleted);
+        saveTransaction(farm, user, null, TransactionType.INCOME, PaymentStatus.PAID, "999.00");
+        saveTransaction(
+                otherFarm, user, otherSeason, TransactionType.INCOME, PaymentStatus.PAID, "999.00");
+
+        PageResponse<HarvestSeasonSummaryListResponse> response =
+                harvestSeasonService.findSummaryList(
+                        farm.getId(), null, null, pagination("id", 20));
+
+        assertThat(response.totalElements()).isEqualTo(2);
+        assertThat(response.content())
+                .extracting(HarvestSeasonSummaryListResponse::id)
+                .containsExactly(season.getId(), emptySeason.getId());
+
+        HarvestSeasonSummaryListResponse summary = response.content().getFirst();
+        assertThat(summary.expectedCost()).isEqualByComparingTo("96500.00");
+        assertThat(summary.expectedRevenue()).isEqualByComparingTo("210000.00");
+        assertThat(summary.expectedProfit()).isEqualByComparingTo("113500.00");
+        assertThat(summary.realizedRevenue()).isEqualByComparingTo("150000.00");
+        assertThat(summary.realizedCost()).isEqualByComparingTo("72500.00");
+        assertThat(summary.realizedProfit()).isEqualByComparingTo("77500.00");
+        assertThat(summary.pendingExpenses()).isEqualByComparingTo("18000.00");
+        assertThat(summary.overdueExpenses()).isEqualByComparingTo("6000.00");
+        assertThat(summary.pendingRevenue()).isEqualByComparingTo("25000.00");
+        assertThat(summary.transactionCount()).isEqualTo(6L);
+        assertThat(summary.incomeCount()).isEqualTo(3L);
+        assertThat(summary.expenseCount()).isEqualTo(3L);
+
+        HarvestSeasonSummaryListResponse emptySummary = response.content().get(1);
+        assertThat(emptySummary.expectedCost()).isEqualByComparingTo("0.00");
+        assertThat(emptySummary.expectedRevenue()).isEqualByComparingTo("0.00");
+        assertThat(emptySummary.expectedProfit()).isEqualByComparingTo("0.00");
+        assertThat(emptySummary.realizedCost()).isEqualByComparingTo("0.00");
+        assertThat(emptySummary.realizedRevenue()).isEqualByComparingTo("0.00");
+        assertThat(emptySummary.realizedProfit()).isEqualByComparingTo("0.00");
+        assertThat(emptySummary.transactionCount()).isZero();
+        assertThat(emptySummary.incomeCount()).isZero();
+        assertThat(emptySummary.expenseCount()).isZero();
+    }
+
+    @Test
+    void shouldFilterSummaryListByStatusSearchAndRespectPagination() {
+        Farm farm = saveFarm("Farm");
+        ProductionActivity soy = saveActivity("Soja");
+        ProductionActivity corn = saveActivity("Milho");
+        HarvestSeason first = saveSeason(farm, soy, "10.00", "4.00", null, "Safra Alpha");
+        HarvestSeason second = saveSeason(farm, corn, "20.00", "5.00", null, "Safra Beta");
+        HarvestSeason inactive = saveSeason(farm, soy, "30.00", "6.00", null, "Safra Inativa");
+        first.setDescription("Primeiro ciclo agricola");
+        inactive.setStatus(HarvestSeasonStatus.INACTIVE);
+        harvestSeasonRepository.save(first);
+        harvestSeasonRepository.save(inactive);
+
+        PageResponse<HarvestSeasonSummaryListResponse> activitySearch =
+                harvestSeasonService.findSummaryList(
+                        farm.getId(), null, "  milho ", pagination("id", 10));
+        PageResponse<HarvestSeasonSummaryListResponse> descriptionSearch =
+                harvestSeasonService.findSummaryList(
+                        farm.getId(), null, "CICLO", pagination("id", 10));
+        PageResponse<HarvestSeasonSummaryListResponse> inactiveOnly =
+                harvestSeasonService.findSummaryList(
+                        farm.getId(), HarvestSeasonStatus.INACTIVE, null, pagination("id", 10));
+        PageResponse<HarvestSeasonSummaryListResponse> paged =
+                harvestSeasonService.findSummaryList(farm.getId(), null, null, pagination("id", 1));
+
+        assertThat(activitySearch.content())
+                .extracting(HarvestSeasonSummaryListResponse::id)
+                .containsExactly(second.getId());
+        assertThat(descriptionSearch.content())
+                .extracting(HarvestSeasonSummaryListResponse::id)
+                .containsExactly(first.getId());
+        assertThat(inactiveOnly.content())
+                .extracting(HarvestSeasonSummaryListResponse::id)
+                .containsExactly(inactive.getId());
+        assertThat(paged.content())
+                .extracting(HarvestSeasonSummaryListResponse::id)
+                .containsExactly(first.getId());
+        assertThat(paged.totalElements()).isEqualTo(2);
+        assertThat(paged.totalPages()).isEqualTo(2);
+    }
+
+    @Test
     void shouldReturnPerHectareIndicatorsNullWhenAreaIsNullOrZero() {
         Farm farm = saveFarm("Farm");
         ProductionActivity activity = saveActivity("Soja");
@@ -264,6 +382,14 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         transaction.setRecordStatus(FinancialRecordStatus.ACTIVE);
 
         return financialTransactionRepository.save(transaction);
+    }
+
+    private PaginationParams pagination(String sort, int size) {
+        PaginationParams paginationParams = new PaginationParams();
+        paginationParams.setSort(sort);
+        paginationParams.setSize(size);
+
+        return paginationParams;
     }
 
     private BigDecimal toBigDecimal(String value) {
