@@ -11,6 +11,7 @@ import br.com.gestaodireta.harvest.service.HarvestSeasonService;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -47,9 +48,12 @@ public class HarvestSeasonController {
     @PreAuthorize("@harvestAccess.canViewSeasons(#farmId)")
     public PageResponse<HarvestSeasonResponse> findAll(
             @RequestParam Long farmId,
+            @RequestParam(required = false) HarvestSeasonStatus status,
+            @RequestParam(required = false) List<HarvestSeasonStatus> statuses,
             @RequestParam(defaultValue = "false") boolean includeInactive,
             @Valid @ModelAttribute PaginationParams paginationParams) {
-        return harvestSeasonService.findAll(farmId, includeInactive, paginationParams);
+        return harvestSeasonService.findAll(
+                farmId, status, statuses, includeInactive, paginationParams);
     }
 
     @GetMapping("/summary-list")
@@ -57,9 +61,11 @@ public class HarvestSeasonController {
     public PageResponse<HarvestSeasonSummaryListResponse> findSummaryList(
             @RequestParam Long farmId,
             @RequestParam(required = false) HarvestSeasonStatus status,
+            @RequestParam(required = false) List<HarvestSeasonStatus> statuses,
             @RequestParam(required = false) String search,
             @Valid @ModelAttribute PaginationParams paginationParams) {
-        return harvestSeasonService.findSummaryList(farmId, status, search, paginationParams);
+        return harvestSeasonService.findSummaryList(
+                farmId, status, statuses, search, paginationParams);
     }
 
     @GetMapping("/{id}")

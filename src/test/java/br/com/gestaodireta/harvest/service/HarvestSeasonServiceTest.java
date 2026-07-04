@@ -31,6 +31,7 @@ import br.com.gestaodireta.user.enumeration.UserType;
 import br.com.gestaodireta.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -197,7 +198,7 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
 
         PageResponse<HarvestSeasonSummaryListResponse> response =
                 harvestSeasonService.findSummaryList(
-                        farm.getId(), null, null, pagination("id", 20));
+                        farm.getId(), null, null, null, pagination("id", 20));
 
         assertThat(response.totalElements()).isEqualTo(2);
         assertThat(response.content())
@@ -245,15 +246,20 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
 
         PageResponse<HarvestSeasonSummaryListResponse> activitySearch =
                 harvestSeasonService.findSummaryList(
-                        farm.getId(), null, "  milho ", pagination("id", 10));
+                        farm.getId(), null, null, "  milho ", pagination("id", 10));
         PageResponse<HarvestSeasonSummaryListResponse> descriptionSearch =
                 harvestSeasonService.findSummaryList(
-                        farm.getId(), null, "CICLO", pagination("id", 10));
+                        farm.getId(), null, null, "CICLO", pagination("id", 10));
         PageResponse<HarvestSeasonSummaryListResponse> inactiveOnly =
                 harvestSeasonService.findSummaryList(
-                        farm.getId(), HarvestSeasonStatus.INACTIVE, null, pagination("id", 10));
+                        farm.getId(),
+                        HarvestSeasonStatus.INACTIVE,
+                        null,
+                        null,
+                        pagination("id", 10));
         PageResponse<HarvestSeasonSummaryListResponse> paged =
-                harvestSeasonService.findSummaryList(farm.getId(), null, null, pagination("id", 1));
+                harvestSeasonService.findSummaryList(
+                        farm.getId(), null, null, null, pagination("id", 1));
 
         assertThat(activitySearch.content())
                 .extracting(HarvestSeasonSummaryListResponse::id)
@@ -313,6 +319,31 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         assertThatThrownBy(() -> harvestSeasonService.getSummary(999L))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Harvest season not found");
+    }
+
+    @Test
+    void shouldResolvePluralStatusesWithPriorityOverSingleStatus() {
+        List<HarvestSeasonStatus> resolvedStatuses =
+                harvestSeasonService.resolveStatuses(
+                        HarvestSeasonStatus.FINISHED,
+                        List.of(HarvestSeasonStatus.PLANNED, HarvestSeasonStatus.IN_PROGRESS));
+
+        assertThat(resolvedStatuses)
+                .containsExactly(HarvestSeasonStatus.PLANNED, HarvestSeasonStatus.IN_PROGRESS);
+    }
+
+    @Test
+    void shouldResolveSingleStatusWhenPluralStatusesAreEmpty() {
+        assertThat(harvestSeasonService.resolveStatuses(HarvestSeasonStatus.PLANNED, null))
+                .containsExactly(HarvestSeasonStatus.PLANNED);
+        assertThat(harvestSeasonService.resolveStatuses(HarvestSeasonStatus.FINISHED, List.of()))
+                .containsExactly(HarvestSeasonStatus.FINISHED);
+    }
+
+    @Test
+    void shouldResolveEmptyStatusesWhenNoStatusFilterIsProvided() {
+        assertThat(harvestSeasonService.resolveStatuses(null, null)).isEmpty();
+        assertThat(harvestSeasonService.resolveStatuses(null, List.of())).isEmpty();
     }
 
     private Farm saveFarm(String name) {

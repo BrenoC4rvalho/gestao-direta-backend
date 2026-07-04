@@ -25,7 +25,10 @@ import br.com.gestaodireta.shared.response.PageResponse;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -81,11 +84,21 @@ public class HarvestSeasonService {
 
     @Transactional(readOnly = true)
     public PageResponse<HarvestSeasonResponse> findAll(
-            Long farmId, boolean includeInactive, PaginationParams paginationParams) {
+            Long farmId,
+            HarvestSeasonStatus status,
+            List<HarvestSeasonStatus> statuses,
+            boolean includeInactive,
+            PaginationParams paginationParams) {
         farmService.findEntityById(farmId);
+        List<HarvestSeasonStatus> resolvedStatuses = resolveStatuses(status, statuses);
+        boolean filterStatuses = !resolvedStatuses.isEmpty();
         Page<HarvestSeason> seasons =
                 harvestSeasonRepository.findByFarmId(
-                        farmId, includeInactive, paginationParams.toPageable());
+                        farmId,
+                        includeInactive,
+                        filterStatuses,
+                        statusesForQuery(resolvedStatuses),
+                        paginationParams.toPageable());
 
         return PageResponse.from(seasons.map(harvestSeasonMapper::toResponse));
     }
@@ -94,12 +107,19 @@ public class HarvestSeasonService {
     public PageResponse<HarvestSeasonSummaryListResponse> findSummaryList(
             Long farmId,
             HarvestSeasonStatus status,
+            List<HarvestSeasonStatus> statuses,
             String search,
             PaginationParams paginationParams) {
         farmService.findEntityById(farmId);
+        List<HarvestSeasonStatus> resolvedStatuses = resolveStatuses(status, statuses);
+        boolean filterStatuses = !resolvedStatuses.isEmpty();
         Page<HarvestSeasonSummaryListProjection> seasons =
                 harvestSeasonRepository.findSummaryList(
-                        farmId, status, normalizeSearch(search), paginationParams.toPageable());
+                        farmId,
+                        filterStatuses,
+                        statusesForQuery(resolvedStatuses),
+                        normalizeSearch(search),
+                        paginationParams.toPageable());
 
         return PageResponse.from(seasons.map(this::toSummaryListResponse));
     }
@@ -315,6 +335,30 @@ public class HarvestSeasonService {
                 zeroIfNull(projection.getExpenseCount()),
                 projection.getCreatedAt(),
                 projection.getUpdatedAt());
+    }
+
+    List<HarvestSeasonStatus> resolveStatuses(
+            HarvestSeasonStatus status, List<HarvestSeasonStatus> statuses) {
+        List<HarvestSeasonStatus> normalizedStatuses =
+                statuses == null ? List.of() : statuses.stream().filter(Objects::nonNull).toList();
+
+        if (!normalizedStatuses.isEmpty()) {
+            return normalizedStatuses;
+        }
+
+        if (status != null) {
+            return List.of(status);
+        }
+
+        return List.of();
+    }
+
+    private List<HarvestSeasonStatus> statusesForQuery(List<HarvestSeasonStatus> statuses) {
+        if (!statuses.isEmpty()) {
+            return statuses;
+        }
+
+        return Arrays.asList(HarvestSeasonStatus.values());
     }
 
     private String normalizeSearch(String search) {

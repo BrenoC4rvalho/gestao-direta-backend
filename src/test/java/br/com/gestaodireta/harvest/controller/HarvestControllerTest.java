@@ -393,6 +393,181 @@ class HarvestControllerTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldFilterHarvestSeasonListByStatusAndStatuses() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        ProductionActivity activity = saveActivity("Soja", ProductionActivityStatus.ACTIVE);
+        User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN);
+        saveSeason(farm, activity, "Planejada", HarvestSeasonStatus.PLANNED);
+        saveSeason(farm, activity, "Andamento", HarvestSeasonStatus.IN_PROGRESS);
+        saveSeason(farm, activity, "Finalizada", HarvestSeasonStatus.FINISHED);
+        saveSeason(farm, activity, "Inativa", HarvestSeasonStatus.INACTIVE);
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.content[*].name")
+                                .value(containsInAnyOrder("Planejada", "Andamento", "Finalizada")))
+                .andExpect(jsonPath("$.totalElements").value(3));
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("status", "PLANNED")
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].name").value(containsInAnyOrder("Planejada")))
+                .andExpect(jsonPath("$.totalElements").value(1));
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("statuses", "PLANNED,IN_PROGRESS")
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.content[*].name")
+                                .value(containsInAnyOrder("Planejada", "Andamento")))
+                .andExpect(jsonPath("$.totalElements").value(2));
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("statuses", "FINISHED", "INACTIVE")
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.content[*].name")
+                                .value(containsInAnyOrder("Finalizada", "Inativa")))
+                .andExpect(jsonPath("$.totalElements").value(2));
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("status", "FINISHED")
+                                .param("statuses", "PLANNED,IN_PROGRESS")
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.content[*].name")
+                                .value(containsInAnyOrder("Planejada", "Andamento")))
+                .andExpect(jsonPath("$.totalElements").value(2));
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("statuses", "")
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(3));
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("status", "INVALID")
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldFilterHarvestSeasonSummaryListByStatusAndStatuses() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        ProductionActivity activity = saveActivity("Soja", ProductionActivityStatus.ACTIVE);
+        User accountant = saveUser("Accountant", "accountant@example.com", UserType.USER);
+        saveFarmUser(farm, accountant, FarmUserRole.ACCOUNTANT);
+        HarvestSeason planned =
+                saveSeason(farm, activity, "Planejada", HarvestSeasonStatus.PLANNED);
+        HarvestSeason inProgress =
+                saveSeason(farm, activity, "Andamento", HarvestSeasonStatus.IN_PROGRESS);
+        saveSeason(farm, activity, "Finalizada", HarvestSeasonStatus.FINISHED);
+        saveSeason(farm, activity, "Inativa", HarvestSeasonStatus.INACTIVE);
+        saveTransaction(
+                farm, accountant, planned, TransactionType.INCOME, PaymentStatus.PAID, "100.00");
+        saveTransaction(
+                farm, accountant, planned, TransactionType.EXPENSE, PaymentStatus.PAID, "40.00");
+        saveTransaction(
+                farm, accountant, planned, TransactionType.INCOME, PaymentStatus.PENDING, "10.00");
+        saveTransaction(
+                farm,
+                accountant,
+                planned,
+                TransactionType.INCOME,
+                PaymentStatus.CANCELED,
+                "999.00");
+        FinancialTransaction deleted =
+                saveTransaction(
+                        farm,
+                        accountant,
+                        planned,
+                        TransactionType.EXPENSE,
+                        PaymentStatus.PAID,
+                        "999.00");
+        deleted.setRecordStatus(FinancialRecordStatus.DELETED);
+        financialTransactionRepository.save(deleted);
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/summary-list")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .with(user(String.valueOf(accountant.getId())).roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.content[*].name")
+                                .value(containsInAnyOrder("Planejada", "Andamento", "Finalizada")))
+                .andExpect(jsonPath("$.totalElements").value(3));
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/summary-list")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("status", "IN_PROGRESS")
+                                .with(user(String.valueOf(accountant.getId())).roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].name").value(containsInAnyOrder("Andamento")))
+                .andExpect(jsonPath("$.totalElements").value(1));
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/summary-list")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("status", "FINISHED")
+                                .param("statuses", "PLANNED,IN_PROGRESS")
+                                .with(user(String.valueOf(accountant.getId())).roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.content[*].name")
+                                .value(containsInAnyOrder("Planejada", "Andamento")))
+                .andExpect(jsonPath("$.content[0].id").value(planned.getId()))
+                .andExpect(jsonPath("$.content[0].realizedRevenue").value(100.00))
+                .andExpect(jsonPath("$.content[0].realizedCost").value(40.00))
+                .andExpect(jsonPath("$.content[0].pendingRevenue").value(10.00))
+                .andExpect(jsonPath("$.content[0].transactionCount").value(3))
+                .andExpect(jsonPath("$.content[0].incomeCount").value(2))
+                .andExpect(jsonPath("$.content[0].expenseCount").value(1))
+                .andExpect(jsonPath("$.content[1].id").value(inProgress.getId()))
+                .andExpect(jsonPath("$.content[1].transactionCount").value(0))
+                .andExpect(jsonPath("$.totalElements").value(2));
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/summary-list")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("statuses", "")
+                                .with(user(String.valueOf(accountant.getId())).roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(3));
+    }
+
+    @Test
     void shouldProtectHarvestSeasonSummaryListEndpoint() throws Exception {
         Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
         ProductionActivity activity = saveActivity("Soja", ProductionActivityStatus.ACTIVE);

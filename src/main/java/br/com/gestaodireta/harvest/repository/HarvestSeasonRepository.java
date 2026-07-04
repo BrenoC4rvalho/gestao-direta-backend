@@ -2,6 +2,7 @@ package br.com.gestaodireta.harvest.repository;
 
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
+import java.util.Collection;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,7 +20,9 @@ public interface HarvestSeasonRepository extends JpaRepository<HarvestSeason, Lo
                     join fetch season.farm
                     join fetch season.productionActivity
                     where season.farm.id = :farmId
-                      and (:includeInactive = true
+                      and (:filterStatuses = false or season.status in :statuses)
+                      and (:filterStatuses = true
+                        or :includeInactive = true
                         or season.status <> br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus.INACTIVE)
                     """,
             countQuery =
@@ -27,12 +30,16 @@ public interface HarvestSeasonRepository extends JpaRepository<HarvestSeason, Lo
                     select count(season)
                     from HarvestSeason season
                     where season.farm.id = :farmId
-                      and (:includeInactive = true
+                      and (:filterStatuses = false or season.status in :statuses)
+                      and (:filterStatuses = true
+                        or :includeInactive = true
                         or season.status <> br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus.INACTIVE)
                     """)
     Page<HarvestSeason> findByFarmId(
             @Param("farmId") Long farmId,
             @Param("includeInactive") boolean includeInactive,
+            @Param("filterStatuses") boolean filterStatuses,
+            @Param("statuses") Collection<HarvestSeasonStatus> statuses,
             Pageable pageable);
 
     @Query(
@@ -107,8 +114,8 @@ public interface HarvestSeasonRepository extends JpaRepository<HarvestSeason, Lo
                         br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
                       )
                     where farm.id = :farmId
-                      and (:status is null or season.status = :status)
-                      and (:status is not null
+                      and (:filterStatuses = false or season.status in :statuses)
+                      and (:filterStatuses = true
                         or season.status <> br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus.INACTIVE)
                       and (:search is null
                         or lower(season.name) like concat('%', cast(:search as string), '%')
@@ -137,8 +144,8 @@ public interface HarvestSeasonRepository extends JpaRepository<HarvestSeason, Lo
                     from HarvestSeason season
                     join season.productionActivity productionActivity
                     where season.farm.id = :farmId
-                      and (:status is null or season.status = :status)
-                      and (:status is not null
+                      and (:filterStatuses = false or season.status in :statuses)
+                      and (:filterStatuses = true
                         or season.status <> br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus.INACTIVE)
                       and (:search is null
                         or lower(season.name) like concat('%', cast(:search as string), '%')
@@ -147,7 +154,8 @@ public interface HarvestSeasonRepository extends JpaRepository<HarvestSeason, Lo
                     """)
     Page<HarvestSeasonSummaryListProjection> findSummaryList(
             @Param("farmId") Long farmId,
-            @Param("status") HarvestSeasonStatus status,
+            @Param("filterStatuses") boolean filterStatuses,
+            @Param("statuses") Collection<HarvestSeasonStatus> statuses,
             @Param("search") String search,
             Pageable pageable);
 

@@ -2165,12 +2165,20 @@ Lista safras de uma fazenda.
 ```json
 {
   "farmId": 1,
+  "status": "PLANNED",
+  "statuses": ["PLANNED", "IN_PROGRESS"],
   "includeInactive": false,
   "page": 0,
   "size": 10,
   "sort": "id",
   "direction": "ASC"
 }
+```
+
+Exemplos:
+```http
+GET /api/harvest/seasons?farmId=1&status=PLANNED
+GET /api/harvest/seasons?farmId=1&statuses=PLANNED,IN_PROGRESS
 ```
 
 **Body esperado:**
@@ -2182,6 +2190,8 @@ Lista safras de uma fazenda.
 - `farmId`
 
 **Campos opcionais:**
+- `status`
+- `statuses`
 - `includeInactive`
 - `page`
 - `size`
@@ -2228,8 +2238,12 @@ Lista safras de uma fazenda.
 
 **Observações de regra de negócio:**
 - `farmId` é obrigatório.
-- `includeInactive=false` é o default e oculta safras com status `INACTIVE`.
-- `includeInactive=true` inclui safras inativas.
+- `status` filtra por um único status de safra.
+- `statuses` filtra por múltiplos status, por exemplo `statuses=PLANNED,IN_PROGRESS`.
+- Quando `status` e `statuses` são enviados juntos, `statuses` tem prioridade.
+- Sem `status` ou `statuses`, `includeInactive=false` é o default e oculta safras com status `INACTIVE`.
+- Sem `status` ou `statuses`, `includeInactive=true` inclui safras inativas.
+- Com `status` ou `statuses`, o filtro de status informado define quais status são retornados.
 - Usuário com vínculo `INACTIVE` não acessa a listagem.
 
 ### GET /api/harvest/seasons/summary-list
@@ -2250,12 +2264,19 @@ Lista safras de uma fazenda com dados cadastrais e resumo financeiro agregado po
 {
   "farmId": 1,
   "status": "PLANNED",
+  "statuses": ["PLANNED", "IN_PROGRESS"],
   "search": "soja",
   "page": 0,
   "size": 10,
   "sort": "id",
   "direction": "ASC"
 }
+```
+
+Exemplos:
+```http
+GET /api/harvest/seasons/summary-list?farmId=1&status=PLANNED
+GET /api/harvest/seasons/summary-list?farmId=1&statuses=PLANNED,IN_PROGRESS
 ```
 
 **Body esperado:**
@@ -2268,6 +2289,7 @@ Lista safras de uma fazenda com dados cadastrais e resumo financeiro agregado po
 
 **Campos opcionais:**
 - `status`
+- `statuses`
 - `search`
 - `page`
 - `size`
@@ -2324,7 +2346,10 @@ Lista safras de uma fazenda com dados cadastrais e resumo financeiro agregado po
 
 **Observações de regra de negócio:**
 - `farmId` é obrigatório.
-- Sem `status`, safras com status `INACTIVE` não são retornadas.
+- `status` filtra por um único status de safra.
+- `statuses` filtra por múltiplos status, por exemplo `statuses=PLANNED,IN_PROGRESS`.
+- Quando `status` e `statuses` são enviados juntos, `statuses` tem prioridade.
+- Sem `status` ou `statuses`, safras com status `INACTIVE` não são retornadas.
 - Com `status=INACTIVE`, somente safras inativas são retornadas.
 - `search` é normalizado com `trim` e busca, sem diferenciar maiúsculas e minúsculas, por nome da safra, descrição da safra e nome da atividade produtiva.
 - O retorno é paginado com o mesmo formato de `PageResponse`.
