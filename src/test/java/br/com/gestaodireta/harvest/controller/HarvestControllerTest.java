@@ -568,6 +568,167 @@ class HarvestControllerTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldFilterHarvestSeasonListByProductionActivityAndPeriod() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        ProductionActivity soy = saveActivity("Soja", ProductionActivityStatus.ACTIVE);
+        ProductionActivity corn = saveActivity("Milho", ProductionActivityStatus.ACTIVE);
+        ProductionActivity coffee = saveActivity("Cafe", ProductionActivityStatus.ACTIVE);
+        User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN);
+        HarvestSeason soySeason = saveSeason(farm, soy, "Safra Soja", HarvestSeasonStatus.PLANNED);
+        HarvestSeason cornSeason =
+                saveSeason(farm, corn, "Safra Milho", HarvestSeasonStatus.PLANNED);
+        HarvestSeason coffeeSeason =
+                saveSeason(farm, coffee, "Safra Cafe", HarvestSeasonStatus.PLANNED);
+        HarvestSeason openEndedSeason =
+                saveSeason(farm, soy, "Safra Permanente", HarvestSeasonStatus.PLANNED);
+        soySeason.setStartDate(LocalDate.of(2026, 1, 1));
+        soySeason.setEndDate(LocalDate.of(2026, 3, 31));
+        cornSeason.setStartDate(LocalDate.of(2026, 4, 1));
+        cornSeason.setEndDate(LocalDate.of(2026, 6, 30));
+        coffeeSeason.setStartDate(LocalDate.of(2026, 8, 1));
+        coffeeSeason.setEndDate(LocalDate.of(2026, 9, 30));
+        openEndedSeason.setStartDate(LocalDate.of(2025, 11, 1));
+        openEndedSeason.setEndDate(null);
+        harvestSeasonRepository.saveAll(
+                java.util.List.of(soySeason, cornSeason, coffeeSeason, openEndedSeason));
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("productionActivityId", String.valueOf(corn.getId()))
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].name").value(containsInAnyOrder("Safra Milho")))
+                .andExpect(jsonPath("$.totalElements").value(1));
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("productionActivityId", String.valueOf(coffee.getId()))
+                                .param(
+                                        "productionActivityIds",
+                                        String.valueOf(soy.getId()),
+                                        String.valueOf(corn.getId()))
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.content[*].name")
+                                .value(
+                                        containsInAnyOrder(
+                                                "Safra Soja", "Safra Milho", "Safra Permanente")))
+                .andExpect(jsonPath("$.totalElements").value(3));
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("periodStart", "2026-02-01")
+                                .param("periodEnd", "2026-04-30")
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.content[*].name")
+                                .value(
+                                        containsInAnyOrder(
+                                                "Safra Soja", "Safra Milho", "Safra Permanente")))
+                .andExpect(jsonPath("$.totalElements").value(3));
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("periodStart", "2026-07-01")
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.content[*].name")
+                                .value(containsInAnyOrder("Safra Cafe", "Safra Permanente")))
+                .andExpect(jsonPath("$.totalElements").value(2));
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("periodEnd", "2026-02-15")
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.content[*].name")
+                                .value(containsInAnyOrder("Safra Soja", "Safra Permanente")))
+                .andExpect(jsonPath("$.totalElements").value(2));
+    }
+
+    @Test
+    void shouldRejectInvalidHarvestSeasonListPeriod() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN);
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("periodStart", "2026-02-01")
+                                .param("periodEnd", "2026-01-31")
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isBadRequest())
+                .andExpect(
+                        jsonPath("$.message")
+                                .value(
+                                        "A data inicial do período não pode ser posterior à data final."));
+    }
+
+    @Test
+    void shouldFilterHarvestSeasonSummaryListByCombinedFilters() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        ProductionActivity soy = saveActivity("Soja", ProductionActivityStatus.ACTIVE);
+        ProductionActivity corn = saveActivity("Milho", ProductionActivityStatus.ACTIVE);
+        User accountant = saveUser("Accountant", "accountant@example.com", UserType.USER);
+        saveFarmUser(farm, accountant, FarmUserRole.ACCOUNTANT);
+        HarvestSeason plannedSoy = saveSeason(farm, soy, "Safra Soja", HarvestSeasonStatus.PLANNED);
+        HarvestSeason progressSoy =
+                saveSeason(farm, soy, "Segunda Soja", HarvestSeasonStatus.IN_PROGRESS);
+        HarvestSeason plannedCorn =
+                saveSeason(farm, corn, "Safra Milho", HarvestSeasonStatus.PLANNED);
+        plannedSoy.setDescription("Ciclo especial");
+        plannedSoy.setStartDate(LocalDate.of(2026, 1, 1));
+        plannedSoy.setEndDate(LocalDate.of(2026, 3, 31));
+        progressSoy.setStartDate(LocalDate.of(2026, 2, 1));
+        progressSoy.setEndDate(LocalDate.of(2026, 5, 31));
+        plannedCorn.setStartDate(LocalDate.of(2026, 2, 1));
+        plannedCorn.setEndDate(LocalDate.of(2026, 5, 31));
+        harvestSeasonRepository.saveAll(java.util.List.of(plannedSoy, progressSoy, plannedCorn));
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/summary-list")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("search", "ciclo")
+                                .param("statuses", "PLANNED,IN_PROGRESS")
+                                .param("productionActivityIds", String.valueOf(soy.getId()))
+                                .param("periodStart", "2026-02-15")
+                                .param("periodEnd", "2026-04-15")
+                                .with(user(String.valueOf(accountant.getId())).roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].name").value(containsInAnyOrder("Safra Soja")))
+                .andExpect(jsonPath("$.totalElements").value(1));
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/summary-list")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("periodStart", "2026-06-01")
+                                .param("periodEnd", "2026-05-31")
+                                .with(user(String.valueOf(accountant.getId())).roles("USER")))
+                .andExpect(status().isBadRequest())
+                .andExpect(
+                        jsonPath("$.message")
+                                .value(
+                                        "A data inicial do período não pode ser posterior à data final."));
+    }
+
+    @Test
     void shouldProtectHarvestSeasonSummaryListEndpoint() throws Exception {
         Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
         ProductionActivity activity = saveActivity("Soja", ProductionActivityStatus.ACTIVE);

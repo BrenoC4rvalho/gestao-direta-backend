@@ -2167,6 +2167,10 @@ Lista safras de uma fazenda.
   "farmId": 1,
   "status": "PLANNED",
   "statuses": ["PLANNED", "IN_PROGRESS"],
+  "productionActivityId": 1,
+  "productionActivityIds": [1, 2],
+  "periodStart": "2026-01-01",
+  "periodEnd": "2026-06-30",
   "includeInactive": false,
   "page": 0,
   "size": 10,
@@ -2179,6 +2183,8 @@ Exemplos:
 ```http
 GET /api/harvest/seasons?farmId=1&status=PLANNED
 GET /api/harvest/seasons?farmId=1&statuses=PLANNED,IN_PROGRESS
+GET /api/harvest/seasons?farmId=1&productionActivityIds=1,2&periodStart=2026-01-01&periodEnd=2026-06-30
+GET /api/harvest/seasons?farmId=1&statuses=PLANNED,IN_PROGRESS&productionActivityIds=1,2&periodStart=2026-01-01&periodEnd=2026-06-30
 ```
 
 **Body esperado:**
@@ -2192,6 +2198,10 @@ GET /api/harvest/seasons?farmId=1&statuses=PLANNED,IN_PROGRESS
 **Campos opcionais:**
 - `status`
 - `statuses`
+- `productionActivityId`
+- `productionActivityIds`
+- `periodStart`
+- `periodEnd`
 - `includeInactive`
 - `page`
 - `size`
@@ -2231,7 +2241,7 @@ GET /api/harvest/seasons?farmId=1&statuses=PLANNED,IN_PROGRESS
 
 **Possíveis erros/status HTTP:**
 - `200 OK` em caso de sucesso.
-- `400 Bad Request` para `farmId` ausente ou parâmetro inválido.
+- `400 Bad Request` para `farmId` ausente, parâmetro inválido ou `periodStart` posterior a `periodEnd`.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
 - `403 Forbidden` para usuário sem permissão.
 - `404 Not Found` se a fazenda não existir.
@@ -2241,6 +2251,14 @@ GET /api/harvest/seasons?farmId=1&statuses=PLANNED,IN_PROGRESS
 - `status` filtra por um único status de safra.
 - `statuses` filtra por múltiplos status, por exemplo `statuses=PLANNED,IN_PROGRESS`.
 - Quando `status` e `statuses` são enviados juntos, `statuses` tem prioridade.
+- `productionActivityId` filtra por uma única atividade produtiva.
+- `productionActivityIds` filtra por múltiplas atividades produtivas, por exemplo `productionActivityIds=1,2`.
+- Quando `productionActivityId` e `productionActivityIds` são enviados juntos, `productionActivityIds` tem prioridade.
+- `periodStart` e `periodEnd` usam formato `yyyy-MM-dd`.
+- O filtro de período retorna safras que intersectam o período informado: `startDate <= periodEnd` e `endDate >= periodStart`; safras sem `endDate` intersectam qualquer período iniciado após o `startDate`.
+- Se apenas `periodStart` for informado, retorna safras sem data final ou com `endDate` maior ou igual a `periodStart`.
+- Se apenas `periodEnd` for informado, retorna safras com `startDate` menor ou igual a `periodEnd`.
+- `periodStart` posterior a `periodEnd` retorna `400 Bad Request` com a mensagem `A data inicial do período não pode ser posterior à data final.`.
 - Sem `status` ou `statuses`, `includeInactive=false` é o default e oculta safras com status `INACTIVE`.
 - Sem `status` ou `statuses`, `includeInactive=true` inclui safras inativas.
 - Com `status` ou `statuses`, o filtro de status informado define quais status são retornados.
@@ -2265,6 +2283,10 @@ Lista safras de uma fazenda com dados cadastrais e resumo financeiro agregado po
   "farmId": 1,
   "status": "PLANNED",
   "statuses": ["PLANNED", "IN_PROGRESS"],
+  "productionActivityId": 1,
+  "productionActivityIds": [1, 2],
+  "periodStart": "2026-01-01",
+  "periodEnd": "2026-06-30",
   "search": "soja",
   "page": 0,
   "size": 10,
@@ -2277,6 +2299,8 @@ Exemplos:
 ```http
 GET /api/harvest/seasons/summary-list?farmId=1&status=PLANNED
 GET /api/harvest/seasons/summary-list?farmId=1&statuses=PLANNED,IN_PROGRESS
+GET /api/harvest/seasons/summary-list?farmId=1&productionActivityIds=1,2&periodStart=2026-01-01&periodEnd=2026-06-30
+GET /api/harvest/seasons/summary-list?farmId=1&search=soja&statuses=PLANNED,IN_PROGRESS&productionActivityIds=1,2&periodStart=2026-01-01&periodEnd=2026-06-30
 ```
 
 **Body esperado:**
@@ -2290,6 +2314,10 @@ GET /api/harvest/seasons/summary-list?farmId=1&statuses=PLANNED,IN_PROGRESS
 **Campos opcionais:**
 - `status`
 - `statuses`
+- `productionActivityId`
+- `productionActivityIds`
+- `periodStart`
+- `periodEnd`
 - `search`
 - `page`
 - `size`
@@ -2339,7 +2367,7 @@ GET /api/harvest/seasons/summary-list?farmId=1&statuses=PLANNED,IN_PROGRESS
 
 **Possíveis erros/status HTTP:**
 - `200 OK` em caso de sucesso.
-- `400 Bad Request` para `farmId` ausente ou parâmetro inválido.
+- `400 Bad Request` para `farmId` ausente, parâmetro inválido ou `periodStart` posterior a `periodEnd`.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
 - `403 Forbidden` para usuário sem permissão.
 - `404 Not Found` se a fazenda não existir.
@@ -2349,6 +2377,14 @@ GET /api/harvest/seasons/summary-list?farmId=1&statuses=PLANNED,IN_PROGRESS
 - `status` filtra por um único status de safra.
 - `statuses` filtra por múltiplos status, por exemplo `statuses=PLANNED,IN_PROGRESS`.
 - Quando `status` e `statuses` são enviados juntos, `statuses` tem prioridade.
+- `productionActivityId` filtra por uma única atividade produtiva.
+- `productionActivityIds` filtra por múltiplas atividades produtivas, por exemplo `productionActivityIds=1,2`.
+- Quando `productionActivityId` e `productionActivityIds` são enviados juntos, `productionActivityIds` tem prioridade.
+- `periodStart` e `periodEnd` usam formato `yyyy-MM-dd`.
+- O filtro de período retorna safras que intersectam o período informado: `startDate <= periodEnd` e `endDate >= periodStart`; safras sem `endDate` intersectam qualquer período iniciado após o `startDate`.
+- Se apenas `periodStart` for informado, retorna safras sem data final ou com `endDate` maior ou igual a `periodStart`.
+- Se apenas `periodEnd` for informado, retorna safras com `startDate` menor ou igual a `periodEnd`.
+- `periodStart` posterior a `periodEnd` retorna `400 Bad Request` com a mensagem `A data inicial do período não pode ser posterior à data final.`.
 - Sem `status` ou `statuses`, safras com status `INACTIVE` não são retornadas.
 - Com `status=INACTIVE`, somente safras inativas são retornadas.
 - `search` é normalizado com `trim` e busca, sem diferenciar maiúsculas e minúsculas, por nome da safra, descrição da safra e nome da atividade produtiva.

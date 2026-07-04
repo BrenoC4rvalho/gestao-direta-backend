@@ -198,7 +198,15 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
 
         PageResponse<HarvestSeasonSummaryListResponse> response =
                 harvestSeasonService.findSummaryList(
-                        farm.getId(), null, null, null, pagination("id", 20));
+                        farm.getId(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        pagination("id", 20));
 
         assertThat(response.totalElements()).isEqualTo(2);
         assertThat(response.content())
@@ -246,20 +254,48 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
 
         PageResponse<HarvestSeasonSummaryListResponse> activitySearch =
                 harvestSeasonService.findSummaryList(
-                        farm.getId(), null, null, "  milho ", pagination("id", 10));
+                        farm.getId(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "  milho ",
+                        pagination("id", 10));
         PageResponse<HarvestSeasonSummaryListResponse> descriptionSearch =
                 harvestSeasonService.findSummaryList(
-                        farm.getId(), null, null, "CICLO", pagination("id", 10));
+                        farm.getId(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "CICLO",
+                        pagination("id", 10));
         PageResponse<HarvestSeasonSummaryListResponse> inactiveOnly =
                 harvestSeasonService.findSummaryList(
                         farm.getId(),
                         HarvestSeasonStatus.INACTIVE,
                         null,
                         null,
+                        null,
+                        null,
+                        null,
+                        null,
                         pagination("id", 10));
         PageResponse<HarvestSeasonSummaryListResponse> paged =
                 harvestSeasonService.findSummaryList(
-                        farm.getId(), null, null, null, pagination("id", 1));
+                        farm.getId(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        pagination("id", 1));
 
         assertThat(activitySearch.content())
                 .extracting(HarvestSeasonSummaryListResponse::id)
@@ -344,6 +380,105 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
     void shouldResolveEmptyStatusesWhenNoStatusFilterIsProvided() {
         assertThat(harvestSeasonService.resolveStatuses(null, null)).isEmpty();
         assertThat(harvestSeasonService.resolveStatuses(null, List.of())).isEmpty();
+    }
+
+    @Test
+    void shouldResolvePluralProductionActivityIdsWithPriorityOverSingleId() {
+        List<Long> resolvedIds =
+                harvestSeasonService.resolveProductionActivityIds(1L, List.of(2L, 3L));
+
+        assertThat(resolvedIds).containsExactly(2L, 3L);
+    }
+
+    @Test
+    void shouldResolveSingleProductionActivityIdWhenPluralIdsAreEmpty() {
+        assertThat(harvestSeasonService.resolveProductionActivityIds(1L, null)).containsExactly(1L);
+        assertThat(harvestSeasonService.resolveProductionActivityIds(2L, List.of()))
+                .containsExactly(2L);
+    }
+
+    @Test
+    void shouldResolveEmptyProductionActivityIdsWhenNoActivityFilterIsProvided() {
+        assertThat(harvestSeasonService.resolveProductionActivityIds(null, null)).isEmpty();
+        assertThat(harvestSeasonService.resolveProductionActivityIds(null, List.of())).isEmpty();
+    }
+
+    @Test
+    void shouldRejectInvalidPeriodFilter() {
+        Farm farm = saveFarm("Farm");
+
+        assertThatThrownBy(
+                        () ->
+                                harvestSeasonService.findAll(
+                                        farm.getId(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        LocalDate.of(2026, 2, 1),
+                                        LocalDate.of(2026, 1, 31),
+                                        false,
+                                        pagination("id", 10)))
+                .isInstanceOf(br.com.gestaodireta.shared.exception.BusinessException.class)
+                .hasMessage("A data inicial do período não pode ser posterior à data final.");
+    }
+
+    @Test
+    void shouldNotRestrictHarvestSeasonListWhenActivityAndPeriodFiltersAreEmpty() {
+        Farm farm = saveFarm("Farm");
+        ProductionActivity soy = saveActivity("Soja");
+        ProductionActivity corn = saveActivity("Milho");
+        HarvestSeason first = saveSeason(farm, soy, null, null, null, "Safra Soja");
+        HarvestSeason second = saveSeason(farm, corn, null, null, null, "Safra Milho");
+
+        PageResponse<?> response =
+                harvestSeasonService.findAll(
+                        farm.getId(),
+                        null,
+                        null,
+                        null,
+                        List.of(),
+                        null,
+                        null,
+                        false,
+                        pagination("id", 10));
+
+        assertThat(response.content())
+                .extracting("id")
+                .containsExactly(first.getId(), second.getId());
+    }
+
+    @Test
+    void shouldFilterSummaryListByProductionActivitiesAndIntersectingPeriod() {
+        Farm farm = saveFarm("Farm");
+        ProductionActivity soy = saveActivity("Soja");
+        ProductionActivity corn = saveActivity("Milho");
+        HarvestSeason soySeason = saveSeason(farm, soy, null, null, null, "Safra Soja");
+        HarvestSeason cornSeason = saveSeason(farm, corn, null, null, null, "Safra Milho");
+        HarvestSeason openEndedSeason = saveSeason(farm, soy, null, null, null, "Safra Permanente");
+        soySeason.setStartDate(LocalDate.of(2026, 1, 1));
+        soySeason.setEndDate(LocalDate.of(2026, 3, 31));
+        cornSeason.setStartDate(LocalDate.of(2026, 4, 1));
+        cornSeason.setEndDate(LocalDate.of(2026, 6, 30));
+        openEndedSeason.setStartDate(LocalDate.of(2025, 11, 1));
+        openEndedSeason.setEndDate(null);
+        harvestSeasonRepository.saveAll(List.of(soySeason, cornSeason, openEndedSeason));
+
+        PageResponse<HarvestSeasonSummaryListResponse> response =
+                harvestSeasonService.findSummaryList(
+                        farm.getId(),
+                        null,
+                        null,
+                        null,
+                        List.of(soy.getId()),
+                        LocalDate.of(2026, 2, 1),
+                        LocalDate.of(2026, 4, 30),
+                        null,
+                        pagination("id", 10));
+
+        assertThat(response.content())
+                .extracting(HarvestSeasonSummaryListResponse::id)
+                .containsExactly(soySeason.getId(), openEndedSeason.getId());
     }
 
     private Farm saveFarm(String name) {

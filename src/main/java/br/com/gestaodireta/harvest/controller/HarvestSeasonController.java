@@ -11,7 +11,9 @@ import br.com.gestaodireta.harvest.service.HarvestSeasonService;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
 import java.util.List;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -50,10 +52,24 @@ public class HarvestSeasonController {
             @RequestParam Long farmId,
             @RequestParam(required = false) HarvestSeasonStatus status,
             @RequestParam(required = false) List<HarvestSeasonStatus> statuses,
+            @RequestParam(required = false) Long productionActivityId,
+            @RequestParam(required = false) List<Long> productionActivityIds,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+                    LocalDate periodStart,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+                    LocalDate periodEnd,
             @RequestParam(defaultValue = "false") boolean includeInactive,
             @Valid @ModelAttribute PaginationParams paginationParams) {
         return harvestSeasonService.findAll(
-                farmId, status, statuses, includeInactive, paginationParams);
+                farmId,
+                status,
+                statuses,
+                productionActivityId,
+                productionActivityIds,
+                periodStart,
+                periodEnd,
+                includeInactive,
+                paginationParams);
     }
 
     @GetMapping("/summary-list")
@@ -62,10 +78,24 @@ public class HarvestSeasonController {
             @RequestParam Long farmId,
             @RequestParam(required = false) HarvestSeasonStatus status,
             @RequestParam(required = false) List<HarvestSeasonStatus> statuses,
+            @RequestParam(required = false) Long productionActivityId,
+            @RequestParam(required = false) List<Long> productionActivityIds,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+                    LocalDate periodStart,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+                    LocalDate periodEnd,
             @RequestParam(required = false) String search,
             @Valid @ModelAttribute PaginationParams paginationParams) {
         return harvestSeasonService.findSummaryList(
-                farmId, status, statuses, search, paginationParams);
+                farmId,
+                status,
+                statuses,
+                productionActivityId,
+                productionActivityIds,
+                periodStart,
+                periodEnd,
+                search,
+                paginationParams);
     }
 
     @GetMapping("/{id}")

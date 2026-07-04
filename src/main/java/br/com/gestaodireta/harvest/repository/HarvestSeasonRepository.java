@@ -2,6 +2,7 @@ package br.com.gestaodireta.harvest.repository;
 
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -24,6 +25,10 @@ public interface HarvestSeasonRepository extends JpaRepository<HarvestSeason, Lo
                       and (:filterStatuses = true
                         or :includeInactive = true
                         or season.status <> br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus.INACTIVE)
+                      and (:filterProductionActivityIds = false
+                        or season.productionActivity.id in :productionActivityIds)
+                      and (:filterPeriodStart = false or season.endDate is null or season.endDate >= :periodStart)
+                      and (:filterPeriodEnd = false or season.startDate <= :periodEnd)
                     """,
             countQuery =
                     """
@@ -34,12 +39,22 @@ public interface HarvestSeasonRepository extends JpaRepository<HarvestSeason, Lo
                       and (:filterStatuses = true
                         or :includeInactive = true
                         or season.status <> br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus.INACTIVE)
+                      and (:filterProductionActivityIds = false
+                        or season.productionActivity.id in :productionActivityIds)
+                      and (:filterPeriodStart = false or season.endDate is null or season.endDate >= :periodStart)
+                      and (:filterPeriodEnd = false or season.startDate <= :periodEnd)
                     """)
     Page<HarvestSeason> findByFarmId(
             @Param("farmId") Long farmId,
             @Param("includeInactive") boolean includeInactive,
             @Param("filterStatuses") boolean filterStatuses,
             @Param("statuses") Collection<HarvestSeasonStatus> statuses,
+            @Param("filterProductionActivityIds") boolean filterProductionActivityIds,
+            @Param("productionActivityIds") Collection<Long> productionActivityIds,
+            @Param("filterPeriodStart") boolean filterPeriodStart,
+            @Param("periodStart") LocalDate periodStart,
+            @Param("filterPeriodEnd") boolean filterPeriodEnd,
+            @Param("periodEnd") LocalDate periodEnd,
             Pageable pageable);
 
     @Query(
@@ -117,6 +132,10 @@ public interface HarvestSeasonRepository extends JpaRepository<HarvestSeason, Lo
                       and (:filterStatuses = false or season.status in :statuses)
                       and (:filterStatuses = true
                         or season.status <> br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus.INACTIVE)
+                      and (:filterProductionActivityIds = false
+                        or productionActivity.id in :productionActivityIds)
+                      and (:filterPeriodStart = false or season.endDate is null or season.endDate >= :periodStart)
+                      and (:filterPeriodEnd = false or season.startDate <= :periodEnd)
                       and (:search is null
                         or lower(season.name) like concat('%', cast(:search as string), '%')
                         or lower(coalesce(season.description, ' ')) like concat('%', cast(:search as string), '%')
@@ -147,6 +166,10 @@ public interface HarvestSeasonRepository extends JpaRepository<HarvestSeason, Lo
                       and (:filterStatuses = false or season.status in :statuses)
                       and (:filterStatuses = true
                         or season.status <> br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus.INACTIVE)
+                      and (:filterProductionActivityIds = false
+                        or productionActivity.id in :productionActivityIds)
+                      and (:filterPeriodStart = false or season.endDate is null or season.endDate >= :periodStart)
+                      and (:filterPeriodEnd = false or season.startDate <= :periodEnd)
                       and (:search is null
                         or lower(season.name) like concat('%', cast(:search as string), '%')
                         or lower(coalesce(season.description, ' ')) like concat('%', cast(:search as string), '%')
@@ -156,6 +179,12 @@ public interface HarvestSeasonRepository extends JpaRepository<HarvestSeason, Lo
             @Param("farmId") Long farmId,
             @Param("filterStatuses") boolean filterStatuses,
             @Param("statuses") Collection<HarvestSeasonStatus> statuses,
+            @Param("filterProductionActivityIds") boolean filterProductionActivityIds,
+            @Param("productionActivityIds") Collection<Long> productionActivityIds,
+            @Param("filterPeriodStart") boolean filterPeriodStart,
+            @Param("periodStart") LocalDate periodStart,
+            @Param("filterPeriodEnd") boolean filterPeriodEnd,
+            @Param("periodEnd") LocalDate periodEnd,
             @Param("search") String search,
             Pageable pageable);
 

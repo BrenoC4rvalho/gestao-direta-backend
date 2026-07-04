@@ -87,17 +87,31 @@ public class HarvestSeasonService {
             Long farmId,
             HarvestSeasonStatus status,
             List<HarvestSeasonStatus> statuses,
+            Long productionActivityId,
+            List<Long> productionActivityIds,
+            LocalDate periodStart,
+            LocalDate periodEnd,
             boolean includeInactive,
             PaginationParams paginationParams) {
         farmService.findEntityById(farmId);
+        validatePeriod(periodStart, periodEnd);
         List<HarvestSeasonStatus> resolvedStatuses = resolveStatuses(status, statuses);
+        List<Long> resolvedProductionActivityIds =
+                resolveProductionActivityIds(productionActivityId, productionActivityIds);
         boolean filterStatuses = !resolvedStatuses.isEmpty();
+        boolean filterProductionActivityIds = !resolvedProductionActivityIds.isEmpty();
         Page<HarvestSeason> seasons =
                 harvestSeasonRepository.findByFarmId(
                         farmId,
                         includeInactive,
                         filterStatuses,
                         statusesForQuery(resolvedStatuses),
+                        filterProductionActivityIds,
+                        idsForQuery(resolvedProductionActivityIds),
+                        periodStart != null,
+                        periodStart,
+                        periodEnd != null,
+                        periodEnd,
                         paginationParams.toPageable());
 
         return PageResponse.from(seasons.map(harvestSeasonMapper::toResponse));
@@ -108,16 +122,30 @@ public class HarvestSeasonService {
             Long farmId,
             HarvestSeasonStatus status,
             List<HarvestSeasonStatus> statuses,
+            Long productionActivityId,
+            List<Long> productionActivityIds,
+            LocalDate periodStart,
+            LocalDate periodEnd,
             String search,
             PaginationParams paginationParams) {
         farmService.findEntityById(farmId);
+        validatePeriod(periodStart, periodEnd);
         List<HarvestSeasonStatus> resolvedStatuses = resolveStatuses(status, statuses);
+        List<Long> resolvedProductionActivityIds =
+                resolveProductionActivityIds(productionActivityId, productionActivityIds);
         boolean filterStatuses = !resolvedStatuses.isEmpty();
+        boolean filterProductionActivityIds = !resolvedProductionActivityIds.isEmpty();
         Page<HarvestSeasonSummaryListProjection> seasons =
                 harvestSeasonRepository.findSummaryList(
                         farmId,
                         filterStatuses,
                         statusesForQuery(resolvedStatuses),
+                        filterProductionActivityIds,
+                        idsForQuery(resolvedProductionActivityIds),
+                        periodStart != null,
+                        periodStart,
+                        periodEnd != null,
+                        periodEnd,
                         normalizeSearch(search),
                         paginationParams.toPageable());
 
@@ -351,6 +379,39 @@ public class HarvestSeasonService {
         }
 
         return List.of();
+    }
+
+    List<Long> resolveProductionActivityIds(
+            Long productionActivityId, List<Long> productionActivityIds) {
+        List<Long> normalizedIds =
+                productionActivityIds == null
+                        ? List.of()
+                        : productionActivityIds.stream().filter(Objects::nonNull).toList();
+
+        if (!normalizedIds.isEmpty()) {
+            return normalizedIds;
+        }
+
+        if (productionActivityId != null) {
+            return List.of(productionActivityId);
+        }
+
+        return List.of();
+    }
+
+    private void validatePeriod(LocalDate periodStart, LocalDate periodEnd) {
+        if (periodStart != null && periodEnd != null && periodStart.isAfter(periodEnd)) {
+            throw new BusinessException(
+                    "A data inicial do período não pode ser posterior à data final.");
+        }
+    }
+
+    private List<Long> idsForQuery(List<Long> ids) {
+        if (!ids.isEmpty()) {
+            return ids;
+        }
+
+        return List.of(-1L);
     }
 
     private List<HarvestSeasonStatus> statusesForQuery(List<HarvestSeasonStatus> statuses) {
