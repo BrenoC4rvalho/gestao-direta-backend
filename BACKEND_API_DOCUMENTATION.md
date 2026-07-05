@@ -124,6 +124,33 @@ O backend executa diariamente um job para marcar contas vencidas.
 
 ## Endpoints
 
+## Observabilidade
+
+### `GET /api/system/status`
+
+Endpoint publico de status simplificado da aplicacao. Sempre retorna HTTP 200 e nao expoe URL, usuario ou senha do banco, variaveis de ambiente ou detalhes de excecao.
+
+Campos principais:
+
+- `status`: `UP` quando a aplicacao e o banco estao disponiveis, ou `DEGRADED` quando a aplicacao responde, mas o banco esta indisponivel.
+- `application`: nome da aplicacao.
+- `profile`: profiles ativos separados por virgula, ou `default` quando nenhum profile estiver ativo.
+- `database`: `UP` quando o banco responde ao health check, ou `DOWN` quando nao responde.
+- `uptimeSeconds`: tempo de execucao da aplicacao em segundos.
+- `timestamp`: data e hora da resposta.
+
+### Actuator
+
+- `GET /api/actuator/health`: publico, expoe o health check da aplicacao.
+- `GET /api/actuator/info`: publico, expoe informacoes basicas da aplicacao.
+- `GET /api/actuator/metrics`: restrito a usuarios com papel global `ADMIN`.
+
+Significados:
+
+- `UP`: componente disponivel.
+- `DEGRADED`: aplicacao responde, mas algum componente essencial esta indisponivel.
+- `DOWN`: componente indisponivel.
+
 ### POST /api/auth/login
 
 **Descrição:**

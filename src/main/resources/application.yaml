@@ -30,6 +30,27 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+  health:
+    db:
+      enabled: true
+  info:
+    java:
+      enabled: true
+info:
+  app:
+    name: Gestao Direta API
+    description: Backend API for Gestao Direta
+    version: 0.0.1-SNAPSHOT
+    java-version: 21
+
 server:
   port: 8080
   servlet:
