@@ -79,31 +79,73 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
 
     @Query(
             """
-            select coalesce(sum(transaction.amount), 0)
+            select
+              coalesce(sum(case
+                when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME
+                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PAID
+                then transaction.amount
+                else 0
+              end), 0) as paidIncome,
+              coalesce(sum(case
+                when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PAID
+                then transaction.amount
+                else 0
+              end), 0) as paidExpense,
+              coalesce(sum(case
+                when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME
+                  and transaction.status in (
+                    br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING,
+                    br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                  )
+                then transaction.amount
+                else 0
+              end), 0) as expectedIncome,
+              coalesce(sum(case
+                when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+                  and transaction.status in (
+                    br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING,
+                    br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                  )
+                then transaction.amount
+                else 0
+              end), 0) as expectedExpense,
+              coalesce(sum(case
+                when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                  and transaction.dueDate >= :today
+                  and transaction.dueDate <= :next30Days
+                then transaction.amount
+                else 0
+              end), 0) as payableNext30Days,
+              coalesce(sum(case
+                when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                then transaction.amount
+                else 0
+              end), 0) as overdueExpenses,
+              coalesce(sum(case
+                when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME
+                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                then transaction.amount
+                else 0
+              end), 0) as overdueIncome,
+              coalesce(sum(case
+                when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME
+                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                  and transaction.dueDate >= :today
+                  and transaction.dueDate <= :next30Days
+                then transaction.amount
+                else 0
+              end), 0) as receivablePendingNext30Days
             from FinancialTransaction transaction
             where transaction.farm.id = :farmId
-              and transaction.recordStatus = :recordStatus
-              and transaction.status <> :ignoredStatus
-              and transaction.type = :type
+              and transaction.recordStatus = br.com.gestaodireta.financial.enumeration.FinancialRecordStatus.ACTIVE
             """)
-    BigDecimal sumByFarmAndType(
+    FinancialSummaryProjection summarizeFinancialDashboard(
             @Param("farmId") Long farmId,
-            @Param("recordStatus") FinancialRecordStatus recordStatus,
-            @Param("ignoredStatus") PaymentStatus ignoredStatus,
-            @Param("type") TransactionType type);
-
-    @Query(
-            """
-            select coalesce(sum(transaction.amount), 0)
-            from FinancialTransaction transaction
-            where transaction.farm.id = :farmId
-              and transaction.recordStatus = :recordStatus
-              and transaction.status = :status
-            """)
-    BigDecimal sumByFarmAndPaymentStatus(
-            @Param("farmId") Long farmId,
-            @Param("recordStatus") FinancialRecordStatus recordStatus,
-            @Param("status") PaymentStatus status);
+            @Param("today") LocalDate today,
+            @Param("next30Days") LocalDate next30Days);
 
     @Query(
             """

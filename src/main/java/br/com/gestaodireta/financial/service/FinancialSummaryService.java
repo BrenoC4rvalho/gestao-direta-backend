@@ -7,10 +7,13 @@ import br.com.gestaodireta.financial.entity.FinancialTransaction;
 import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
 import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
+import br.com.gestaodireta.financial.repository.FinancialSummaryProjection;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
@@ -21,42 +24,45 @@ public class FinancialSummaryService {
 
     private final FinancialTransactionRepository financialTransactionRepository;
 
-    public FinancialSummaryService(FinancialTransactionRepository financialTransactionRepository) {
+    private final Clock clock;
+
+    public FinancialSummaryService(
+            FinancialTransactionRepository financialTransactionRepository, Clock clock) {
         this.financialTransactionRepository = financialTransactionRepository;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
     public FinancialSummaryResponse summarize(Long farmId) {
-        BigDecimal incomeTotal =
-                financialTransactionRepository.sumByFarmAndType(
-                        farmId,
-                        FinancialRecordStatus.ACTIVE,
-                        PaymentStatus.CANCELED,
-                        TransactionType.INCOME);
-        BigDecimal expenseTotal =
-                financialTransactionRepository.sumByFarmAndType(
-                        farmId,
-                        FinancialRecordStatus.ACTIVE,
-                        PaymentStatus.CANCELED,
-                        TransactionType.EXPENSE);
-        BigDecimal pendingTotal =
-                financialTransactionRepository.sumByFarmAndPaymentStatus(
-                        farmId, FinancialRecordStatus.ACTIVE, PaymentStatus.PENDING);
-        BigDecimal paidTotal =
-                financialTransactionRepository.sumByFarmAndPaymentStatus(
-                        farmId, FinancialRecordStatus.ACTIVE, PaymentStatus.PAID);
-        BigDecimal overdueTotal =
-                financialTransactionRepository.sumByFarmAndPaymentStatus(
-                        farmId, FinancialRecordStatus.ACTIVE, PaymentStatus.OVERDUE);
+        LocalDate today = LocalDate.now(clock);
+        LocalDate next30Days = today.plusDays(30);
+        FinancialSummaryProjection summary =
+                financialTransactionRepository.summarizeFinancialDashboard(
+                        farmId, today, next30Days);
+        BigDecimal paidIncome = zeroIfNull(summary.getPaidIncome());
+        BigDecimal paidExpense = zeroIfNull(summary.getPaidExpense());
+        BigDecimal expectedIncome = zeroIfNull(summary.getExpectedIncome());
+        BigDecimal expectedExpense = zeroIfNull(summary.getExpectedExpense());
+        BigDecimal payableNext30Days = zeroIfNull(summary.getPayableNext30Days());
+        BigDecimal overdueExpenses = zeroIfNull(summary.getOverdueExpenses());
+        BigDecimal receivableNext30Days =
+                zeroIfNull(summary.getOverdueIncome())
+                        .add(zeroIfNull(summary.getReceivablePendingNext30Days()));
+        BigDecimal currentBalance = paidIncome.subtract(paidExpense);
+        BigDecimal projectedBalance = currentBalance.add(expectedIncome).subtract(expectedExpense);
+        BigDecimal cashFlowNext30Days =
+                receivableNext30Days.subtract(payableNext30Days).subtract(overdueExpenses);
 
         return new FinancialSummaryResponse(
                 farmId,
-                incomeTotal,
-                expenseTotal,
-                incomeTotal.subtract(expenseTotal),
-                pendingTotal,
-                paidTotal,
-                overdueTotal);
+                currentBalance,
+                expectedIncome,
+                expectedExpense,
+                projectedBalance,
+                payableNext30Days,
+                overdueExpenses,
+                receivableNext30Days,
+                cashFlowNext30Days);
     }
 
     @Transactional(readOnly = true)
@@ -87,5 +93,9 @@ public class FinancialSummaryService {
                 transaction.getFarm().getId(),
                 category == null ? null : category.getId(),
                 category == null ? null : category.getName());
+    }
+
+    private BigDecimal zeroIfNull(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 }

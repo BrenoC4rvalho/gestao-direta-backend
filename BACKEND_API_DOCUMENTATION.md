@@ -4004,7 +4004,7 @@ Cancela uma movimentação financeira.
 ### GET /api/financial/summary
 
 **Descrição:**
-Retorna resumo financeiro de uma fazenda.
+Retorna os indicadores financeiros do dashboard para uma fazenda.
 
 **Autenticação:** Sim
 **Permissão:** `ADMIN`, `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com acesso financeiro à fazenda.
@@ -4036,12 +4036,14 @@ Retorna resumo financeiro de uma fazenda.
 ```json
 {
   "farmId": 1,
-  "incomeTotal": 10000.00,
-  "expenseTotal": 2500.00,
-  "balance": 7500.00,
-  "pendingTotal": 2500.00,
-  "paidTotal": 10000.00,
-  "overdueTotal": 0.00
+  "currentBalance": 700.00,
+  "expectedIncome": 700.00,
+  "expectedExpense": 1150.00,
+  "projectedBalance": 250.00,
+  "payableNext30Days": 150.00,
+  "overdueExpenses": 100.00,
+  "receivableNext30Days": 700.00,
+  "cashFlowNext30Days": 450.00
 }
 ```
 
@@ -4051,8 +4053,17 @@ Retorna resumo financeiro de uma fazenda.
 - `403 Forbidden` para usuário sem acesso financeiro à fazenda.
 
 **Observações de regra de negócio:**
-- Soma apenas registros `ACTIVE`.
-- Totais por tipo ignoram status `CANCELED`.
+- Considera apenas movimentações da fazenda informada com `recordStatus=ACTIVE`.
+- Movimentações `CANCELED` e `DELETED` são ignoradas nos cálculos.
+- `currentBalance`: receitas pagas menos despesas pagas.
+- `expectedIncome`: receitas pendentes ou atrasadas.
+- `expectedExpense`: despesas pendentes ou atrasadas.
+- `projectedBalance`: `currentBalance + expectedIncome - expectedExpense`.
+- `payableNext30Days`: despesas pendentes com vencimento entre hoje e hoje mais 30 dias.
+- `overdueExpenses`: despesas com status `OVERDUE`.
+- `receivableNext30Days`: receitas atrasadas ou pendentes com vencimento entre hoje e hoje mais 30 dias.
+- `cashFlowNext30Days`: `receivableNext30Days - payableNext30Days - overdueExpenses`.
+- Despesas `PENDING` vencidas sao convertidas para `OVERDUE` pelo job diario de vencimentos; por isso `overdueExpenses` usa apenas status `OVERDUE`.
 - `ACCOUNTANT` pode consultar resumo financeiro.
 
 ### GET /api/financial/upcoming-bills

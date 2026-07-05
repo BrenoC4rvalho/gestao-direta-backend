@@ -62,12 +62,10 @@ class FinancialSummaryControllerTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void shouldAllowAccountantAndRejectInactiveForSummary() throws Exception {
+    void shouldReturnNewSummaryFieldsAndRemoveLegacyFieldsForAuthorizedUser() throws Exception {
         Farm farm = saveFarm();
         User accountant = saveUser("Accountant", "accountant@example.com");
-        User inactive = saveUser("Inactive", "inactive@example.com");
         saveFarmUser(farm, accountant, FarmUserRole.ACCOUNTANT);
-        saveFarmUser(farm, inactive, FarmUserRole.INACTIVE);
         saveTransaction(farm, accountant);
 
         mockMvc.perform(
@@ -76,7 +74,29 @@ class FinancialSummaryControllerTest extends PostgresIntegrationTest {
                                 .param("farmId", String.valueOf(farm.getId()))
                                 .with(user(String.valueOf(accountant.getId())).roles("USER")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.expenseTotal").value(10.00));
+                .andExpect(jsonPath("$.farmId").value(farm.getId()))
+                .andExpect(jsonPath("$.currentBalance").value(0.00))
+                .andExpect(jsonPath("$.expectedIncome").value(0.00))
+                .andExpect(jsonPath("$.expectedExpense").value(10.00))
+                .andExpect(jsonPath("$.projectedBalance").value(-10.00))
+                .andExpect(jsonPath("$.payableNext30Days").exists())
+                .andExpect(jsonPath("$.overdueExpenses").value(0.00))
+                .andExpect(jsonPath("$.receivableNext30Days").value(0.00))
+                .andExpect(jsonPath("$.cashFlowNext30Days").exists())
+                .andExpect(jsonPath("$.incomeTotal").doesNotExist())
+                .andExpect(jsonPath("$.expenseTotal").doesNotExist())
+                .andExpect(jsonPath("$.balance").doesNotExist())
+                .andExpect(jsonPath("$.pendingTotal").doesNotExist())
+                .andExpect(jsonPath("$.paidTotal").doesNotExist())
+                .andExpect(jsonPath("$.overdueTotal").doesNotExist());
+    }
+
+    @Test
+    void shouldRejectInactiveOrUnlinkedUserForSummary() throws Exception {
+        Farm farm = saveFarm();
+        User inactive = saveUser("Inactive", "inactive@example.com");
+        User unlinked = saveUser("Unlinked", "unlinked@example.com");
+        saveFarmUser(farm, inactive, FarmUserRole.INACTIVE);
 
         mockMvc.perform(
                         get("/api/financial/summary")
@@ -84,6 +104,24 @@ class FinancialSummaryControllerTest extends PostgresIntegrationTest {
                                 .param("farmId", String.valueOf(farm.getId()))
                                 .with(user(String.valueOf(inactive.getId())).roles("USER")))
                 .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        get("/api/financial/summary")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .with(user(String.valueOf(unlinked.getId())).roles("USER")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldRejectUnauthenticatedUserForSummary() throws Exception {
+        Farm farm = saveFarm();
+
+        mockMvc.perform(
+                        get("/api/financial/summary")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId())))
+                .andExpect(status().isUnauthorized());
     }
 
     private Farm saveFarm() {
