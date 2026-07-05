@@ -40,6 +40,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -78,15 +79,18 @@ class HarvestControllerTest extends PostgresIntegrationTest {
 
     @Test
     void shouldManageProductionActivitiesAsAdmin() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
         User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN);
 
         mockMvc.perform(
                         post("/api/harvest/production-activities")
                                 .contextPath(CONTEXT_PATH)
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(activityBody("Soja"))
+                                .content(activityBody(farm.getId(), "Soja"))
                                 .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.farmId").value(farm.getId()))
+                .andExpect(jsonPath("$.farmName").value("Farm"))
                 .andExpect(jsonPath("$.name").value("Soja"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
 
@@ -96,9 +100,10 @@ class HarvestControllerTest extends PostgresIntegrationTest {
                         put("/api/harvest/production-activities/{id}", activity.getId())
                                 .contextPath(CONTEXT_PATH)
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(activityBody("Soja verão"))
+                                .content(updateActivityBody("Soja verão"))
                                 .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.farmId").value(farm.getId()))
                 .andExpect(jsonPath("$.name").value("Soja verão"));
 
         mockMvc.perform(
@@ -121,41 +126,169 @@ class HarvestControllerTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void shouldDenyProductionActivityManagementForUser() throws Exception {
+    void shouldAllowProducerAndDenyReadOnlyUsersToCreateProductionActivities() throws Exception {
         Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
         User producer = saveUser("Producer", "producer@example.com", UserType.USER);
+        User employee = saveUser("Employee", "employee@example.com", UserType.USER);
+        User accountant = saveUser("Accountant", "accountant@example.com", UserType.USER);
+        User unlinked = saveUser("Unlinked", "unlinked@example.com", UserType.USER);
         saveFarmUser(farm, producer, FarmUserRole.PRODUCER);
+        saveFarmUser(farm, employee, FarmUserRole.EMPLOYEE);
+        saveFarmUser(farm, accountant, FarmUserRole.ACCOUNTANT);
 
         mockMvc.perform(
                         post("/api/harvest/production-activities")
                                 .contextPath(CONTEXT_PATH)
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(activityBody("Milho"))
+                                .content(activityBody(farm.getId(), "Milho"))
                                 .with(user(String.valueOf(producer.getId())).roles("USER")))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.farmId").value(farm.getId()))
+                .andExpect(jsonPath("$.name").value("Milho"));
+
+        expectCannotCreateActivity(farm, employee, "Trigo");
+        expectCannotCreateActivity(farm, accountant, "Arroz");
+        expectCannotCreateActivity(farm, unlinked, "Café");
     }
 
     @Test
-    void shouldListOnlyActiveProductionActivitiesForLinkedUsers() throws Exception {
+    void shouldListOnlyFarmProductionActivitiesForLinkedUsers() throws Exception {
         Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        Farm otherFarm = saveFarm("Other Farm", FarmStatus.ACTIVE);
         User producer = saveUser("Producer", "producer@example.com", UserType.USER);
         User unlinked = saveUser("Unlinked", "unlinked@example.com", UserType.USER);
         saveFarmUser(farm, producer, FarmUserRole.PRODUCER);
-        saveActivity("Soja", ProductionActivityStatus.ACTIVE);
-        saveActivity("Milho", ProductionActivityStatus.ACTIVE);
-        saveActivity("Café", ProductionActivityStatus.INACTIVE);
+        saveActivity(farm, "Soja", ProductionActivityStatus.ACTIVE);
+        saveActivity(farm, "Milho", ProductionActivityStatus.ACTIVE);
+        saveActivity(farm, "Café", ProductionActivityStatus.INACTIVE);
+        saveActivity(otherFarm, "Tomate", ProductionActivityStatus.ACTIVE);
 
         mockMvc.perform(
                         get("/api/harvest/production-activities/active")
                                 .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
                                 .with(user(String.valueOf(producer.getId())).roles("USER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[*].name").value(containsInAnyOrder("Soja", "Milho")));
 
         mockMvc.perform(
+                        get("/api/harvest/production-activities")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .with(user(String.valueOf(producer.getId())).roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.content[*].name")
+                                .value(containsInAnyOrder("Soja", "Milho", "Café")))
+                .andExpect(jsonPath("$.totalElements").value(3));
+
+        mockMvc.perform(
+                        get("/api/harvest/production-activities")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(producer.getId())).roles("USER")))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(
                         get("/api/harvest/production-activities/active")
                                 .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
                                 .with(user(String.valueOf(unlinked.getId())).roles("USER")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldValidateProductionActivityDuplicateNameByFarm() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        Farm otherFarm = saveFarm("Other Farm", FarmStatus.ACTIVE);
+        User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN);
+        saveActivity(farm, "Soja", ProductionActivityStatus.ACTIVE);
+
+        mockMvc.perform(
+                        post("/api/harvest/production-activities")
+                                .contextPath(CONTEXT_PATH)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(activityBody(farm.getId(), " soja "))
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isBadRequest())
+                .andExpect(
+                        jsonPath("$.message")
+                                .value(
+                                        "A production activity with this name already exists for this farm."));
+
+        mockMvc.perform(
+                        post("/api/harvest/production-activities")
+                                .contextPath(CONTEXT_PATH)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(activityBody(otherFarm.getId(), "Soja"))
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.farmId").value(otherFarm.getId()))
+                .andExpect(jsonPath("$.name").value("Soja"));
+    }
+
+    @Test
+    void shouldSummarizeProductionActivitiesByFarm() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        Farm otherFarm = saveFarm("Other Farm", FarmStatus.ACTIVE);
+        User producer = saveUser("Producer", "producer@example.com", UserType.USER);
+        User unlinked = saveUser("Unlinked", "unlinked@example.com", UserType.USER);
+        saveFarmUser(farm, producer, FarmUserRole.PRODUCER);
+        ProductionActivity soy = saveActivity(farm, "Soja", ProductionActivityStatus.ACTIVE);
+        ProductionActivity corn = saveActivity(farm, "Milho", ProductionActivityStatus.ACTIVE);
+        saveActivity(farm, "Café", ProductionActivityStatus.INACTIVE);
+        ProductionActivity otherSoy =
+                saveActivity(otherFarm, "Soja", ProductionActivityStatus.ACTIVE);
+        saveSeason(farm, soy, "Safra Soja 1", HarvestSeasonStatus.IN_PROGRESS);
+        saveSeason(farm, soy, "Safra Soja 2", HarvestSeasonStatus.IN_PROGRESS);
+        saveSeason(farm, corn, "Safra Milho", HarvestSeasonStatus.PLANNED);
+        saveSeason(otherFarm, otherSoy, "Outra Safra", HarvestSeasonStatus.IN_PROGRESS);
+
+        mockMvc.perform(
+                        get("/api/harvest/production-activities/summary")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .with(user(String.valueOf(producer.getId())).roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.farmId").value(farm.getId()))
+                .andExpect(jsonPath("$.totalCount").value(3))
+                .andExpect(jsonPath("$.activeCount").value(2))
+                .andExpect(jsonPath("$.inactiveCount").value(1))
+                .andExpect(jsonPath("$.inProgressCount").value(1));
+
+        mockMvc.perform(
+                        get("/api/harvest/production-activities/summary")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .with(user(String.valueOf(unlinked.getId())).roles("USER")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldRejectProductionActivityChangesForInactiveFarm() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.INACTIVE);
+        User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN);
+        ProductionActivity activity = saveActivity(farm, "Soja", ProductionActivityStatus.ACTIVE);
+
+        mockMvc.perform(
+                        post("/api/harvest/production-activities")
+                                .contextPath(CONTEXT_PATH)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(activityBody(farm.getId(), "Milho"))
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        put("/api/harvest/production-activities/{id}", activity.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(updateActivityBody("Soja verão"))
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        delete("/api/harvest/production-activities/{id}", activity.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
                 .andExpect(status().isForbidden());
     }
 
@@ -223,7 +356,7 @@ class HarvestControllerTest extends PostgresIntegrationTest {
         Farm inactiveFarm = saveFarm("Inactive Farm", FarmStatus.INACTIVE);
         Farm activeFarm = saveFarm("Active Farm", FarmStatus.ACTIVE);
         ProductionActivity inactiveActivity =
-                saveActivity("Café", ProductionActivityStatus.INACTIVE);
+                saveActivity(activeFarm, "Café", ProductionActivityStatus.INACTIVE);
 
         mockMvc.perform(
                         post("/api/harvest/seasons")
@@ -259,9 +392,11 @@ class HarvestControllerTest extends PostgresIntegrationTest {
         User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN);
         Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
         Farm otherFarm = saveFarm("Other Farm", FarmStatus.ACTIVE);
-        ProductionActivity activity = saveActivity("Soja", ProductionActivityStatus.ACTIVE);
+        ProductionActivity activity = saveActivity(farm, "Soja", ProductionActivityStatus.ACTIVE);
+        ProductionActivity otherActivity =
+                saveActivity(otherFarm, "Soja", ProductionActivityStatus.ACTIVE);
         saveSeason(farm, activity, "Safra Soja", HarvestSeasonStatus.PLANNED);
-        saveSeason(otherFarm, activity, "Safra Soja", HarvestSeasonStatus.PLANNED);
+        saveSeason(otherFarm, otherActivity, "Safra Soja", HarvestSeasonStatus.PLANNED);
 
         mockMvc.perform(
                         post("/api/harvest/seasons")
@@ -851,7 +986,31 @@ class HarvestControllerTest extends PostgresIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
-    private String activityBody(String name) {
+    private void expectCannotCreateActivity(Farm farm, User authenticatedUser, String name)
+            throws Exception {
+        mockMvc.perform(
+                        post("/api/harvest/production-activities")
+                                .contextPath(CONTEXT_PATH)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(activityBody(farm.getId(), name))
+                                .with(
+                                        user(String.valueOf(authenticatedUser.getId()))
+                                                .roles("USER")))
+                .andExpect(status().isForbidden());
+    }
+
+    private String activityBody(Long farmId, String name) {
+        return """
+                {
+                  "farmId": %s,
+                  "name": "%s",
+                  "description": "Activity description"
+                }
+                """
+                .formatted(farmId, name);
+    }
+
+    private String updateActivityBody(String name) {
         return """
                 {
                   "name": "%s",
@@ -921,7 +1080,15 @@ class HarvestControllerTest extends PostgresIntegrationTest {
     }
 
     private ProductionActivity saveActivity(String name, ProductionActivityStatus status) {
+        Farm farm = farmRepository.findAll(Sort.by("id")).getFirst();
+
+        return saveActivity(farm, name, status);
+    }
+
+    private ProductionActivity saveActivity(
+            Farm farm, String name, ProductionActivityStatus status) {
         ProductionActivity activity = new ProductionActivity();
+        activity.setFarm(farm);
         activity.setName(name);
         activity.setStatus(status);
 

@@ -1439,8 +1439,9 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
                 otherFarmTransaction);
     }
 
-    private ProductionActivity saveActivity(String name) {
+    private ProductionActivity saveActivity(Farm farm, String name) {
         ProductionActivity activity = new ProductionActivity();
+        activity.setFarm(farm);
         activity.setName(name);
         activity.setStatus(ProductionActivityStatus.ACTIVE);
 
@@ -1450,7 +1451,7 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
     private HarvestSeason saveSeason(Farm farm, String name, HarvestSeasonStatus status) {
         HarvestSeason season = new HarvestSeason();
         season.setFarm(farm);
-        season.setProductionActivity(saveActivity(name + " Activity"));
+        season.setProductionActivity(saveActivity(farm, name + " Activity"));
         season.setName(name);
         season.setStartDate(LocalDate.of(2026, 1, 1));
         season.setExpectedRevenue(BigDecimal.ZERO);

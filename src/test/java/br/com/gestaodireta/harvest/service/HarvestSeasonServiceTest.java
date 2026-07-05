@@ -13,8 +13,10 @@ import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryListResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryResponse;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonUpdateRequest;
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
 import br.com.gestaodireta.harvest.entity.ProductionActivity;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
@@ -36,6 +38,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -70,6 +73,69 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         farmUserRepository.deleteAll();
         farmRepository.deleteAll();
         userRepository.deleteAll();
+    }
+
+    @Test
+    void shouldCreateHarvestSeasonWithProductionActivityFromSameFarm() {
+        Farm farm = saveFarm("Farm");
+        ProductionActivity activity = saveActivity(farm, "Soja");
+
+        var response =
+                harvestSeasonService.create(
+                        seasonRequest(farm.getId(), activity.getId(), "Safra Soja"));
+
+        assertThat(response.farmId()).isEqualTo(farm.getId());
+        assertThat(response.productionActivityId()).isEqualTo(activity.getId());
+    }
+
+    @Test
+    void shouldRejectHarvestSeasonWithProductionActivityFromAnotherFarm() {
+        Farm farm = saveFarm("Farm");
+        Farm otherFarm = saveFarm("Other Farm");
+        ProductionActivity otherActivity = saveActivity(otherFarm, "Soja");
+
+        assertThatThrownBy(
+                        () ->
+                                harvestSeasonService.create(
+                                        seasonRequest(
+                                                farm.getId(), otherActivity.getId(), "Safra Soja")))
+                .isInstanceOf(br.com.gestaodireta.shared.exception.BusinessException.class)
+                .hasMessage(
+                        "Production activity must belong to the same farm as the harvest season.");
+    }
+
+    @Test
+    void shouldRejectHarvestSeasonUpdateWithProductionActivityFromAnotherFarm() {
+        Farm farm = saveFarm("Farm");
+        Farm otherFarm = saveFarm("Other Farm");
+        ProductionActivity activity = saveActivity(farm, "Soja");
+        ProductionActivity otherActivity = saveActivity(otherFarm, "Milho");
+        HarvestSeason season = saveSeason(farm, activity, null, null, null, "Safra Soja");
+
+        assertThatThrownBy(
+                        () ->
+                                harvestSeasonService.update(
+                                        season.getId(),
+                                        seasonUpdateRequest(otherActivity.getId(), "Safra Milho")))
+                .isInstanceOf(br.com.gestaodireta.shared.exception.BusinessException.class)
+                .hasMessage(
+                        "Production activity must belong to the same farm as the harvest season.");
+    }
+
+    @Test
+    void shouldRejectHarvestSeasonWithInactiveProductionActivityFromSameFarm() {
+        Farm farm = saveFarm("Farm");
+        ProductionActivity activity = saveActivity(farm, "Soja");
+        activity.setStatus(ProductionActivityStatus.INACTIVE);
+        productionActivityRepository.save(activity);
+
+        assertThatThrownBy(
+                        () ->
+                                harvestSeasonService.create(
+                                        seasonRequest(
+                                                farm.getId(), activity.getId(), "Safra Soja")))
+                .isInstanceOf(br.com.gestaodireta.shared.exception.BusinessException.class)
+                .hasMessage("Inactive production activity cannot be used in a harvest season.");
     }
 
     @Test
@@ -490,7 +556,14 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
     }
 
     private ProductionActivity saveActivity(String name) {
+        Farm farm = farmRepository.findAll(Sort.by("id")).getFirst();
+
+        return saveActivity(farm, name);
+    }
+
+    private ProductionActivity saveActivity(Farm farm, String name) {
         ProductionActivity activity = new ProductionActivity();
+        activity.setFarm(farm);
         activity.setName(name);
         activity.setStatus(ProductionActivityStatus.ACTIVE);
 
@@ -515,6 +588,31 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         season.setStatus(HarvestSeasonStatus.PLANNED);
 
         return harvestSeasonRepository.save(season);
+    }
+
+    private HarvestSeasonRequest seasonRequest(Long farmId, Long activityId, String name) {
+        return new HarvestSeasonRequest(
+                farmId,
+                activityId,
+                name,
+                "Season description",
+                LocalDate.of(2026, 1, 1),
+                null,
+                new BigDecimal("1000.00"),
+                new BigDecimal("500.00"),
+                BigDecimal.ZERO);
+    }
+
+    private HarvestSeasonUpdateRequest seasonUpdateRequest(Long activityId, String name) {
+        return new HarvestSeasonUpdateRequest(
+                activityId,
+                name,
+                "Updated description",
+                LocalDate.of(2026, 1, 1),
+                null,
+                new BigDecimal("1000.00"),
+                new BigDecimal("500.00"),
+                BigDecimal.ZERO);
     }
 
     private User saveUser() {

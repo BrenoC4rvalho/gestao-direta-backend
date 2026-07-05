@@ -7,6 +7,7 @@ import br.com.gestaodireta.harvest.dto.HarvestSeasonRequest;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
 import br.com.gestaodireta.harvest.repository.HarvestFarmUserAccessRepository;
 import br.com.gestaodireta.harvest.repository.HarvestSeasonRepository;
+import br.com.gestaodireta.harvest.repository.ProductionActivityRepository;
 import br.com.gestaodireta.shared.security.SecurityUtils;
 import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.enumeration.UserStatus;
@@ -23,31 +24,43 @@ public class HarvestAccess {
 
     private final HarvestSeasonRepository harvestSeasonRepository;
 
+    private final ProductionActivityRepository productionActivityRepository;
+
     private final UserRepository userRepository;
 
     public HarvestAccess(
             FarmRepository farmRepository,
             HarvestFarmUserAccessRepository harvestFarmUserAccessRepository,
             HarvestSeasonRepository harvestSeasonRepository,
+            ProductionActivityRepository productionActivityRepository,
             UserRepository userRepository) {
         this.farmRepository = farmRepository;
         this.harvestFarmUserAccessRepository = harvestFarmUserAccessRepository;
         this.harvestSeasonRepository = harvestSeasonRepository;
+        this.productionActivityRepository = productionActivityRepository;
         this.userRepository = userRepository;
     }
 
-    public boolean canManageProductionActivities() {
-        return SecurityUtils.isAdmin();
+    public boolean canManageProductionActivities(Long farmId) {
+        return canManageActiveFarm(farmId);
     }
 
-    public boolean canViewActiveProductionActivities() {
-        if (SecurityUtils.isAdmin()) {
-            return true;
-        }
+    public boolean canManageProductionActivity(Long activityId) {
+        return productionActivityRepository
+                .findFarmIdById(activityId)
+                .filter(this::canManageActiveFarm)
+                .isPresent();
+    }
 
-        return isCurrentUserActive()
-                && harvestFarmUserAccessRepository.existsActiveFarmAccessByUserId(
-                        SecurityUtils.getAuthenticatedUserId());
+    public boolean canViewProductionActivities(Long farmId) {
+        return canViewFarmHarvestData(farmId);
+    }
+
+    public boolean canViewProductionActivity(Long activityId) {
+        return productionActivityRepository
+                .findFarmIdById(activityId)
+                .map(this::canViewFarmHarvestData)
+                .orElse(true);
     }
 
     public boolean canCreateSeason(HarvestSeasonRequest request) {

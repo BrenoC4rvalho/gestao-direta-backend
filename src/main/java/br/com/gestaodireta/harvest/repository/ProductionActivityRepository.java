@@ -10,23 +10,79 @@ import org.springframework.data.repository.query.Param;
 
 public interface ProductionActivityRepository extends JpaRepository<ProductionActivity, Long> {
 
-    Page<ProductionActivity> findByStatus(ProductionActivityStatus status, Pageable pageable);
+    @Query(
+            value =
+                    """
+                    select activity
+                    from ProductionActivity activity
+                    join fetch activity.farm
+                    where activity.farm.id = :farmId
+                      and (:status is null or activity.status = :status)
+                    """,
+            countQuery =
+                    """
+                    select count(activity)
+                    from ProductionActivity activity
+                    where activity.farm.id = :farmId
+                      and (:status is null or activity.status = :status)
+                    """)
+    Page<ProductionActivity> findByFarmIdAndStatus(
+            @Param("farmId") Long farmId,
+            @Param("status") ProductionActivityStatus status,
+            Pageable pageable);
 
     @Query(
             """
-            select count(activity) > 0
+            select activity
             from ProductionActivity activity
-            where lower(trim(activity.name)) = :normalizedName
+            join fetch activity.farm
+            where activity.id = :activityId
             """)
-    boolean existsByNormalizedName(@Param("normalizedName") String normalizedName);
+    java.util.Optional<ProductionActivity> findByIdWithFarm(@Param("activityId") Long activityId);
+
+    @Query(
+            """
+            select activity.farm.id
+            from ProductionActivity activity
+            where activity.id = :activityId
+            """)
+    java.util.Optional<Long> findFarmIdById(@Param("activityId") Long activityId);
 
     @Query(
             """
             select count(activity) > 0
             from ProductionActivity activity
-            where activity.id <> :activityId
+            where activity.farm.id = :farmId
               and lower(trim(activity.name)) = :normalizedName
             """)
-    boolean existsByNormalizedNameAndIdNot(
-            @Param("normalizedName") String normalizedName, @Param("activityId") Long activityId);
+    boolean existsByFarmIdAndNormalizedName(
+            @Param("farmId") Long farmId, @Param("normalizedName") String normalizedName);
+
+    @Query(
+            """
+            select count(activity) > 0
+            from ProductionActivity activity
+            where activity.farm.id = :farmId
+              and activity.id <> :activityId
+              and lower(trim(activity.name)) = :normalizedName
+            """)
+    boolean existsByFarmIdAndNormalizedNameAndIdNot(
+            @Param("farmId") Long farmId,
+            @Param("activityId") Long activityId,
+            @Param("normalizedName") String normalizedName);
+
+    long countByFarmId(Long farmId);
+
+    long countByFarmIdAndStatus(Long farmId, ProductionActivityStatus status);
+
+    @Query(
+            """
+            select count(distinct activity.id)
+            from ProductionActivity activity
+            join HarvestSeason season on season.productionActivity.id = activity.id
+            where activity.farm.id = :farmId
+              and season.farm.id = :farmId
+              and season.status = br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus.IN_PROGRESS
+            """)
+    long countDistinctInProgressByFarmId(@Param("farmId") Long farmId);
 }

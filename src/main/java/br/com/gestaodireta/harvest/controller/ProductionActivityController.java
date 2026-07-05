@@ -1,7 +1,9 @@
 package br.com.gestaodireta.harvest.controller;
 
-import br.com.gestaodireta.harvest.dto.ProductionActivityRequest;
+import br.com.gestaodireta.harvest.dto.ProductionActivityCreateRequest;
 import br.com.gestaodireta.harvest.dto.ProductionActivityResponse;
+import br.com.gestaodireta.harvest.dto.ProductionActivitySummaryResponse;
+import br.com.gestaodireta.harvest.dto.ProductionActivityUpdateRequest;
 import br.com.gestaodireta.harvest.enumeration.ProductionActivityStatus;
 import br.com.gestaodireta.harvest.service.ProductionActivityService;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
@@ -35,48 +37,55 @@ public class ProductionActivityController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("@harvestAccess.canManageProductionActivities()")
+    @PreAuthorize("@harvestAccess.canManageProductionActivities(#request.farmId)")
     public ProductionActivityResponse create(
-            @Valid @RequestBody ProductionActivityRequest request) {
+            @Valid @RequestBody ProductionActivityCreateRequest request) {
         return productionActivityService.create(request);
     }
 
     @GetMapping
-    @PreAuthorize("@harvestAccess.canManageProductionActivities()")
+    @PreAuthorize("@harvestAccess.canViewProductionActivities(#farmId)")
     public PageResponse<ProductionActivityResponse> findAll(
+            @RequestParam Long farmId,
             @RequestParam(required = false) ProductionActivityStatus status,
             @Valid @ModelAttribute PaginationParams paginationParams) {
-        return productionActivityService.findAll(status, paginationParams);
+        return productionActivityService.findAll(farmId, status, paginationParams);
     }
 
     @GetMapping("/active")
-    @PreAuthorize("@harvestAccess.canViewActiveProductionActivities()")
-    public List<ProductionActivityResponse> findActive() {
-        return productionActivityService.findActive();
+    @PreAuthorize("@harvestAccess.canViewProductionActivities(#farmId)")
+    public List<ProductionActivityResponse> findActive(@RequestParam Long farmId) {
+        return productionActivityService.findActive(farmId);
+    }
+
+    @GetMapping("/summary")
+    @PreAuthorize("@harvestAccess.canViewProductionActivities(#farmId)")
+    public ProductionActivitySummaryResponse getSummary(@RequestParam Long farmId) {
+        return productionActivityService.getSummary(farmId);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("@harvestAccess.canManageProductionActivities()")
+    @PreAuthorize("@harvestAccess.canViewProductionActivity(#id)")
     public ProductionActivityResponse findById(@PathVariable Long id) {
         return productionActivityService.findById(id);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("@harvestAccess.canManageProductionActivities()")
+    @PreAuthorize("@harvestAccess.canManageProductionActivity(#id)")
     public ProductionActivityResponse update(
-            @PathVariable Long id, @Valid @RequestBody ProductionActivityRequest request) {
+            @PathVariable Long id, @Valid @RequestBody ProductionActivityUpdateRequest request) {
         return productionActivityService.update(id, request);
     }
 
     @PatchMapping("/{id}/activate")
-    @PreAuthorize("@harvestAccess.canManageProductionActivities()")
+    @PreAuthorize("@harvestAccess.canManageProductionActivity(#id)")
     public ProductionActivityResponse activate(@PathVariable Long id) {
         return productionActivityService.activate(id);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("@harvestAccess.canManageProductionActivities()")
+    @PreAuthorize("@harvestAccess.canManageProductionActivity(#id)")
     public void inactivate(@PathVariable Long id) {
         productionActivityService.inactivate(id);
     }

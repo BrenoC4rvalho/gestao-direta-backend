@@ -10,6 +10,8 @@ public class ProductionActivityMapper {
     public ProductionActivityResponse toResponse(ProductionActivity productionActivity) {
         return new ProductionActivityResponse(
                 productionActivity.getId(),
+                productionActivity.getFarm().getId(),
+                productionActivity.getFarm().getName(),
                 productionActivity.getName(),
                 productionActivity.getDescription(),
                 productionActivity.getStatus(),

@@ -1,7 +1,12 @@
 package br.com.gestaodireta.harvest.service;
 
-import br.com.gestaodireta.harvest.dto.ProductionActivityRequest;
+import br.com.gestaodireta.farm.entity.Farm;
+import br.com.gestaodireta.farm.enumeration.FarmStatus;
+import br.com.gestaodireta.farm.service.FarmService;
+import br.com.gestaodireta.harvest.dto.ProductionActivityCreateRequest;
 import br.com.gestaodireta.harvest.dto.ProductionActivityResponse;
+import br.com.gestaodireta.harvest.dto.ProductionActivitySummaryResponse;
+import br.com.gestaodireta.harvest.dto.ProductionActivityUpdateRequest;
 import br.com.gestaodireta.harvest.entity.ProductionActivity;
 import br.com.gestaodireta.harvest.enumeration.ProductionActivityStatus;
 import br.com.gestaodireta.harvest.mapper.ProductionActivityMapper;
@@ -21,19 +26,27 @@ public class ProductionActivityService {
 
     private final ProductionActivityRepository productionActivityRepository;
 
+    private final FarmService farmService;
+
     private final ProductionActivityMapper productionActivityMapper;
 
     public ProductionActivityService(
             ProductionActivityRepository productionActivityRepository,
+            FarmService farmService,
             ProductionActivityMapper productionActivityMapper) {
         this.productionActivityRepository = productionActivityRepository;
+        this.farmService = farmService;
         this.productionActivityMapper = productionActivityMapper;
     }
 
     @Transactional
-    public ProductionActivityResponse create(ProductionActivityRequest request) {
+    public ProductionActivityResponse create(ProductionActivityCreateRequest request) {
+        Farm farm = farmService.findEntityById(request.farmId());
+        ensureFarmIsActive(farm);
+
         ProductionActivity productionActivity = new ProductionActivity();
-        applyRequest(productionActivity, request, null);
+        productionActivity.setFarm(farm);
+        applyRequest(productionActivity, request.name(), request.description(), null);
         productionActivity.setStatus(ProductionActivityStatus.ACTIVE);
 
         return productionActivityMapper.toResponse(
@@ -42,23 +55,41 @@ public class ProductionActivityService {
 
     @Transactional(readOnly = true)
     public PageResponse<ProductionActivityResponse> findAll(
-            ProductionActivityStatus status, PaginationParams paginationParams) {
+            Long farmId, ProductionActivityStatus status, PaginationParams paginationParams) {
+        farmService.findEntityById(farmId);
         Page<ProductionActivity> activities =
-                status == null
-                        ? productionActivityRepository.findAll(paginationParams.toPageable())
-                        : productionActivityRepository.findByStatus(
-                                status, paginationParams.toPageable());
+                productionActivityRepository.findByFarmIdAndStatus(
+                        farmId, status, paginationParams.toPageable());
 
         return PageResponse.from(activities.map(productionActivityMapper::toResponse));
     }
 
     @Transactional(readOnly = true)
-    public List<ProductionActivityResponse> findActive() {
+    public List<ProductionActivityResponse> findActive(Long farmId) {
+        farmService.findEntityById(farmId);
+
         return productionActivityRepository
-                .findByStatus(ProductionActivityStatus.ACTIVE, PaginationParamsForOptions.PAGEABLE)
+                .findByFarmIdAndStatus(
+                        farmId,
+                        ProductionActivityStatus.ACTIVE,
+                        PaginationParamsForOptions.PAGEABLE)
                 .stream()
                 .map(productionActivityMapper::toResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ProductionActivitySummaryResponse getSummary(Long farmId) {
+        farmService.findEntityById(farmId);
+
+        return new ProductionActivitySummaryResponse(
+                farmId,
+                productionActivityRepository.countByFarmId(farmId),
+                productionActivityRepository.countByFarmIdAndStatus(
+                        farmId, ProductionActivityStatus.ACTIVE),
+                productionActivityRepository.countByFarmIdAndStatus(
+                        farmId, ProductionActivityStatus.INACTIVE),
+                productionActivityRepository.countDistinctInProgressByFarmId(farmId));
     }
 
     @Transactional(readOnly = true)
@@ -67,9 +98,10 @@ public class ProductionActivityService {
     }
 
     @Transactional
-    public ProductionActivityResponse update(Long id, ProductionActivityRequest request) {
+    public ProductionActivityResponse update(Long id, ProductionActivityUpdateRequest request) {
         ProductionActivity productionActivity = findEntityById(id);
-        applyRequest(productionActivity, request, id);
+        ensureFarmIsActive(productionActivity.getFarm());
+        applyRequest(productionActivity, request.name(), request.description(), id);
 
         return productionActivityMapper.toResponse(
                 productionActivityRepository.save(productionActivity));
@@ -78,6 +110,7 @@ public class ProductionActivityService {
     @Transactional
     public ProductionActivityResponse activate(Long id) {
         ProductionActivity productionActivity = findEntityById(id);
+        ensureFarmIsActive(productionActivity.getFarm());
         productionActivity.setStatus(ProductionActivityStatus.ACTIVE);
 
         return productionActivityMapper.toResponse(
@@ -87,25 +120,27 @@ public class ProductionActivityService {
     @Transactional
     public void inactivate(Long id) {
         ProductionActivity productionActivity = findEntityById(id);
+        ensureFarmIsActive(productionActivity.getFarm());
         productionActivity.setStatus(ProductionActivityStatus.INACTIVE);
         productionActivityRepository.save(productionActivity);
     }
 
     public ProductionActivity findEntityById(Long id) {
         return productionActivityRepository
-                .findById(id)
+                .findByIdWithFarm(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Production activity not found"));
     }
 
     private void applyRequest(
             ProductionActivity productionActivity,
-            ProductionActivityRequest request,
+            String name,
+            String description,
             Long ignoredActivityId) {
-        String name = sanitizeName(request.name());
-        validateUniqueName(name, ignoredActivityId);
+        String sanitizedName = sanitizeName(name);
+        validateUniqueName(productionActivity.getFarm().getId(), sanitizedName, ignoredActivityId);
 
-        productionActivity.setName(name);
-        productionActivity.setDescription(request.description());
+        productionActivity.setName(sanitizedName);
+        productionActivity.setDescription(description);
     }
 
     private String sanitizeName(String name) {
@@ -118,16 +153,24 @@ public class ProductionActivityService {
         return sanitizedName;
     }
 
-    private void validateUniqueName(String name, Long ignoredActivityId) {
+    private void validateUniqueName(Long farmId, String name, Long ignoredActivityId) {
         String normalizedName = name.toLowerCase(Locale.ROOT);
         boolean duplicateExists =
                 ignoredActivityId == null
-                        ? productionActivityRepository.existsByNormalizedName(normalizedName)
-                        : productionActivityRepository.existsByNormalizedNameAndIdNot(
-                                normalizedName, ignoredActivityId);
+                        ? productionActivityRepository.existsByFarmIdAndNormalizedName(
+                                farmId, normalizedName)
+                        : productionActivityRepository.existsByFarmIdAndNormalizedNameAndIdNot(
+                                farmId, ignoredActivityId, normalizedName);
 
         if (duplicateExists) {
-            throw new BusinessException("A production activity with this name already exists.");
+            throw new BusinessException(
+                    "A production activity with this name already exists for this farm.");
+        }
+    }
+
+    private void ensureFarmIsActive(Farm farm) {
+        if (!FarmStatus.ACTIVE.equals(farm.getStatus())) {
+            throw new BusinessException("Inactive farm cannot receive production activities.");
         }
     }
 }

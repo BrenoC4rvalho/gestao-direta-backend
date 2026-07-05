@@ -1705,10 +1705,10 @@ Inativa o vínculo de um usuário com uma fazenda.
 ### POST /api/harvest/production-activities
 
 **Descrição:**
-Cria uma atividade produtiva global para uso em safras.
+Cria uma atividade produtiva para uma fazenda.
 
 **Autenticação:** Sim
-**Permissão:** Apenas `ADMIN`.
+**Permissão:** `ADMIN` para fazenda ativa; `PRODUCER` da fazenda ativa com vínculo ativo.
 
 **Path params:**
 ```json
@@ -1723,12 +1723,14 @@ Cria uma atividade produtiva global para uso em safras.
 **Body esperado:**
 ```json
 {
+  "farmId": 1,
   "name": "Soja",
   "description": "Cultivo de soja"
 }
 ```
 
 **Campos obrigatórios:**
+- `farmId`
 - `name`
 
 **Campos opcionais:**
@@ -1738,6 +1740,8 @@ Cria uma atividade produtiva global para uso em safras.
 ```json
 {
   "id": 1,
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
   "name": "Soja",
   "description": "Cultivo de soja",
   "status": "ACTIVE",
@@ -1748,22 +1752,25 @@ Cria uma atividade produtiva global para uso em safras.
 
 **Possíveis erros/status HTTP:**
 - `201 Created` em caso de sucesso.
-- `400 Bad Request` para body inválido, nome em branco ou nome duplicado.
+- `400 Bad Request` para body inválido, `farmId` ausente, nome em branco ou nome duplicado na mesma fazenda.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
-- `403 Forbidden` para usuário sem papel `ADMIN`.
+- `403 Forbidden` para usuário sem permissão ou fazenda inativa.
+- `404 Not Found` se a fazenda não existir.
 
 **Observações de regra de negócio:**
-- A atividade produtiva é global e não pertence a uma fazenda.
+- A atividade produtiva pertence obrigatoriamente a uma fazenda.
 - O status inicial é `ACTIVE`.
-- O nome é único globalmente por comparação normalizada.
+- O nome é único por fazenda por comparação normalizada.
+- O mesmo nome pode existir em fazendas diferentes.
+- Fazenda inativa não pode receber nova atividade produtiva.
 
 ### GET /api/harvest/production-activities
 
 **Descrição:**
-Lista atividades produtivas globais, com filtro opcional por status.
+Lista atividades produtivas de uma fazenda, com filtro opcional por status.
 
 **Autenticação:** Sim
-**Permissão:** Apenas `ADMIN`.
+**Permissão:** `ADMIN`; `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com vínculo ativo na fazenda ativa.
 
 **Path params:**
 ```json
@@ -1773,6 +1780,7 @@ Lista atividades produtivas globais, com filtro opcional por status.
 **Query params:**
 ```json
 {
+  "farmId": 1,
   "status": "ACTIVE",
   "page": 0,
   "size": 10,
@@ -1787,7 +1795,7 @@ Lista atividades produtivas globais, com filtro opcional por status.
 ```
 
 **Campos obrigatórios:**
-- Nenhum.
+- `farmId`
 
 **Campos opcionais:**
 - `status`
@@ -1802,6 +1810,8 @@ Lista atividades produtivas globais, com filtro opcional por status.
   "content": [
     {
       "id": 1,
+      "farmId": 1,
+      "farmName": "Fazenda Boa Safra",
       "name": "Soja",
       "description": "Cultivo de soja",
       "status": "ACTIVE",
@@ -1820,21 +1830,24 @@ Lista atividades produtivas globais, com filtro opcional por status.
 
 **Possíveis erros/status HTTP:**
 - `200 OK` em caso de sucesso.
-- `400 Bad Request` para parâmetro `status` inválido.
+- `400 Bad Request` para `farmId` ausente ou parâmetro `status` inválido.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
-- `403 Forbidden` para usuário sem papel `ADMIN`.
+- `403 Forbidden` para usuário sem permissão.
+- `404 Not Found` se a fazenda não existir.
 
 **Observações de regra de negócio:**
-- Sem `status`, retorna atividades `ACTIVE` e `INACTIVE` paginadas.
-- Com `status`, retorna apenas atividades no status informado.
+- `farmId` é obrigatório.
+- A listagem sempre é restrita à fazenda informada.
+- Sem `status`, retorna atividades `ACTIVE` e `INACTIVE` paginadas da fazenda.
+- Com `status`, retorna apenas atividades da fazenda no status informado.
 
 ### GET /api/harvest/production-activities/active
 
 **Descrição:**
-Lista atividades produtivas ativas para seleção em safras.
+Lista atividades produtivas ativas de uma fazenda para seleção em safras.
 
 **Autenticação:** Sim
-**Permissão:** `ADMIN` ou usuário `USER` ativo com vínculo ativo em pelo menos uma fazenda ativa.
+**Permissão:** `ADMIN`; `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com vínculo ativo na fazenda ativa.
 
 **Path params:**
 ```json
@@ -1843,7 +1856,9 @@ Lista atividades produtivas ativas para seleção em safras.
 
 **Query params:**
 ```json
-{}
+{
+  "farmId": 1
+}
 ```
 
 **Body esperado:**
@@ -1852,7 +1867,7 @@ Lista atividades produtivas ativas para seleção em safras.
 ```
 
 **Campos obrigatórios:**
-- Nenhum.
+- `farmId`
 
 **Campos opcionais:**
 - Nenhum.
@@ -1862,6 +1877,8 @@ Lista atividades produtivas ativas para seleção em safras.
 [
   {
     "id": 1,
+    "farmId": 1,
+    "farmName": "Fazenda Boa Safra",
     "name": "Soja",
     "description": "Cultivo de soja",
     "status": "ACTIVE",
@@ -1873,21 +1890,78 @@ Lista atividades produtivas ativas para seleção em safras.
 
 **Possíveis erros/status HTTP:**
 - `200 OK` em caso de sucesso.
+- `400 Bad Request` para `farmId` ausente.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
-- `403 Forbidden` para usuário sem vínculo ativo em fazenda ativa.
+- `403 Forbidden` para usuário sem vínculo ativo na fazenda.
+- `404 Not Found` se a fazenda não existir.
 
 **Observações de regra de negócio:**
-- Retorna apenas atividades com status `ACTIVE`.
+- Retorna apenas atividades `ACTIVE` da fazenda informada.
 - A resposta não é paginada.
 - Usuário com vínculo `INACTIVE` não tem acesso.
+
+### GET /api/harvest/production-activities/summary
+
+**Descrição:**
+Retorna o resumo de atividades produtivas de uma fazenda.
+
+**Autenticação:** Sim
+**Permissão:** `ADMIN`; `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com vínculo ativo na fazenda ativa.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{
+  "farmId": 1
+}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `farmId`
+
+**Campos opcionais:**
+- Nenhum.
+
+**Resposta de sucesso:**
+```json
+{
+  "farmId": 1,
+  "totalCount": 5,
+  "activeCount": 4,
+  "inactiveCount": 1,
+  "inProgressCount": 2
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `200 OK` em caso de sucesso.
+- `400 Bad Request` para `farmId` ausente.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem acesso à fazenda.
+- `404 Not Found` se a fazenda não existir.
+
+**Observações de regra de negócio:**
+- `totalCount` conta todas as atividades produtivas da fazenda.
+- `activeCount` conta atividades com status `ACTIVE`.
+- `inactiveCount` conta atividades com status `INACTIVE`.
+- `inProgressCount` conta atividades distintas com pelo menos uma safra `IN_PROGRESS` na mesma fazenda.
 
 ### GET /api/harvest/production-activities/{id}
 
 **Descrição:**
-Busca uma atividade produtiva global por id.
+Busca uma atividade produtiva por id.
 
 **Autenticação:** Sim
-**Permissão:** Apenas `ADMIN`.
+**Permissão:** `ADMIN`; `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com vínculo ativo na fazenda da atividade.
 
 **Path params:**
 ```json
@@ -1916,6 +1990,8 @@ Busca uma atividade produtiva global por id.
 ```json
 {
   "id": 1,
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
   "name": "Soja",
   "description": "Cultivo de soja",
   "status": "ACTIVE",
@@ -1927,19 +2003,19 @@ Busca uma atividade produtiva global por id.
 **Possíveis erros/status HTTP:**
 - `200 OK` em caso de sucesso.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
-- `403 Forbidden` para usuário sem papel `ADMIN`.
+- `403 Forbidden` para usuário sem acesso à fazenda da atividade.
 - `404 Not Found` se a atividade produtiva não existir.
 
 **Observações de regra de negócio:**
-- Retorna atividades `ACTIVE` ou `INACTIVE`, desde que o usuário seja `ADMIN`.
+- A autorização é calculada pela fazenda da atividade produtiva.
 
 ### PUT /api/harvest/production-activities/{id}
 
 **Descrição:**
-Atualiza uma atividade produtiva global.
+Atualiza nome e descrição de uma atividade produtiva.
 
 **Autenticação:** Sim
-**Permissão:** Apenas `ADMIN`.
+**Permissão:** `ADMIN` para fazenda ativa; `PRODUCER` da fazenda ativa com vínculo ativo.
 
 **Path params:**
 ```json
@@ -1972,6 +2048,8 @@ Atualiza uma atividade produtiva global.
 ```json
 {
   "id": 1,
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
   "name": "Soja verão",
   "description": "Cultivo de soja no verão",
   "status": "ACTIVE",
@@ -1982,14 +2060,15 @@ Atualiza uma atividade produtiva global.
 
 **Possíveis erros/status HTTP:**
 - `200 OK` em caso de sucesso.
-- `400 Bad Request` para body inválido, nome em branco ou nome duplicado.
+- `400 Bad Request` para body inválido, nome em branco ou nome duplicado na mesma fazenda.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
-- `403 Forbidden` para usuário sem papel `ADMIN`.
+- `403 Forbidden` para usuário sem permissão ou fazenda inativa.
 - `404 Not Found` se a atividade produtiva não existir.
 
 **Observações de regra de negócio:**
 - A atualização não altera o status.
-- O nome continua único globalmente.
+- A atualização não permite trocar a fazenda da atividade produtiva.
+- O nome continua único por fazenda.
 
 ### PATCH /api/harvest/production-activities/{id}/activate
 
@@ -1997,7 +2076,7 @@ Atualiza uma atividade produtiva global.
 Ativa uma atividade produtiva inativa.
 
 **Autenticação:** Sim
-**Permissão:** Apenas `ADMIN`.
+**Permissão:** `ADMIN` para fazenda ativa; `PRODUCER` da fazenda ativa com vínculo ativo.
 
 **Path params:**
 ```json
@@ -2026,6 +2105,8 @@ Ativa uma atividade produtiva inativa.
 ```json
 {
   "id": 1,
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
   "name": "Soja",
   "description": "Cultivo de soja",
   "status": "ACTIVE",
@@ -2037,19 +2118,20 @@ Ativa uma atividade produtiva inativa.
 **Possíveis erros/status HTTP:**
 - `200 OK` em caso de sucesso.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
-- `403 Forbidden` para usuário sem papel `ADMIN`.
+- `403 Forbidden` para usuário sem permissão ou fazenda inativa.
 - `404 Not Found` se a atividade produtiva não existir.
 
 **Observações de regra de negócio:**
 - Define `status=ACTIVE`.
+- Fazenda inativa bloqueia alteração de status.
 
 ### DELETE /api/harvest/production-activities/{id}
 
 **Descrição:**
-Inativa uma atividade produtiva global.
+Inativa uma atividade produtiva.
 
 **Autenticação:** Sim
-**Permissão:** Apenas `ADMIN`.
+**Permissão:** `ADMIN` para fazenda ativa; `PRODUCER` da fazenda ativa com vínculo ativo.
 
 **Path params:**
 ```json
@@ -2082,7 +2164,7 @@ Inativa uma atividade produtiva global.
 **Possíveis erros/status HTTP:**
 - `204 No Content` em caso de sucesso.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
-- `403 Forbidden` para usuário sem papel `ADMIN`.
+- `403 Forbidden` para usuário sem permissão ou fazenda inativa.
 - `404 Not Found` se a atividade produtiva não existir.
 
 **Observações de regra de negócio:**
@@ -2170,6 +2252,7 @@ Cria uma safra/ciclo produtivo vinculado a uma fazenda e a uma atividade produti
 - O status inicial é `PLANNED`.
 - Fazenda inativa não pode receber nova safra, inclusive para `ADMIN`.
 - Atividade produtiva inativa não pode ser usada em nova safra.
+- A atividade produtiva deve pertencer à mesma fazenda da safra.
 - `endDate` não pode ser anterior a `startDate`.
 - `expectedRevenue`, `expectedCost` e `areaHectares` não podem ser negativos.
 - `areaHectares=0` é aceito.
@@ -2278,8 +2361,8 @@ GET /api/harvest/seasons?farmId=1&statuses=PLANNED,IN_PROGRESS&productionActivit
 - `status` filtra por um único status de safra.
 - `statuses` filtra por múltiplos status, por exemplo `statuses=PLANNED,IN_PROGRESS`.
 - Quando `status` e `statuses` são enviados juntos, `statuses` tem prioridade.
-- `productionActivityId` filtra por uma única atividade produtiva.
-- `productionActivityIds` filtra por múltiplas atividades produtivas, por exemplo `productionActivityIds=1,2`.
+- `productionActivityId` filtra por uma única atividade produtiva da fazenda informada.
+- `productionActivityIds` filtra por múltiplas atividades produtivas da fazenda informada, por exemplo `productionActivityIds=1,2`.
 - Quando `productionActivityId` e `productionActivityIds` são enviados juntos, `productionActivityIds` tem prioridade.
 - `periodStart` e `periodEnd` usam formato `yyyy-MM-dd`.
 - O filtro de período retorna safras que intersectam o período informado: `startDate <= periodEnd` e `endDate >= periodStart`; safras sem `endDate` intersectam qualquer período iniciado após o `startDate`.
@@ -2404,8 +2487,8 @@ GET /api/harvest/seasons/summary-list?farmId=1&search=soja&statuses=PLANNED,IN_P
 - `status` filtra por um único status de safra.
 - `statuses` filtra por múltiplos status, por exemplo `statuses=PLANNED,IN_PROGRESS`.
 - Quando `status` e `statuses` são enviados juntos, `statuses` tem prioridade.
-- `productionActivityId` filtra por uma única atividade produtiva.
-- `productionActivityIds` filtra por múltiplas atividades produtivas, por exemplo `productionActivityIds=1,2`.
+- `productionActivityId` filtra por uma única atividade produtiva da fazenda informada.
+- `productionActivityIds` filtra por múltiplas atividades produtivas da fazenda informada, por exemplo `productionActivityIds=1,2`.
 - Quando `productionActivityId` e `productionActivityIds` são enviados juntos, `productionActivityIds` tem prioridade.
 - `periodStart` e `periodEnd` usam formato `yyyy-MM-dd`.
 - O filtro de período retorna safras que intersectam o período informado: `startDate <= periodEnd` e `endDate >= periodStart`; safras sem `endDate` intersectam qualquer período iniciado após o `startDate`.

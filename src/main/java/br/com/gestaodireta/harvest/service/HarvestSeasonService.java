@@ -271,6 +271,7 @@ public class HarvestSeasonService {
 
         ProductionActivity productionActivity =
                 productionActivityService.findEntityById(productionActivityId);
+        ensureProductionActivityBelongsToFarm(productionActivity, harvestSeason.getFarm().getId());
         ensureProductionActivityIsActive(productionActivity);
 
         harvestSeason.setProductionActivity(productionActivity);
@@ -320,6 +321,14 @@ public class HarvestSeasonService {
     private void ensureFarmIsActive(Farm farm) {
         if (!FarmStatus.ACTIVE.equals(farm.getStatus())) {
             throw new BusinessException("Inactive farm cannot receive harvest seasons.");
+        }
+    }
+
+    private void ensureProductionActivityBelongsToFarm(
+            ProductionActivity productionActivity, Long farmId) {
+        if (!productionActivity.getFarm().getId().equals(farmId)) {
+            throw new BusinessException(
+                    "Production activity must belong to the same farm as the harvest season.");
         }
     }
 
