@@ -429,10 +429,9 @@ class FinancialTransactionControllerTest extends PostgresIntegrationTest {
 
     private FinancialCategory saveCategory(Farm farm, TransactionType type) {
         FinancialCategory category = new FinancialCategory();
-        category.setName("Category");
+        category.setName("Category " + type + " " + System.nanoTime());
         category.setFarm(farm);
         category.setType(type);
-        category.setDefaultCategory(false);
         category.setStatus(FinancialCategoryStatus.ACTIVE);
 
         return financialCategoryRepository.save(category);

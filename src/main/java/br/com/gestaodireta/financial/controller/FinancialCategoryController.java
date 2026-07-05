@@ -1,7 +1,8 @@
 package br.com.gestaodireta.financial.controller;
 
-import br.com.gestaodireta.financial.dto.FinancialCategoryRequest;
+import br.com.gestaodireta.financial.dto.FinancialCategoryCreateRequest;
 import br.com.gestaodireta.financial.dto.FinancialCategoryResponse;
+import br.com.gestaodireta.financial.dto.FinancialCategoryUpdateRequest;
 import br.com.gestaodireta.financial.service.FinancialCategoryService;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
@@ -35,7 +36,8 @@ public class FinancialCategoryController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@financialAccess.canCreateCategory(#request)")
-    public FinancialCategoryResponse create(@Valid @RequestBody FinancialCategoryRequest request) {
+    public FinancialCategoryResponse create(
+            @Valid @RequestBody FinancialCategoryCreateRequest request) {
         return financialCategoryService.create(request);
     }
 
@@ -55,31 +57,29 @@ public class FinancialCategoryController {
     }
 
     @GetMapping("/global")
-    @PreAuthorize("hasRole('ADMIN')")
-    public PageResponse<FinancialCategoryResponse> findGlobal(
-            @Valid @ModelAttribute PaginationParams paginationParams) {
-        return financialCategoryService.findGlobal(paginationParams);
-    }
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public void removedGlobalCategoriesEndpoint() {}
 
-    @GetMapping("/{id}")
+    @GetMapping("/{id:\\d+}")
+    @PreAuthorize("@financialAccess.canViewCategory(#id)")
     public FinancialCategoryResponse findById(@PathVariable Long id) {
         return financialCategoryService.findById(id);
     }
 
-    @PutMapping("/{id}")
-    @PreAuthorize("@financialAccess.canUpdateCategory(#id, #request)")
+    @PutMapping("/{id:\\d+}")
+    @PreAuthorize("@financialAccess.canUpdateCategory(#id)")
     public FinancialCategoryResponse update(
-            @PathVariable Long id, @Valid @RequestBody FinancialCategoryRequest request) {
+            @PathVariable Long id, @Valid @RequestBody FinancialCategoryUpdateRequest request) {
         return financialCategoryService.update(id, request);
     }
 
-    @PatchMapping("/{id}/activate")
+    @PatchMapping("/{id:\\d+}/activate")
     @PreAuthorize("@financialAccess.canManageCategoryByCategoryId(#id)")
     public FinancialCategoryResponse activate(@PathVariable Long id) {
         return financialCategoryService.activate(id);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{id:\\d+}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("@financialAccess.canManageCategoryByCategoryId(#id)")
     public void inactivate(@PathVariable Long id) {

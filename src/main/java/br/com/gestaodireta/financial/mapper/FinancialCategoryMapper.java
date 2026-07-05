@@ -13,13 +13,12 @@ public class FinancialCategoryMapper {
 
         return new FinancialCategoryResponse(
                 category.getId(),
+                farm.getId(),
+                farm.getName(),
                 category.getName(),
                 category.getType(),
                 category.getColor(),
                 category.getIcon(),
-                farm == null ? null : farm.getId(),
-                farm == null ? null : farm.getName(),
-                category.isDefaultCategory(),
                 category.getStatus(),
                 category.getCreatedAt(),
                 category.getUpdatedAt());

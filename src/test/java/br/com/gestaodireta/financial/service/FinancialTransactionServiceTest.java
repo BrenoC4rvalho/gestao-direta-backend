@@ -125,7 +125,7 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
         Farm activeFarm = saveFarm("Active Farm", FarmStatus.ACTIVE);
         Farm inactiveFarm = saveFarm("Inactive Farm", FarmStatus.INACTIVE);
         FinancialCategory incomeCategory =
-                saveCategory("Income", activeFarm, TransactionType.INCOME, false);
+                saveCategory("Income", activeFarm, TransactionType.INCOME);
         authenticateAs(admin, "ROLE_ADMIN");
 
         assertThatThrownBy(
@@ -160,7 +160,6 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
                         "Inactive",
                         farm,
                         TransactionType.EXPENSE,
-                        false,
                         FinancialCategoryStatus.INACTIVE);
         FinancialTransaction transaction =
                 saveTransaction(farm, null, admin, TransactionType.EXPENSE);
@@ -183,6 +182,37 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
                                                 TransactionType.EXPENSE)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("Financial category is inactive");
+    }
+
+    @Test
+    void shouldRejectCategoryFromAnotherFarmWhenCreatingOrUpdatingTransaction() {
+        User admin = saveUser("Admin", "admin-category-farm@example.com", UserType.ADMIN);
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        Farm otherFarm = saveFarm("Other Farm", FarmStatus.ACTIVE);
+        FinancialCategory otherFarmCategory =
+                saveCategory("Inputs", otherFarm, TransactionType.EXPENSE);
+        FinancialTransaction transaction =
+                saveTransaction(farm, null, admin, TransactionType.EXPENSE);
+        authenticateAs(admin, "ROLE_ADMIN");
+
+        assertThatThrownBy(
+                        () ->
+                                financialTransactionService.create(
+                                        transactionRequest(
+                                                farm, otherFarmCategory, BigDecimal.TEN)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Financial category does not belong to farm");
+
+        assertThatThrownBy(
+                        () ->
+                                financialTransactionService.update(
+                                        transaction.getId(),
+                                        updateRequest(
+                                                otherFarmCategory,
+                                                BigDecimal.TEN,
+                                                TransactionType.EXPENSE)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Financial category does not belong to farm");
     }
 
     @Test
@@ -530,6 +560,39 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
                                         null,
                                         null)))
                 .containsExactly(scenario.expense.getId());
+    }
+
+    @Test
+    void shouldRejectCategoryFilterWhenCategoryDoesNotBelongToFarm() {
+        FilterScenario scenario = saveFilterScenario();
+        FinancialCategory otherFarmCategory =
+                saveCategory(
+                        "Other", scenario.otherFarmTransaction.getFarm(), TransactionType.EXPENSE);
+
+        assertThatThrownBy(
+                        () ->
+                                financialTransactionService.findAll(
+                                        pluralFilter(
+                                                scenario.farm.getId(),
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                List.of(otherFarmCategory.getId()),
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null),
+                                        new PaginationParams()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Financial category does not belong to farm");
     }
 
     @Test
@@ -1218,22 +1281,16 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
         return farmRepository.save(farm);
     }
 
-    private FinancialCategory saveCategory(
-            String name, Farm farm, TransactionType type, boolean defaultCategory) {
-        return saveCategory(name, farm, type, defaultCategory, FinancialCategoryStatus.ACTIVE);
+    private FinancialCategory saveCategory(String name, Farm farm, TransactionType type) {
+        return saveCategory(name, farm, type, FinancialCategoryStatus.ACTIVE);
     }
 
     private FinancialCategory saveCategory(
-            String name,
-            Farm farm,
-            TransactionType type,
-            boolean defaultCategory,
-            FinancialCategoryStatus status) {
+            String name, Farm farm, TransactionType type, FinancialCategoryStatus status) {
         FinancialCategory category = new FinancialCategory();
         category.setName(name);
-        category.setFarm(defaultCategory ? null : farm);
+        category.setFarm(farm);
         category.setType(type);
-        category.setDefaultCategory(defaultCategory);
         category.setStatus(status);
 
         return financialCategoryRepository.save(category);
@@ -1356,10 +1413,8 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
         User otherUser = saveUser("Other", "other-filter@example.com", UserType.ADMIN);
         Farm farm = saveFarm("Filter Farm", FarmStatus.ACTIVE);
         Farm otherFarm = saveFarm("Other Farm", FarmStatus.ACTIVE);
-        FinancialCategory incomeCategory =
-                saveCategory("Sales", farm, TransactionType.INCOME, false);
-        FinancialCategory expenseCategory =
-                saveCategory("Inputs", farm, TransactionType.EXPENSE, false);
+        FinancialCategory incomeCategory = saveCategory("Sales", farm, TransactionType.INCOME);
+        FinancialCategory expenseCategory = saveCategory("Inputs", farm, TransactionType.EXPENSE);
 
         FinancialTransaction income =
                 saveTransaction(

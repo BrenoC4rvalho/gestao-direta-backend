@@ -7,8 +7,9 @@ import br.com.gestaodireta.farm.entity.Farm;
 import br.com.gestaodireta.farm.enumeration.FarmStatus;
 import br.com.gestaodireta.farm.repository.FarmRepository;
 import br.com.gestaodireta.farm.repository.FarmUserRepository;
-import br.com.gestaodireta.financial.dto.FinancialCategoryRequest;
+import br.com.gestaodireta.financial.dto.FinancialCategoryCreateRequest;
 import br.com.gestaodireta.financial.dto.FinancialCategoryResponse;
+import br.com.gestaodireta.financial.dto.FinancialCategoryUpdateRequest;
 import br.com.gestaodireta.financial.entity.FinancialCategory;
 import br.com.gestaodireta.financial.entity.FinancialTransaction;
 import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
@@ -27,6 +28,7 @@ import br.com.gestaodireta.user.enumeration.UserType;
 import br.com.gestaodireta.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,7 +39,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 class FinancialCategoryServiceTest extends PostgresIntegrationTest {
 
     private static final String DUPLICATE_CATEGORY_MESSAGE =
-            "A category with this name already exists.";
+            "A category with this name and type already exists for this farm.";
 
     @Autowired private FinancialCategoryService financialCategoryService;
 
@@ -62,83 +64,72 @@ class FinancialCategoryServiceTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void shouldCreateFarmCategoryAndInactivateCategory() {
+    void shouldCreateFarmCategoryAndSaveTrimmedName() {
         Farm farm = saveFarm("Farm");
 
         FinancialCategoryResponse response =
                 financialCategoryService.create(
-                        new FinancialCategoryRequest(
-                                "Insumos",
-                                TransactionType.EXPENSE,
-                                "#ff0000",
-                                "seedling",
-                                farm.getId(),
-                                false));
+                        createRequest(farm, "  Insumos  ", TransactionType.EXPENSE));
 
+        assertThat(response.name()).isEqualTo("Insumos");
         assertThat(response.farmId()).isEqualTo(farm.getId());
+        assertThat(response.farmName()).isEqualTo(farm.getName());
         assertThat(response.status()).isEqualTo(FinancialCategoryStatus.ACTIVE);
+    }
 
-        financialCategoryService.inactivate(response.id());
+    @Test
+    void shouldRequireFarmWhenCreatingCategory() {
+        FinancialCategoryCreateRequest request =
+                new FinancialCategoryCreateRequest(
+                        999L, "Insumos", TransactionType.EXPENSE, "#ff0000", "package");
 
+        assertThatThrownBy(() -> financialCategoryService.create(request))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Farm not found");
+    }
+
+    @Test
+    void shouldRejectCreatingCategoryForInactiveFarm() {
+        Farm farm = saveFarm("Farm");
+        farm.setStatus(FarmStatus.INACTIVE);
+        farmRepository.save(farm);
+
+        assertThatThrownBy(
+                        () ->
+                                financialCategoryService.create(
+                                        createRequest(farm, "Insumos", TransactionType.EXPENSE)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Inactive farm cannot receive financial categories");
+    }
+
+    @Test
+    void shouldActivateAndInactivateFarmCategory() {
+        Farm farm = saveFarm("Farm");
+        FinancialCategory category =
+                saveCategory(
+                        "Insumos", farm, TransactionType.EXPENSE, FinancialCategoryStatus.INACTIVE);
+
+        FinancialCategoryResponse activated = financialCategoryService.activate(category.getId());
+        assertThat(activated.status()).isEqualTo(FinancialCategoryStatus.ACTIVE);
+
+        financialCategoryService.inactivate(category.getId());
         FinancialCategory savedCategory =
-                financialCategoryRepository.findById(response.id()).orElseThrow();
+                financialCategoryRepository.findById(category.getId()).orElseThrow();
         assertThat(savedCategory.getStatus()).isEqualTo(FinancialCategoryStatus.INACTIVE);
     }
 
     @Test
-    void shouldCreateDefaultCategoryWithoutFarm() {
-        FinancialCategoryResponse response =
-                financialCategoryService.create(
-                        new FinancialCategoryRequest(
-                                "Venda de producao",
-                                TransactionType.INCOME,
-                                null,
-                                null,
-                                null,
-                                true));
-
-        assertThat(response.farmId()).isNull();
-        assertThat(response.isDefault()).isTrue();
-    }
-
-    @Test
-    void shouldActivateInactiveDefaultCategory() {
-        FinancialCategory category =
-                saveCategory("Venda de producao", null, true, FinancialCategoryStatus.INACTIVE);
-
-        FinancialCategoryResponse response = financialCategoryService.activate(category.getId());
-
-        assertThat(response.status()).isEqualTo(FinancialCategoryStatus.ACTIVE);
-        assertThat(response.farmId()).isNull();
-        assertThat(response.isDefault()).isTrue();
-        assertThat(financialCategoryRepository.findById(category.getId()).orElseThrow().getStatus())
-                .isEqualTo(FinancialCategoryStatus.ACTIVE);
-    }
-
-    @Test
-    void shouldActivateInactiveFarmCategory() {
+    void shouldRejectActivatingCategoryForInactiveFarm() {
         Farm farm = saveFarm("Farm");
         FinancialCategory category =
-                saveCategory("Insumos", farm, false, FinancialCategoryStatus.INACTIVE);
+                saveCategory(
+                        "Insumos", farm, TransactionType.EXPENSE, FinancialCategoryStatus.INACTIVE);
+        farm.setStatus(FarmStatus.INACTIVE);
+        farmRepository.save(farm);
 
-        FinancialCategoryResponse response = financialCategoryService.activate(category.getId());
-
-        assertThat(response.status()).isEqualTo(FinancialCategoryStatus.ACTIVE);
-        assertThat(response.farmId()).isEqualTo(farm.getId());
-        assertThat(response.isDefault()).isFalse();
-        assertThat(financialCategoryRepository.findById(category.getId()).orElseThrow().getStatus())
-                .isEqualTo(FinancialCategoryStatus.ACTIVE);
-    }
-
-    @Test
-    void shouldReturnSuccessWhenActivatingAlreadyActiveCategory() {
-        FinancialCategory category =
-                saveCategory("Venda de producao", null, true, FinancialCategoryStatus.ACTIVE);
-
-        FinancialCategoryResponse response = financialCategoryService.activate(category.getId());
-
-        assertThat(response.status()).isEqualTo(FinancialCategoryStatus.ACTIVE);
-        assertThat(response.id()).isEqualTo(category.getId());
+        assertThatThrownBy(() -> financialCategoryService.activate(category.getId()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Inactive farm cannot receive financial categories");
     }
 
     @Test
@@ -149,59 +140,44 @@ class FinancialCategoryServiceTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void shouldNotChangeCategoryDataWhenActivatingCategory() {
-        Farm farm = saveFarm("Farm");
-        FinancialCategory category =
-                saveCategory("Insumos", farm, false, FinancialCategoryStatus.INACTIVE);
-        category.setColor("#ff0000");
-        category.setIcon("seedling");
-        FinancialCategory savedCategory = financialCategoryRepository.save(category);
-
-        FinancialCategoryResponse response =
-                financialCategoryService.activate(savedCategory.getId());
-
-        assertThat(response.name()).isEqualTo("Insumos");
-        assertThat(response.type()).isEqualTo(TransactionType.EXPENSE);
-        assertThat(response.farmId()).isEqualTo(farm.getId());
-        assertThat(response.isDefault()).isFalse();
-        assertThat(response.color()).isEqualTo("#ff0000");
-        assertThat(response.icon()).isEqualTo("seedling");
-    }
-
-    @Test
-    void shouldListOnlyActiveVisibleCategoriesByDefault() {
+    void shouldListOnlyActiveFarmCategoriesByDefault() {
         Farm farm = saveFarm("Farm");
         Farm otherFarm = saveFarm("Other Farm");
-        saveCategory("Global Active", null, true, FinancialCategoryStatus.ACTIVE);
-        saveCategory("Farm Active", farm, false, FinancialCategoryStatus.ACTIVE);
-        saveCategory("Global Inactive", null, true, FinancialCategoryStatus.INACTIVE);
-        saveCategory("Farm Inactive", farm, false, FinancialCategoryStatus.INACTIVE);
-        saveCategory("Other Farm Active", otherFarm, false, FinancialCategoryStatus.ACTIVE);
+        saveCategory("Farm Active", farm, TransactionType.EXPENSE, FinancialCategoryStatus.ACTIVE);
+        saveCategory(
+                "Farm Inactive", farm, TransactionType.EXPENSE, FinancialCategoryStatus.INACTIVE);
+        saveCategory(
+                "Other Farm Active",
+                otherFarm,
+                TransactionType.EXPENSE,
+                FinancialCategoryStatus.ACTIVE);
 
         var response =
                 financialCategoryService.findAll(farm.getId(), false, new PaginationParams());
 
         assertThat(response.content())
                 .extracting(FinancialCategoryResponse::name)
-                .containsExactlyInAnyOrder("Global Active", "Farm Active");
+                .containsExactlyInAnyOrder("Farm Active");
     }
 
     @Test
-    void shouldListActiveAndInactiveVisibleCategoriesWhenRequested() {
+    void shouldListActiveAndInactiveFarmCategoriesWhenRequested() {
         Farm farm = saveFarm("Farm");
         Farm otherFarm = saveFarm("Other Farm");
-        saveCategory("Global Active", null, true, FinancialCategoryStatus.ACTIVE);
-        saveCategory("Farm Active", farm, false, FinancialCategoryStatus.ACTIVE);
-        saveCategory("Global Inactive", null, true, FinancialCategoryStatus.INACTIVE);
-        saveCategory("Farm Inactive", farm, false, FinancialCategoryStatus.INACTIVE);
-        saveCategory("Other Farm Inactive", otherFarm, false, FinancialCategoryStatus.INACTIVE);
+        saveCategory("Farm Active", farm, TransactionType.EXPENSE, FinancialCategoryStatus.ACTIVE);
+        saveCategory(
+                "Farm Inactive", farm, TransactionType.EXPENSE, FinancialCategoryStatus.INACTIVE);
+        saveCategory(
+                "Other Farm Inactive",
+                otherFarm,
+                TransactionType.EXPENSE,
+                FinancialCategoryStatus.INACTIVE);
 
         var response = financialCategoryService.findAll(farm.getId(), true, new PaginationParams());
 
         assertThat(response.content())
                 .extracting(FinancialCategoryResponse::name)
-                .containsExactlyInAnyOrder(
-                        "Global Active", "Farm Active", "Global Inactive", "Farm Inactive");
+                .containsExactlyInAnyOrder("Farm Active", "Farm Inactive");
     }
 
     @Test
@@ -209,24 +185,39 @@ class FinancialCategoryServiceTest extends PostgresIntegrationTest {
         Farm farm = saveFarm("Farm");
         Farm otherFarm = saveFarm("Other Farm");
         User user = saveUser("User", "user@example.com");
-        FinancialCategory globalUsed =
-                saveCategory("A Global Used", null, true, FinancialCategoryStatus.ACTIVE);
         FinancialCategory farmUsed =
-                saveCategory("B Farm Used", farm, false, FinancialCategoryStatus.ACTIVE);
+                saveCategory(
+                        "A Farm Used",
+                        farm,
+                        TransactionType.EXPENSE,
+                        FinancialCategoryStatus.ACTIVE);
         FinancialCategory inactiveUsed =
-                saveCategory("C Inactive Used", farm, false, FinancialCategoryStatus.INACTIVE);
+                saveCategory(
+                        "B Inactive Used",
+                        farm,
+                        TransactionType.EXPENSE,
+                        FinancialCategoryStatus.INACTIVE);
         FinancialCategory unusedActive =
-                saveCategory("D Unused Active", farm, false, FinancialCategoryStatus.ACTIVE);
-        FinancialCategory unusedInactive =
-                saveCategory("E Unused Inactive", farm, false, FinancialCategoryStatus.INACTIVE);
+                saveCategory(
+                        "C Unused Active",
+                        farm,
+                        TransactionType.EXPENSE,
+                        FinancialCategoryStatus.ACTIVE);
         FinancialCategory deletedOnly =
-                saveCategory("F Deleted Only", farm, false, FinancialCategoryStatus.ACTIVE);
+                saveCategory(
+                        "D Deleted Only",
+                        farm,
+                        TransactionType.EXPENSE,
+                        FinancialCategoryStatus.ACTIVE);
         FinancialCategory otherFarmUsed =
-                saveCategory("G Other Farm Used", otherFarm, false, FinancialCategoryStatus.ACTIVE);
+                saveCategory(
+                        "E Other Farm Used",
+                        otherFarm,
+                        TransactionType.EXPENSE,
+                        FinancialCategoryStatus.ACTIVE);
 
         saveTransaction(farm, farmUsed, user, FinancialRecordStatus.ACTIVE);
         saveTransaction(farm, farmUsed, user, FinancialRecordStatus.ACTIVE);
-        saveTransaction(farm, globalUsed, user, FinancialRecordStatus.ACTIVE);
         saveTransaction(farm, inactiveUsed, user, FinancialRecordStatus.ACTIVE);
         saveTransaction(farm, deletedOnly, user, FinancialRecordStatus.DELETED);
         saveTransaction(otherFarm, otherFarmUsed, user, FinancialRecordStatus.ACTIVE);
@@ -235,32 +226,10 @@ class FinancialCategoryServiceTest extends PostgresIntegrationTest {
 
         assertThat(response)
                 .extracting(FinancialCategoryResponse::name)
-                .containsExactly("A Global Used", "B Farm Used", "C Inactive Used");
+                .containsExactly("A Farm Used", "B Inactive Used");
         assertThat(response)
                 .extracting(FinancialCategoryResponse::id)
-                .doesNotContain(
-                        unusedActive.getId(),
-                        unusedInactive.getId(),
-                        deletedOnly.getId(),
-                        otherFarmUsed.getId());
-        assertThat(response)
-                .filteredOn(category -> category.name().equals("A Global Used"))
-                .singleElement()
-                .satisfies(
-                        category -> {
-                            assertThat(category.farmId()).isNull();
-                            assertThat(category.isDefault()).isTrue();
-                            assertThat(category.status()).isEqualTo(FinancialCategoryStatus.ACTIVE);
-                        });
-        assertThat(response)
-                .filteredOn(category -> category.name().equals("C Inactive Used"))
-                .singleElement()
-                .satisfies(
-                        category -> {
-                            assertThat(category.farmId()).isEqualTo(farm.getId());
-                            assertThat(category.status())
-                                    .isEqualTo(FinancialCategoryStatus.INACTIVE);
-                        });
+                .doesNotContain(unusedActive.getId(), deletedOnly.getId(), otherFarmUsed.getId());
     }
 
     @Test
@@ -271,75 +240,14 @@ class FinancialCategoryServiceTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void shouldCreateUniqueGlobalCategoryAndSaveTrimmedName() {
-        FinancialCategoryResponse response =
-                financialCategoryService.create(defaultCategoryRequest("  Venda de Safra  "));
-
-        assertThat(response.name()).isEqualTo("Venda de Safra");
-        assertThat(response.farmId()).isNull();
-        assertThat(response.isDefault()).isTrue();
-    }
-
-    @Test
-    void shouldRejectDuplicateGlobalCategoryByExactName() {
-        financialCategoryService.create(defaultCategoryRequest("Insumos"));
-
-        assertThatThrownBy(() -> financialCategoryService.create(defaultCategoryRequest("Insumos")))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage(DUPLICATE_CATEGORY_MESSAGE);
-    }
-
-    @Test
-    void shouldRejectDuplicateGlobalCategoryByCaseAndSpaces() {
-        financialCategoryService.create(defaultCategoryRequest("Insumos"));
-
-        assertThatThrownBy(
-                        () -> financialCategoryService.create(defaultCategoryRequest(" insumos ")))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage(DUPLICATE_CATEGORY_MESSAGE);
-    }
-
-    @Test
-    void shouldRejectDuplicateGlobalCategoryWhenInactiveExists() {
-        saveCategory("Insumos", null, true, FinancialCategoryStatus.INACTIVE);
-
-        assertThatThrownBy(() -> financialCategoryService.create(defaultCategoryRequest("INSUMOS")))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage(DUPLICATE_CATEGORY_MESSAGE);
-    }
-
-    @Test
-    void shouldCreateUniqueFarmCategoryAndSaveTrimmedName() {
+    void shouldRejectDuplicateFarmCategoryByNameAndTypeInSameFarm() {
         Farm farm = saveFarm("Farm");
-
-        FinancialCategoryResponse response =
-                financialCategoryService.create(farmCategoryRequest("  Insumos  ", farm));
-
-        assertThat(response.name()).isEqualTo("Insumos");
-        assertThat(response.farmId()).isEqualTo(farm.getId());
-        assertThat(response.isDefault()).isFalse();
-    }
-
-    @Test
-    void shouldRejectDuplicateFarmCategoryInSameFarmByExactName() {
-        Farm farm = saveFarm("Farm");
-        financialCategoryService.create(farmCategoryRequest("Insumos", farm));
-
-        assertThatThrownBy(
-                        () -> financialCategoryService.create(farmCategoryRequest("Insumos", farm)))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage(DUPLICATE_CATEGORY_MESSAGE);
-    }
-
-    @Test
-    void shouldRejectDuplicateFarmCategoryInSameFarmByCaseAndSpaces() {
-        Farm farm = saveFarm("Farm");
-        financialCategoryService.create(farmCategoryRequest("Insumos", farm));
+        financialCategoryService.create(createRequest(farm, "Insumos", TransactionType.EXPENSE));
 
         assertThatThrownBy(
                         () ->
                                 financialCategoryService.create(
-                                        farmCategoryRequest(" insumos ", farm)))
+                                        createRequest(farm, " insumos ", TransactionType.EXPENSE)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(DUPLICATE_CATEGORY_MESSAGE);
     }
@@ -347,127 +255,122 @@ class FinancialCategoryServiceTest extends PostgresIntegrationTest {
     @Test
     void shouldRejectDuplicateFarmCategoryWhenInactiveExists() {
         Farm farm = saveFarm("Farm");
-        saveCategory("Insumos", farm, false, FinancialCategoryStatus.INACTIVE);
+        saveCategory("Insumos", farm, TransactionType.EXPENSE, FinancialCategoryStatus.INACTIVE);
 
         assertThatThrownBy(
-                        () -> financialCategoryService.create(farmCategoryRequest("INSUMOS", farm)))
+                        () ->
+                                financialCategoryService.create(
+                                        createRequest(farm, "INSUMOS", TransactionType.EXPENSE)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(DUPLICATE_CATEGORY_MESSAGE);
     }
 
     @Test
-    void shouldAllowSameCategoryNameInDifferentFarms() {
+    void shouldAllowSameCategoryNameInSameFarmWhenTypeIsDifferent() {
         Farm farm = saveFarm("Farm");
-        Farm otherFarm = saveFarm("Other Farm");
-        financialCategoryService.create(farmCategoryRequest("Insumos", farm));
+        financialCategoryService.create(createRequest(farm, "Frete", TransactionType.EXPENSE));
 
         FinancialCategoryResponse response =
-                financialCategoryService.create(farmCategoryRequest(" insumos ", otherFarm));
+                financialCategoryService.create(
+                        createRequest(farm, " frete ", TransactionType.INCOME));
+
+        assertThat(response.name()).isEqualTo("frete");
+        assertThat(response.type()).isEqualTo(TransactionType.INCOME);
+    }
+
+    @Test
+    void shouldAllowSameCategoryNameAndTypeInDifferentFarms() {
+        Farm farm = saveFarm("Farm");
+        Farm otherFarm = saveFarm("Other Farm");
+        financialCategoryService.create(createRequest(farm, "Insumos", TransactionType.EXPENSE));
+
+        FinancialCategoryResponse response =
+                financialCategoryService.create(
+                        createRequest(otherFarm, " insumos ", TransactionType.EXPENSE));
 
         assertThat(response.name()).isEqualTo("insumos");
         assertThat(response.farmId()).isEqualTo(otherFarm.getId());
     }
 
     @Test
-    void shouldAllowSameCategoryNameBetweenGlobalAndFarmScopes() {
+    void shouldUpdateCategoryKeepingFarmAndSaveTrimmedName() {
         Farm farm = saveFarm("Farm");
-        financialCategoryService.create(defaultCategoryRequest("Insumos"));
-
-        FinancialCategoryResponse response =
-                financialCategoryService.create(farmCategoryRequest(" insumos ", farm));
-
-        assertThat(response.name()).isEqualTo("insumos");
-        assertThat(response.farmId()).isEqualTo(farm.getId());
-    }
-
-    @Test
-    void shouldAllowUpdatingGlobalCategoryKeepingOwnNormalizedNameAndSaveTrimmedName() {
         FinancialCategory category =
-                saveCategory("Venda", null, true, FinancialCategoryStatus.ACTIVE);
+                saveCategory(
+                        "Insumos", farm, TransactionType.EXPENSE, FinancialCategoryStatus.ACTIVE);
 
         FinancialCategoryResponse response =
                 financialCategoryService.update(
-                        category.getId(), defaultCategoryRequest("  venda  "));
+                        category.getId(), updateRequest("  venda  ", TransactionType.INCOME));
 
         assertThat(response.id()).isEqualTo(category.getId());
         assertThat(response.name()).isEqualTo("venda");
-    }
-
-    @Test
-    void shouldAllowUpdatingFarmCategoryKeepingOwnNormalizedNameAndSaveTrimmedName() {
-        Farm farm = saveFarm("Farm");
-        FinancialCategory category =
-                saveCategory("Insumos", farm, false, FinancialCategoryStatus.ACTIVE);
-
-        FinancialCategoryResponse response =
-                financialCategoryService.update(
-                        category.getId(), farmCategoryRequest("  insumos  ", farm));
-
-        assertThat(response.id()).isEqualTo(category.getId());
-        assertThat(response.name()).isEqualTo("insumos");
-    }
-
-    @Test
-    void shouldRejectUpdatingGlobalCategoryToNameUsedByAnotherGlobalCategory() {
-        FinancialCategory category =
-                saveCategory("Insumos", null, true, FinancialCategoryStatus.ACTIVE);
-        saveCategory("Venda", null, true, FinancialCategoryStatus.ACTIVE);
-
-        assertThatThrownBy(
-                        () ->
-                                financialCategoryService.update(
-                                        category.getId(), defaultCategoryRequest(" venda ")))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage(DUPLICATE_CATEGORY_MESSAGE);
-    }
-
-    @Test
-    void shouldRejectUpdatingFarmCategoryToNameUsedByAnotherCategoryInSameFarm() {
-        Farm farm = saveFarm("Farm");
-        FinancialCategory category =
-                saveCategory("Insumos", farm, false, FinancialCategoryStatus.ACTIVE);
-        saveCategory("Frete", farm, false, FinancialCategoryStatus.INACTIVE);
-
-        assertThatThrownBy(
-                        () ->
-                                financialCategoryService.update(
-                                        category.getId(), farmCategoryRequest(" frete ", farm)))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage(DUPLICATE_CATEGORY_MESSAGE);
-    }
-
-    @Test
-    void shouldAllowUpdatingFarmCategoryToNameUsedByOtherFarmOrGlobalScope() {
-        Farm farm = saveFarm("Farm");
-        Farm otherFarm = saveFarm("Other Farm");
-        FinancialCategory category =
-                saveCategory("Insumos", farm, false, FinancialCategoryStatus.ACTIVE);
-        saveCategory("Frete", otherFarm, false, FinancialCategoryStatus.ACTIVE);
-        saveCategory("Frete", null, true, FinancialCategoryStatus.ACTIVE);
-
-        FinancialCategoryResponse response =
-                financialCategoryService.update(
-                        category.getId(), farmCategoryRequest(" frete ", farm));
-
-        assertThat(response.name()).isEqualTo("frete");
+        assertThat(response.type()).isEqualTo(TransactionType.INCOME);
         assertThat(response.farmId()).isEqualTo(farm.getId());
+    }
+
+    @Test
+    void shouldRejectUpdatingFarmCategoryToDuplicateNameAndType() {
+        Farm farm = saveFarm("Farm");
+        FinancialCategory category =
+                saveCategory(
+                        "Insumos", farm, TransactionType.EXPENSE, FinancialCategoryStatus.ACTIVE);
+        saveCategory("Frete", farm, TransactionType.EXPENSE, FinancialCategoryStatus.INACTIVE);
+
+        assertThatThrownBy(
+                        () ->
+                                financialCategoryService.update(
+                                        category.getId(),
+                                        updateRequest(" frete ", TransactionType.EXPENSE)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(DUPLICATE_CATEGORY_MESSAGE);
     }
 
     @Test
     void shouldRejectCategoryNameBlankAfterTrim() {
-        assertThatThrownBy(() -> financialCategoryService.create(defaultCategoryRequest("   ")))
+        Farm farm = saveFarm("Farm");
+
+        assertThatThrownBy(
+                        () ->
+                                financialCategoryService.create(
+                                        createRequest(farm, "   ", TransactionType.EXPENSE)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("Category name cannot be blank.");
     }
 
-    private FinancialCategoryRequest defaultCategoryRequest(String name) {
-        return new FinancialCategoryRequest(
-                name, TransactionType.EXPENSE, "#ff0000", "package", null, true);
+    @Test
+    void shouldValidateFilterCategoryIdsBelongToFarm() {
+        Farm farm = saveFarm("Farm");
+        Farm otherFarm = saveFarm("Other Farm");
+        FinancialCategory category =
+                saveCategory(
+                        "Insumos", farm, TransactionType.EXPENSE, FinancialCategoryStatus.ACTIVE);
+        FinancialCategory otherCategory =
+                saveCategory(
+                        "Frete",
+                        otherFarm,
+                        TransactionType.EXPENSE,
+                        FinancialCategoryStatus.ACTIVE);
+
+        financialCategoryService.ensureCategoriesBelongToFarm(
+                List.of(category.getId()), farm.getId());
+
+        assertThatThrownBy(
+                        () ->
+                                financialCategoryService.ensureCategoriesBelongToFarm(
+                                        List.of(category.getId(), otherCategory.getId()),
+                                        farm.getId()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Financial category does not belong to farm");
     }
 
-    private FinancialCategoryRequest farmCategoryRequest(String name, Farm farm) {
-        return new FinancialCategoryRequest(
-                name, TransactionType.EXPENSE, "#ff0000", "package", farm.getId(), false);
+    private FinancialCategoryCreateRequest createRequest(
+            Farm farm, String name, TransactionType type) {
+        return new FinancialCategoryCreateRequest(farm.getId(), name, type, "#ff0000", "package");
+    }
+
+    private FinancialCategoryUpdateRequest updateRequest(String name, TransactionType type) {
+        return new FinancialCategoryUpdateRequest(name, type, "#ff0000", "package");
     }
 
     private User saveUser(String name, String email) {
@@ -506,12 +409,11 @@ class FinancialCategoryServiceTest extends PostgresIntegrationTest {
     }
 
     private FinancialCategory saveCategory(
-            String name, Farm farm, boolean defaultCategory, FinancialCategoryStatus status) {
+            String name, Farm farm, TransactionType type, FinancialCategoryStatus status) {
         FinancialCategory category = new FinancialCategory();
         category.setName(name);
-        category.setType(TransactionType.EXPENSE);
+        category.setType(type);
         category.setFarm(farm);
-        category.setDefaultCategory(defaultCategory);
         category.setStatus(status);
 
         return financialCategoryRepository.save(category);

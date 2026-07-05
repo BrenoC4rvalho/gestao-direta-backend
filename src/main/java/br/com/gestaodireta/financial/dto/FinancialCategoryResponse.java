@@ -6,13 +6,12 @@ import java.time.LocalDateTime;
 
 public record FinancialCategoryResponse(
         Long id,
+        Long farmId,
+        String farmName,
         String name,
         TransactionType type,
         String color,
         String icon,
-        Long farmId,
-        String farmName,
-        boolean isDefault,
         FinancialCategoryStatus status,
         LocalDateTime createdAt,
         LocalDateTime updatedAt) {}

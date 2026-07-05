@@ -4,7 +4,7 @@ import br.com.gestaodireta.farm.enumeration.FarmStatus;
 import br.com.gestaodireta.farm.enumeration.FarmUserRole;
 import br.com.gestaodireta.farm.repository.FarmRepository;
 import br.com.gestaodireta.farm.repository.FarmUserRepository;
-import br.com.gestaodireta.financial.dto.FinancialCategoryRequest;
+import br.com.gestaodireta.financial.dto.FinancialCategoryCreateRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionRequest;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
@@ -12,7 +12,6 @@ import br.com.gestaodireta.shared.security.SecurityUtils;
 import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.enumeration.UserStatus;
 import br.com.gestaodireta.user.repository.UserRepository;
-import java.util.Objects;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
 
@@ -112,17 +111,13 @@ public class FinancialAccess {
         return canUpdateTransaction(transactionId);
     }
 
-    public boolean canCreateCategory(FinancialCategoryRequest request) {
-        if (request.isDefault()) {
-            return SecurityUtils.isAdmin();
-        }
-
+    public boolean canCreateCategory(FinancialCategoryCreateRequest request) {
         if (request.farmId() == null) {
             return false;
         }
 
         if (SecurityUtils.isAdmin()) {
-            return true;
+            return isFarmActive(request.farmId());
         }
 
         Optional<FarmUserRole> role = currentUserRole(request.farmId());
@@ -132,35 +127,26 @@ public class FinancialAccess {
                 && role.filter(FarmUserRole.PRODUCER::equals).isPresent();
     }
 
-    public boolean canUpdateCategory(Long categoryId, FinancialCategoryRequest request) {
-        if (SecurityUtils.isAdmin()) {
-            return true;
-        }
+    public boolean canViewCategory(Long categoryId) {
+        return financialCategoryRepository
+                .findFarmIdById(categoryId)
+                .filter(this::canViewFinancialData)
+                .isPresent();
+    }
 
-        if (request.isDefault() || request.farmId() == null) {
-            return false;
-        }
-
-        Optional<Long> farmId = financialCategoryRepository.findFarmIdById(categoryId);
-
-        if (farmId.isEmpty() || !Objects.equals(farmId.get(), request.farmId())) {
-            return false;
-        }
-
-        return isCurrentUserActive()
-                && isFarmActive(farmId.get())
-                && currentUserRole(farmId.get()).filter(FarmUserRole.PRODUCER::equals).isPresent();
+    public boolean canUpdateCategory(Long categoryId) {
+        return canManageCategoryByCategoryId(categoryId);
     }
 
     public boolean canManageCategoryByCategoryId(Long categoryId) {
-        if (SecurityUtils.isAdmin()) {
-            return true;
-        }
-
         Optional<Long> farmId = financialCategoryRepository.findFarmIdById(categoryId);
 
         if (farmId.isEmpty()) {
             return false;
+        }
+
+        if (SecurityUtils.isAdmin()) {
+            return isFarmActive(farmId.get());
         }
 
         return isCurrentUserActive()

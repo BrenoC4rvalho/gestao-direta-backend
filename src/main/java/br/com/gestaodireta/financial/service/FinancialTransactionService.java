@@ -109,6 +109,7 @@ public class FinancialTransactionService {
             FinancialTransactionFilterRequest filterRequest, PaginationParams paginationParams) {
         FinancialTransactionFilterRequest normalizedFilter = normalizeFilter(filterRequest);
         validateFilter(normalizedFilter);
+        validateCategoryFilter(normalizedFilter);
         validateHarvestSeasonFilter(normalizedFilter);
 
         Page<FinancialTransactionResponse> transactions =
@@ -428,7 +429,7 @@ public class FinancialTransactionService {
             throw new BusinessException("Financial category is inactive");
         }
 
-        if (category.getFarm() != null && !category.getFarm().getId().equals(farm.getId())) {
+        if (!category.getFarm().getId().equals(farm.getId())) {
             throw new BusinessException("Financial category does not belong to farm");
         }
 
@@ -453,6 +454,15 @@ public class FinancialTransactionService {
         }
 
         return harvestSeason;
+    }
+
+    private void validateCategoryFilter(FinancialTransactionFilterRequest filterRequest) {
+        if (filterRequest.categoryIds() == null) {
+            return;
+        }
+
+        financialCategoryService.ensureCategoriesBelongToFarm(
+                filterRequest.categoryIds(), filterRequest.farmId());
     }
 
     private void validateHarvestSeasonFilter(FinancialTransactionFilterRequest filterRequest) {

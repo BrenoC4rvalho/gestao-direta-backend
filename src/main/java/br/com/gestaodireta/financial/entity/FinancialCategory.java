@@ -37,12 +37,9 @@ public class FinancialCategory extends BaseEntity {
     @Column(length = 60)
     private String icon;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "farm_id")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "farm_id", nullable = false)
     private Farm farm;
-
-    @Column(name = "is_default", nullable = false)
-    private boolean defaultCategory;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
@@ -90,14 +87,6 @@ public class FinancialCategory extends BaseEntity {
 
     public void setFarm(Farm farm) {
         this.farm = farm;
-    }
-
-    public boolean isDefaultCategory() {
-        return defaultCategory;
-    }
-
-    public void setDefaultCategory(boolean defaultCategory) {
-        this.defaultCategory = defaultCategory;
     }
 
     public FinancialCategoryStatus getStatus() {

@@ -87,7 +87,7 @@ Defaults:
 
 ### Regras importantes
 
-- `ADMIN` administra usuários, fazendas e categorias globais.
+- `ADMIN` administra usuários, fazendas e categorias financeiras por fazenda.
 - `USER` depende de vínculo ativo com fazenda.
 - `FarmUserRole.INACTIVE` não permite acesso à fazenda.
 - `GET /api/farms/{farmId}/access` retorna as permissões calculadas do usuário autenticado para a fazenda selecionada.
@@ -97,7 +97,7 @@ Defaults:
 - `ADMIN` gerencia atividades produtivas globais.
 - `PRODUCER` gerencia safras apenas em fazenda ativa onde possui vínculo ativo.
 - `EMPLOYEE` e `ACCOUNTANT` apenas consultam safras.
-- Categorias default são globais e só `ADMIN` pode criar ou alterar.
+- Categorias financeiras sempre pertencem a uma fazenda; `ADMIN` ou `PRODUCER` podem gerenciá-las conforme permissão da fazenda.
 - Categoria não default exige `farmId`.
 - Fazenda inativa não pode receber nova safra.
 - Atividade produtiva inativa não pode ser usada em nova safra.
@@ -1271,7 +1271,7 @@ Retorna o contexto de acesso do usuário autenticado para uma fazenda, incluindo
 - `ADMIN` não depende de vínculo com fazenda, pode acessar fazendas ativas e inativas e recebe todas as permissões como `true`.
 - Para `ADMIN`, o campo `role` retorna `null`.
 - `USER` depende de vínculo ativo e não acessa fazenda `INACTIVE`; vínculo `INACTIVE` ou ausência de vínculo resulta em `403 Forbidden`.
-- `PRODUCER` pode visualizar e editar a fazenda, gerenciar vínculos, visualizar financeiro, gerenciar movimentações e categorias da fazenda. Não pode alterar o status da fazenda, criar fazenda ou gerenciar categorias globais.
+- `PRODUCER` pode visualizar e editar a fazenda, gerenciar vínculos, visualizar financeiro, gerenciar movimentações e categorias da fazenda. Não pode alterar o status da fazenda, criar fazenda ou gerenciar categorias de outras fazendas.
 - `EMPLOYEE` pode visualizar a fazenda e o financeiro e gerenciar movimentações. Não pode editar a fazenda, gerenciar vínculos ou categorias, nem alterar o status da fazenda.
 - `ACCOUNTANT` pode visualizar a fazenda e os dados financeiros. Não pode editar a fazenda, gerenciar vínculos, movimentações ou categorias, nem alterar o status da fazenda.
 - O endpoint melhora a UX do frontend, mas não substitui a autorização aplicada em cada endpoint protegido do backend.
@@ -2909,10 +2909,10 @@ Inativa uma safra.
 ### POST /api/financial/categories
 
 **Descrição:**
-Cria categoria financeira global ou vinculada a uma fazenda.
+Cria uma categoria financeira vinculada obrigatoriamente a uma fazenda.
 
 **Autenticação:** Sim
-**Permissão:** `ADMIN` para categorias default/globais; `ADMIN` ou `PRODUCER` para categorias da fazenda.
+**Permissão:** `ADMIN` para fazenda ativa ou `PRODUCER` com vínculo ativo na fazenda ativa.
 
 **Path params:**
 ```json
@@ -2927,36 +2927,33 @@ Cria categoria financeira global ou vinculada a uma fazenda.
 **Body esperado:**
 ```json
 {
+  "farmId": 1,
   "name": "Insumos",
   "type": "EXPENSE",
   "color": "#FF0000",
-  "icon": "package",
-  "farmId": 1,
-  "isDefault": false
+  "icon": "package"
 }
 ```
 
 **Campos obrigatórios:**
+- `farmId`
 - `name`
 - `type`
-- `isDefault`
 
 **Campos opcionais:**
 - `color`
 - `icon`
-- `farmId`
 
 **Resposta de sucesso:**
 ```json
 {
   "id": 1,
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
   "name": "Insumos",
   "type": "EXPENSE",
   "color": "#FF0000",
   "icon": "package",
-  "farmId": 1,
-  "farmName": "Fazenda Boa Safra",
-  "isDefault": false,
   "status": "ACTIVE",
   "createdAt": "2026-06-21T10:00:00",
   "updatedAt": "2026-06-21T10:00:00"
@@ -2965,24 +2962,23 @@ Cria categoria financeira global ou vinculada a uma fazenda.
 
 **Possíveis erros/status HTTP:**
 - `201 Created` em caso de sucesso.
-- `400 Bad Request` para body inválido, categoria default com `farmId`, categoria de fazenda sem `farmId` ou nome duplicado no mesmo escopo.
+- `400 Bad Request` para body inválido, `farmId` ausente, nome em branco ou duplicidade de `name + type` na mesma fazenda.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
-- `403 Forbidden` para usuário sem permissão.
+- `403 Forbidden` para usuário sem permissão ou fazenda inativa.
 - `404 Not Found` se a fazenda não existir.
 
 **Observações de regra de negócio:**
-- Categoria default é global e não pode ter `farmId`.
-- Categoria não default deve ter `farmId`.
-- O nome é salvo sem espaços no início/fim e não pode duplicar outra categoria no mesmo escopo, comparando sem diferenciar maiúsculas/minúsculas.
-- Categorias `ACTIVE` e `INACTIVE` bloqueiam novo cadastro duplicado.
-- Categoria global e categoria de fazenda podem ter o mesmo nome.
-- Fazendas diferentes podem ter categorias com o mesmo nome.
-- Categoria é criada com status `ACTIVE`.
+- Não existem categorias globais/default na API.
+- O nome é salvo sem espaços no início/fim.
+- A unicidade é por fazenda, nome normalizado (`lower(trim(name))`) e tipo.
+- Categorias `ACTIVE` e `INACTIVE` bloqueiam novo cadastro duplicado na mesma fazenda.
+- Fazendas diferentes podem ter categorias com o mesmo nome e tipo.
+- A categoria é criada com status `ACTIVE`.
 
 ### GET /api/financial/categories
 
 **Descrição:**
-Lista categorias visíveis para uma fazenda.
+Lista categorias de uma fazenda.
 
 **Autenticação:** Sim
 **Permissão:** `ADMIN`, `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com acesso financeiro à fazenda.
@@ -3025,13 +3021,12 @@ Lista categorias visíveis para uma fazenda.
   "content": [
     {
       "id": 1,
+      "farmId": 1,
+      "farmName": "Fazenda Boa Safra",
       "name": "Insumos",
       "type": "EXPENSE",
       "color": "#FF0000",
       "icon": "package",
-      "farmId": 1,
-      "farmName": "Fazenda Boa Safra",
-      "isDefault": false,
       "status": "ACTIVE",
       "createdAt": "2026-06-21T10:00:00",
       "updatedAt": "2026-06-21T10:00:00"
@@ -3047,22 +3042,21 @@ Lista categorias visíveis para uma fazenda.
 ```
 
 **Possíveis erros/status HTTP:**
-- `400 Bad Request` para query params inválidos ou `harvestSeasonId` de outra fazenda.
+- `400 Bad Request` para query params inválidos ou `farmId` ausente.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
 - `403 Forbidden` para usuário sem acesso financeiro à fazenda.
 - `404 Not Found` se a fazenda não existir.
 
 **Observações de regra de negócio:**
-- Retorna categorias ativas visíveis para a fazenda informada.
-- `ACCOUNTANT` pode consultar, mas não gerenciar.
+- Retorna apenas categorias da fazenda informada.
 - Por padrão, retorna apenas categorias `ACTIVE`.
-- Quando `includeInactive=true`, retorna categorias `ACTIVE` e `INACTIVE`, útil para telas de gestão.
-- O campo `status` permanece na resposta para diferenciar categorias ativas e inativas.
+- Quando `includeInactive=true`, retorna categorias `ACTIVE` e `INACTIVE`.
+- `EMPLOYEE` e `ACCOUNTANT` podem consultar, mas não gerenciar.
 
 ### GET /api/financial/categories/used-in-transactions
 
 **Descrição:**
-Lista as categorias utilizadas em movimentações ativas de uma fazenda, incluindo categorias ativas e inativas, locais e globais/default. Este endpoint deve ser usado para filtros de categoria na tela de movimentações.
+Lista as categorias da fazenda utilizadas em movimentações `ACTIVE`. Este endpoint deve ser usado para filtros de categoria na tela de movimentações.
 
 **Autenticação:** Sim
 **Permissão:** `ADMIN`, `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com acesso financeiro à fazenda.
@@ -3099,27 +3093,13 @@ GET /api/financial/categories/used-in-transactions?farmId=1
 ```json
 [
   {
-    "id": 1,
-    "name": "Venda de soja",
-    "type": "INCOME",
-    "color": "#00AA00",
-    "icon": "sprout",
-    "farmId": null,
-    "farmName": null,
-    "isDefault": true,
-    "status": "ACTIVE",
-    "createdAt": "2026-06-21T10:00:00",
-    "updatedAt": "2026-06-21T10:00:00"
-  },
-  {
     "id": 8,
+    "farmId": 1,
+    "farmName": "Fazenda Boa Safra",
     "name": "Combustível",
     "type": "EXPENSE",
     "color": "#FF0000",
     "icon": "fuel",
-    "farmId": 1,
-    "farmName": "Fazenda Boa Safra",
-    "isDefault": false,
     "status": "INACTIVE",
     "createdAt": "2026-06-21T10:00:00",
     "updatedAt": "2026-06-21T10:00:00"
@@ -3134,12 +3114,107 @@ GET /api/financial/categories/used-in-transactions?farmId=1
 - `404 Not Found` se a fazenda não existir.
 
 **Observações de regra de negócio:**
-- Retorna somente categorias que possuem pelo menos uma movimentação `ACTIVE` na fazenda.
-- Inclui categorias `ACTIVE` e `INACTIVE`.
-- Inclui categorias da fazenda e globais/default.
-- Não retorna categorias sem movimentações.
+- Retorna somente categorias da fazenda que possuem pelo menos uma movimentação `ACTIVE` na mesma fazenda.
+- Inclui categorias `ACTIVE` e `INACTIVE`, preservando categorias inativas usadas historicamente por movimentações ativas.
+- Não retorna categorias de outra fazenda nem categorias sem movimentações.
 - Não considera movimentações deletadas logicamente (`recordStatus=DELETED`).
 - Ordena por nome.
+
+### GET /api/financial/categories/{id}
+
+**Descrição:**
+Busca categoria financeira por id.
+
+**Autenticação:** Sim
+**Permissão:** `ADMIN`, `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com acesso financeiro à fazenda da categoria.
+
+**Resposta de sucesso:**
+```json
+{
+  "id": 1,
+  "farmId": 1,
+  "farmName": "Fazenda Boa Safra",
+  "name": "Insumos",
+  "type": "EXPENSE",
+  "color": "#FF0000",
+  "icon": "package",
+  "status": "ACTIVE",
+  "createdAt": "2026-06-21T10:00:00",
+  "updatedAt": "2026-06-21T10:00:00"
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `200 OK` em caso de sucesso.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem acesso financeiro à fazenda da categoria.
+- `404 Not Found` se a categoria não existir.
+
+### PUT /api/financial/categories/{id}
+
+**Descrição:**
+Atualiza dados editáveis da categoria. Não permite trocar a fazenda da categoria.
+
+**Autenticação:** Sim
+**Permissão:** `ADMIN` para fazenda ativa ou `PRODUCER` com vínculo ativo na fazenda ativa da categoria.
+
+**Body esperado:**
+```json
+{
+  "name": "Combustível",
+  "type": "EXPENSE",
+  "color": "#FF9900",
+  "icon": "fuel"
+}
+```
+
+**Campos obrigatórios:**
+- `name`
+- `type`
+
+**Campos opcionais:**
+- `color`
+- `icon`
+
+**Possíveis erros/status HTTP:**
+- `200 OK` em caso de sucesso.
+- `400 Bad Request` para body inválido, nome em branco ou duplicidade de `name + type` na mesma fazenda.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão ou fazenda inativa.
+- `404 Not Found` se a categoria não existir.
+
+### PATCH /api/financial/categories/{id}/activate
+
+**Descrição:**
+Ativa uma categoria financeira inativa.
+
+**Autenticação:** Sim
+**Permissão:** `ADMIN` para fazenda ativa ou `PRODUCER` com vínculo ativo na fazenda ativa da categoria.
+
+**Possíveis erros/status HTTP:**
+- `200 OK` em caso de sucesso.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão ou fazenda inativa.
+- `404 Not Found` se a categoria não existir.
+
+### DELETE /api/financial/categories/{id}
+
+**Descrição:**
+Inativa uma categoria financeira por exclusão lógica.
+
+**Autenticação:** Sim
+**Permissão:** `ADMIN` para fazenda ativa ou `PRODUCER` com vínculo ativo na fazenda ativa da categoria.
+
+**Possíveis erros/status HTTP:**
+- `204 No Content` em caso de sucesso.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem permissão ou fazenda inativa.
+- `404 Not Found` se a categoria não existir.
+
+**Observações de regra de negócio:**
+- A exclusão é lógica: define `status=INACTIVE`.
+- `EMPLOYEE`, `ACCOUNTANT`, vínculo `INACTIVE` e usuário sem vínculo não gerenciam categorias.
+- A rota `/api/financial/categories/global` foi removida.
 
 ### GET /api/farms/{farmId}/users/options
 
@@ -3205,307 +3280,6 @@ GET /api/farms/1/users/options
 - Não considera movimentações deletadas logicamente (`recordStatus=DELETED`).
 - Remove duplicidades e ordena por nome.
 - Não retorna `email`, `document`, `userType`, `status` ou dados do vínculo com a fazenda.
-
-### GET /api/financial/categories/global
-
-**Descrição:**
-Lista categorias financeiras globais/default.
-
-**Autenticação:** Sim
-**Permissão:** Apenas `ADMIN`.
-
-**Path params:**
-```json
-{}
-```
-
-**Query params:**
-```json
-{
-  "page": 0,
-  "size": 10,
-  "sort": "id",
-  "direction": "ASC"
-}
-```
-
-**Body esperado:**
-```json
-{}
-```
-
-**Campos obrigatórios:**
-- Nenhum.
-
-**Campos opcionais:**
-- `page`
-- `size`
-- `sort`
-- `direction`
-
-**Resposta de sucesso:**
-```json
-{
-  "content": [
-    {
-      "id": 10,
-      "name": "Venda de Safra",
-      "type": "INCOME",
-      "color": "#00AA00",
-      "icon": "wheat",
-      "farmId": null,
-      "farmName": null,
-      "isDefault": true,
-      "status": "ACTIVE",
-      "createdAt": "2026-06-21T10:00:00",
-      "updatedAt": "2026-06-21T10:00:00"
-    }
-  ],
-  "page": 0,
-  "size": 10,
-  "totalElements": 1,
-  "totalPages": 1,
-  "first": true,
-  "last": true
-}
-```
-
-**Possíveis erros/status HTTP:**
-- `401 Unauthorized` para cookie ausente, inválido ou expirado.
-- `403 Forbidden` para usuário sem papel `ADMIN`.
-
-**Observações de regra de negócio:**
-- Categorias globais são categorias default.
-
-### GET /api/financial/categories/{id}
-
-**Descrição:**
-Busca uma categoria financeira por id.
-
-**Autenticação:** Sim
-**Permissão:** Usuário autenticado. A autorização contextual não está declarada no controller atual para este endpoint.
-
-**Path params:**
-```json
-{
-  "id": 1
-}
-```
-
-**Query params:**
-```json
-{}
-```
-
-**Body esperado:**
-```json
-{}
-```
-
-**Campos obrigatórios:**
-- `id`
-
-**Campos opcionais:**
-- Nenhum.
-
-**Resposta de sucesso:**
-```json
-{
-  "id": 1,
-  "name": "Insumos",
-  "type": "EXPENSE",
-  "color": "#FF0000",
-  "icon": "package",
-  "farmId": 1,
-  "farmName": "Fazenda Boa Safra",
-  "isDefault": false,
-  "status": "ACTIVE",
-  "createdAt": "2026-06-21T10:00:00",
-  "updatedAt": "2026-06-21T10:00:00"
-}
-```
-
-**Possíveis erros/status HTTP:**
-- `401 Unauthorized` para cookie ausente, inválido ou expirado.
-- `404 Not Found` se a categoria não existir.
-
-**Observações de regra de negócio:**
-- A categoria pode ser global (`farmId=null`) ou da fazenda.
-
-### PUT /api/financial/categories/{id}
-
-**Descrição:**
-Atualiza uma categoria financeira.
-
-**Autenticação:** Sim
-**Permissão:** `ADMIN`; ou `PRODUCER` para categoria da própria fazenda, não default.
-
-**Path params:**
-```json
-{
-  "id": 1
-}
-```
-
-**Query params:**
-```json
-{}
-```
-
-**Body esperado:**
-```json
-{
-  "name": "Insumos Atualizados",
-  "type": "EXPENSE",
-  "color": "#AA0000",
-  "icon": "package",
-  "farmId": 1,
-  "isDefault": false
-}
-```
-
-**Campos obrigatórios:**
-- `id`
-- `name`
-- `type`
-- `isDefault`
-
-**Campos opcionais:**
-- `color`
-- `icon`
-- `farmId`
-
-**Resposta de sucesso:**
-```json
-{
-  "id": 1,
-  "name": "Insumos Atualizados",
-  "type": "EXPENSE",
-  "color": "#AA0000",
-  "icon": "package",
-  "farmId": 1,
-  "farmName": "Fazenda Boa Safra",
-  "isDefault": false,
-  "status": "ACTIVE",
-  "createdAt": "2026-06-21T10:00:00",
-  "updatedAt": "2026-06-21T10:30:00"
-}
-```
-
-**Possíveis erros/status HTTP:**
-- `400 Bad Request` para body inválido, categoria default com `farmId`, categoria de fazenda sem `farmId` ou nome já usado por outra categoria no mesmo escopo.
-- `401 Unauthorized` para cookie ausente, inválido ou expirado.
-- `403 Forbidden` para usuário sem permissão.
-- `404 Not Found` se categoria ou fazenda não existir.
-
-**Observações de regra de negócio:**
-- `PRODUCER` não pode alterar categoria default.
-- Para `PRODUCER`, o `farmId` do body deve bater com a fazenda da categoria.
-- O nome é salvo sem espaços no início/fim e não pode ser atualizado para um nome usado por outra categoria no mesmo escopo, comparando sem diferenciar maiúsculas/minúsculas.
-- A própria categoria pode manter o mesmo nome normalizado.
-
-### PATCH /api/financial/categories/{id}/activate
-
-**Descrição:**
-Ativa uma categoria financeira inativa.
-
-**Autenticação:** Sim
-**Permissão:** `ADMIN`; ou `PRODUCER` para categoria da própria fazenda.
-
-**Path params:**
-```json
-{
-  "id": 1
-}
-```
-
-**Query params:**
-```json
-{}
-```
-
-**Body esperado:**
-```json
-{}
-```
-
-**Campos obrigatórios:**
-- `id`
-
-**Campos opcionais:**
-- Nenhum.
-
-**Resposta de sucesso:**
-```json
-{
-  "id": 1,
-  "name": "Insumos",
-  "type": "EXPENSE",
-  "color": "#FF0000",
-  "icon": "package",
-  "farmId": 1,
-  "farmName": "Fazenda Boa Safra",
-  "isDefault": false,
-  "status": "ACTIVE",
-  "createdAt": "2026-06-21T10:00:00",
-  "updatedAt": "2026-06-21T10:30:00"
-}
-```
-
-**Possíveis erros/status HTTP:**
-- `200 OK` em caso de sucesso.
-- `401 Unauthorized` para cookie ausente, inválido ou expirado.
-- `403 Forbidden` para usuário sem permissão.
-- `404 Not Found` se a categoria não existir.
-
-**Observações de regra de negócio:**
-- O endpoint é idempotente: categoria já `ACTIVE` retorna sucesso com o DTO atual.
-- Apenas o status passa para `ACTIVE`; os demais dados da categoria não são alterados.
-
-### DELETE /api/financial/categories/{id}
-
-**Descrição:**
-Inativa uma categoria financeira.
-
-**Autenticação:** Sim
-**Permissão:** `ADMIN`; ou `PRODUCER` para categoria da própria fazenda.
-
-**Path params:**
-```json
-{
-  "id": 1
-}
-```
-
-**Query params:**
-```json
-{}
-```
-
-**Body esperado:**
-```json
-{}
-```
-
-**Campos obrigatórios:**
-- `id`
-
-**Campos opcionais:**
-- Nenhum.
-
-**Resposta de sucesso:**
-```json
-{}
-```
-
-**Possíveis erros/status HTTP:**
-- `204 No Content` em caso de sucesso.
-- `401 Unauthorized` para cookie ausente, inválido ou expirado.
-- `403 Forbidden` para usuário sem permissão.
-- `404 Not Found` se a categoria não existir.
-
-**Observações de regra de negócio:**
-- A exclusão é lógica: o status passa para `INACTIVE`.
 
 ### POST /api/financial/transactions
 
@@ -3600,7 +3374,7 @@ Cria uma movimentação financeira.
 - `harvestSeasonId` é opcional; quando informado, a safra deve pertencer à mesma fazenda da movimentação.
 - Não é permitido criar movimentação vinculada a uma safra inativa.
 - `createdByUserId` é definido pelo backend a partir do usuário autenticado.
-- `ACCOUNTANT` pode consultar dados financeiros, mas não criar movimentações.
+- `ACCOUNTANT` pode consultar dados financeiros, mas não criar movimentações. Quando `categoryId` é informado em criação ou edição, a categoria deve estar `ACTIVE`, ter o mesmo tipo da movimentação e pertencer à mesma fazenda.
 
 ### GET /api/financial/transactions
 
@@ -3714,7 +3488,7 @@ Lista movimentações financeiras ativas de uma fazenda.
 ```
 
 **Possíveis erros/status HTTP:**
-- `400 Bad Request` para query params inválidos.
+- `400 Bad Request` para query params inválidos ou categorias de filtro que não pertencem à fazenda.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
 - `403 Forbidden` para usuário sem acesso financeiro à fazenda.
 - `404 Not Found` se a safra informada no filtro não existir.
@@ -3728,10 +3502,10 @@ Lista movimentações financeiras ativas de uma fazenda.
 - `paymentStatus` filtra o campo `status` da movimentação.
 - `paymentMethod` filtra a forma de pagamento da movimentação.
 - `paymentStatuses`: aceita query params repetidos, por exemplo `paymentStatuses=PENDING&paymentStatuses=PAID`. Quando informado com valores válidos, tem prioridade sobre `paymentStatus`.
-- `categoryId` filtra a categoria vinculada à movimentação, mantendo o escopo da fazenda consultada.
+- `categoryId` filtra a categoria vinculada à movimentação; a categoria informada deve existir e pertencer à fazenda consultada.
 - `harvestSeasonId` filtra movimentações vinculadas à safra informada; a safra deve existir e pertencer à fazenda consultada.
 - Exemplo: `GET /api/financial/transactions?farmId=1&harvestSeasonId=10`.
-- `categoryIds`: aceita query params repetidos, por exemplo `categoryIds=1&categoryIds=2`. Quando informado com valores válidos, tem prioridade sobre `categoryId`.
+- `categoryIds`: aceita query params repetidos, por exemplo `categoryIds=1&categoryIds=2`. Quando informado com valores válidos, tem prioridade sobre `categoryId`; todas as categorias devem pertencer à fazenda consultada.
 - `paymentMethods`: aceita query params repetidos, por exemplo `paymentMethods=PIX&paymentMethods=CASH`. Quando informado com valores válidos, tem prioridade sobre `paymentMethod`.
 - `ACCOUNTANT` pode consultar movimentações.
 
@@ -4131,7 +3905,7 @@ Retorna os indicadores financeiros do dashboard para uma fazenda.
 ```
 
 **Possíveis erros/status HTTP:**
-- `400 Bad Request` para query params inválidos.
+- `400 Bad Request` para query params inválidos ou categorias de filtro que não pertencem à fazenda.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
 - `403 Forbidden` para usuário sem acesso financeiro à fazenda.
 
@@ -4211,7 +3985,7 @@ Retorna os principais alertas financeiros da fazenda selecionada para o Dashboar
 ```
 
 **Possíveis erros/status HTTP:**
-- `400 Bad Request` para query params inválidos.
+- `400 Bad Request` para query params inválidos ou categorias de filtro que não pertencem à fazenda.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
 - `403 Forbidden` para usuário sem acesso financeiro à fazenda.
 
@@ -4288,7 +4062,7 @@ Lista contas a vencer de uma fazenda.
 ```
 
 **Possíveis erros/status HTTP:**
-- `400 Bad Request` para query params inválidos.
+- `400 Bad Request` para query params inválidos ou categorias de filtro que não pertencem à fazenda.
 - `401 Unauthorized` para cookie ausente, inválido ou expirado.
 - `403 Forbidden` para usuário sem acesso financeiro à fazenda.
 
