@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -146,6 +147,65 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
             @Param("farmId") Long farmId,
             @Param("today") LocalDate today,
             @Param("next30Days") LocalDate next30Days);
+
+    @Query(
+            """
+            select
+              transaction.id as transactionId,
+              transaction.description as description,
+              category.name as categoryName,
+              transaction.amount as amount,
+              transaction.dueDate as dueDate
+            from FinancialTransaction transaction
+            left join transaction.category category
+            where transaction.farm.id = :farmId
+              and transaction.recordStatus = br.com.gestaodireta.financial.enumeration.FinancialRecordStatus.ACTIVE
+              and transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+              and transaction.dueDate is not null
+              and (
+                transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                or (
+                  transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                  and transaction.dueDate < :today
+                )
+              )
+            order by transaction.dueDate asc, transaction.amount desc
+            """)
+    List<OverdueBillAlertProjection> findOverdueBillAlerts(
+            @Param("farmId") Long farmId, @Param("today") LocalDate today, Pageable pageable);
+
+    @Query(
+            """
+            select
+              count(transaction) as count,
+              coalesce(sum(transaction.amount), 0) as totalAmount
+            from FinancialTransaction transaction
+            where transaction.farm.id = :farmId
+              and transaction.recordStatus = br.com.gestaodireta.financial.enumeration.FinancialRecordStatus.ACTIVE
+              and transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+              and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+              and transaction.dueDate = :today
+            """)
+    DueBillsSummaryProjection summarizeDueToday(
+            @Param("farmId") Long farmId, @Param("today") LocalDate today);
+
+    @Query(
+            """
+            select
+              count(transaction) as count,
+              coalesce(sum(transaction.amount), 0) as totalAmount
+            from FinancialTransaction transaction
+            where transaction.farm.id = :farmId
+              and transaction.recordStatus = br.com.gestaodireta.financial.enumeration.FinancialRecordStatus.ACTIVE
+              and transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+              and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+              and transaction.dueDate > :today
+              and transaction.dueDate <= :next7Days
+            """)
+    DueBillsSummaryProjection summarizeDueNext7Days(
+            @Param("farmId") Long farmId,
+            @Param("today") LocalDate today,
+            @Param("next7Days") LocalDate next7Days);
 
     @Query(
             """

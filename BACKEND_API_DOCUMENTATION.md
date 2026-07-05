@@ -4066,6 +4066,82 @@ Retorna os indicadores financeiros do dashboard para uma fazenda.
 - Despesas `PENDING` vencidas sao convertidas para `OVERDUE` pelo job diario de vencimentos; por isso `overdueExpenses` usa apenas status `OVERDUE`.
 - `ACCOUNTANT` pode consultar resumo financeiro.
 
+### GET /api/financial/alerts
+
+**Descrição:**
+Retorna os principais alertas financeiros da fazenda selecionada para o Dashboard.
+
+**Autenticação:** Sim
+**Permissão:** `ADMIN`, `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com acesso financeiro à fazenda.
+
+**Path params:**
+```json
+{}
+```
+
+**Query params:**
+```json
+{
+  "farmId": 1
+}
+```
+
+**Body esperado:**
+```json
+{}
+```
+
+**Campos obrigatórios:**
+- `farmId`
+
+**Resposta de sucesso:**
+```json
+{
+  "farmId": 1,
+  "overdueBills": [
+    {
+      "transactionId": 101,
+      "description": "Boleto fornecedor AgroSul",
+      "categoryName": "Insumos",
+      "amount": 3200.00,
+      "dueDate": "2026-07-02",
+      "daysOverdue": 3
+    },
+    {
+      "transactionId": 102,
+      "description": "Parcela oficina trator",
+      "categoryName": "Manutenção",
+      "amount": 1250.00,
+      "dueDate": "2026-07-04",
+      "daysOverdue": 1
+    }
+  ],
+  "dueToday": {
+    "count": 2,
+    "totalAmount": 1850.00
+  },
+  "dueNext7Days": {
+    "count": 5,
+    "totalAmount": 7400.00
+  }
+}
+```
+
+**Possíveis erros/status HTTP:**
+- `400 Bad Request` para query params inválidos.
+- `401 Unauthorized` para cookie ausente, inválido ou expirado.
+- `403 Forbidden` para usuário sem acesso financeiro à fazenda.
+
+**Observações de regra de negócio:**
+- Considera apenas movimentações da fazenda informada com `recordStatus=ACTIVE` e `type=EXPENSE`.
+- Ignora movimentações `PAID`, `CANCELED`, `DELETED`, `INCOME`, de outra fazenda ou sem `dueDate`.
+- `overdueBills`: contas atrasadas com status `OVERDUE` ou status `PENDING` e `dueDate` anterior à data atual.
+- `overdueBills` é ordenado por `dueDate ASC` e `amount DESC`, limitado a 20 itens.
+- `daysOverdue`: diferença em dias entre `dueDate` e a data atual.
+- `dueToday`: despesas `PENDING` com `dueDate` igual à data atual.
+- `dueNext7Days`: despesas `PENDING` com `dueDate` maior que a data atual e menor ou igual à data atual mais 7 dias.
+- `dueNext7Days` não inclui contas que vencem hoje.
+
 ### GET /api/financial/upcoming-bills
 
 **Descrição:**
