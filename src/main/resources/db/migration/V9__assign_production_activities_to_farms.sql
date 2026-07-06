@@ -1,8 +1,8 @@
 ALTER TABLE production_activities
-    DROP CONSTRAINT uk_production_activities_name;
+    DROP CONSTRAINT IF EXISTS uk_production_activities_name;
 
 ALTER TABLE production_activities
-    ADD COLUMN farm_id BIGINT;
+    ADD COLUMN IF NOT EXISTS farm_id BIGINT;
 
 CREATE TEMP TABLE tmp_production_activity_farms ON COMMIT DROP AS
 SELECT
@@ -14,13 +14,15 @@ FROM (
         production_activity_id,
         farm_id
     FROM harvest_seasons
+    WHERE production_activity_id IS NOT NULL
 ) activity_farms;
 
 UPDATE production_activities activity
 SET farm_id = ranked.farm_id
 FROM tmp_production_activity_farms ranked
 WHERE activity.id = ranked.activity_id
-  AND ranked.farm_rank = 1;
+  AND ranked.farm_rank = 1
+  AND activity.farm_id IS NULL;
 
 INSERT INTO production_activities (farm_id, name, description, status, created_at, updated_at)
 SELECT
@@ -36,11 +38,19 @@ WHERE ranked.farm_rank > 1;
 
 UPDATE harvest_seasons season
 SET production_activity_id = farm_activity.id
-FROM production_activities global_activity, production_activities farm_activity
-WHERE season.production_activity_id = global_activity.id
+FROM production_activities original_activity, production_activities farm_activity
+WHERE season.production_activity_id = original_activity.id
   AND farm_activity.farm_id = season.farm_id
-  AND lower(trim(farm_activity.name)) = lower(trim(global_activity.name))
-  AND global_activity.farm_id IS DISTINCT FROM season.farm_id;
+  AND lower(trim(farm_activity.name)) = lower(trim(original_activity.name))
+  AND original_activity.farm_id IS DISTINCT FROM season.farm_id;
+
+DELETE FROM production_activities activity
+WHERE activity.farm_id IS NULL
+  AND NOT EXISTS (
+      SELECT 1
+      FROM harvest_seasons season
+      WHERE season.production_activity_id = activity.id
+  );
 
 DO $$
 BEGIN
@@ -50,7 +60,33 @@ BEGIN
         WHERE farm_id IS NULL
     ) THEN
         RAISE EXCEPTION
-            'Cannot infer farm_id for existing production_activities not used by harvest_seasons. Assign farm_id manually before applying this migration.';
+            'There are production_activities with null farm_id after migration.';
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM harvest_seasons season
+        JOIN production_activities activity ON activity.id = season.production_activity_id
+        WHERE season.farm_id <> activity.farm_id
+    ) THEN
+        RAISE EXCEPTION
+            'There are harvest_seasons linked to production_activities from another farm.';
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM production_activities
+        GROUP BY farm_id, lower(trim(name))
+        HAVING COUNT(*) > 1
+    ) THEN
+        RAISE EXCEPTION
+            'Duplicate production_activities found for the same farm and normalized name.';
     END IF;
 END $$;
 
