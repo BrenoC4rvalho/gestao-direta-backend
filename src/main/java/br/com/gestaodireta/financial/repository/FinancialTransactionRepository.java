@@ -270,6 +270,227 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
             Collection<PaymentStatus> statuses,
             Pageable pageable);
 
+    @EntityGraph(attributePaths = {"farm", "category", "harvestSeason"})
+    @Query(
+            """
+            select transaction
+            from FinancialTransaction transaction
+            where transaction.farm.id = :farmId
+              and transaction.recordStatus = br.com.gestaodireta.financial.enumeration.FinancialRecordStatus.ACTIVE
+              and transaction.status in (
+                br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING,
+                br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+              )
+              and transaction.dueDate is not null
+              and (:type is null or transaction.type = :type)
+              and (:filterHarvestSeasonIds = false
+                or transaction.harvestSeason.id in :harvestSeasonIds)
+              and (
+                :includeAll = true
+                or (
+                  :includePending = true
+                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                  and transaction.dueDate >= :today
+                )
+                or (
+                  :includeOverdue = true
+                  and (
+                    transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                    or (
+                      transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                      and transaction.dueDate < :today
+                    )
+                  )
+                )
+              )
+              and (
+                :periodDays is null
+                or (
+                  :includeOverdue = true
+                  and (
+                    transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                    or (
+                      transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                      and transaction.dueDate < :today
+                    )
+                  )
+                )
+                or (
+                  :includePending = true
+                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                  and transaction.dueDate >= :today
+                  and transaction.dueDate <= :endDate
+                )
+                or (
+                  :includeAll = true
+                  and (
+                    transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                    or transaction.dueDate < :today
+                    or (
+                      transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                      and transaction.dueDate >= :today
+                      and transaction.dueDate <= :endDate
+                    )
+                  )
+                )
+              )
+            order by transaction.dueDate asc
+            """)
+    List<FinancialTransaction> findAgendaTransactions(
+            @Param("farmId") Long farmId,
+            @Param("type") TransactionType type,
+            @Param("includeAll") boolean includeAll,
+            @Param("includePending") boolean includePending,
+            @Param("includeOverdue") boolean includeOverdue,
+            @Param("periodDays") Integer periodDays,
+            @Param("today") LocalDate today,
+            @Param("endDate") LocalDate endDate,
+            @Param("filterHarvestSeasonIds") boolean filterHarvestSeasonIds,
+            @Param("harvestSeasonIds") Collection<Long> harvestSeasonIds);
+
+    @EntityGraph(attributePaths = {"farm", "category", "harvestSeason"})
+    @Query(
+            value =
+                    """
+                    select transaction
+                    from FinancialTransaction transaction
+                    where transaction.farm.id = :farmId
+                      and transaction.recordStatus = br.com.gestaodireta.financial.enumeration.FinancialRecordStatus.ACTIVE
+                      and transaction.status in (
+                        br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING,
+                        br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                      )
+                      and transaction.dueDate is not null
+                      and (:type is null or transaction.type = :type)
+                      and (:filterHarvestSeasonIds = false
+                        or transaction.harvestSeason.id in :harvestSeasonIds)
+                      and (
+                        :includeAll = true
+                        or (
+                          :includePending = true
+                          and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                          and transaction.dueDate >= :today
+                        )
+                        or (
+                          :includeOverdue = true
+                          and (
+                            transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                            or (
+                              transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                              and transaction.dueDate < :today
+                            )
+                          )
+                        )
+                      )
+                      and (
+                        :periodDays is null
+                        or (
+                          :includeOverdue = true
+                          and (
+                            transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                            or (
+                              transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                              and transaction.dueDate < :today
+                            )
+                          )
+                        )
+                        or (
+                          :includePending = true
+                          and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                          and transaction.dueDate >= :today
+                          and transaction.dueDate <= :endDate
+                        )
+                        or (
+                          :includeAll = true
+                          and (
+                            transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                            or transaction.dueDate < :today
+                            or (
+                              transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                              and transaction.dueDate >= :today
+                              and transaction.dueDate <= :endDate
+                            )
+                          )
+                        )
+                      )
+                    """,
+            countQuery =
+                    """
+                    select count(transaction)
+                    from FinancialTransaction transaction
+                    where transaction.farm.id = :farmId
+                      and transaction.recordStatus = br.com.gestaodireta.financial.enumeration.FinancialRecordStatus.ACTIVE
+                      and transaction.status in (
+                        br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING,
+                        br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                      )
+                      and transaction.dueDate is not null
+                      and (:type is null or transaction.type = :type)
+                      and (:filterHarvestSeasonIds = false
+                        or transaction.harvestSeason.id in :harvestSeasonIds)
+                      and (
+                        :includeAll = true
+                        or (
+                          :includePending = true
+                          and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                          and transaction.dueDate >= :today
+                        )
+                        or (
+                          :includeOverdue = true
+                          and (
+                            transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                            or (
+                              transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                              and transaction.dueDate < :today
+                            )
+                          )
+                        )
+                      )
+                      and (
+                        :periodDays is null
+                        or (
+                          :includeOverdue = true
+                          and (
+                            transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                            or (
+                              transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                              and transaction.dueDate < :today
+                            )
+                          )
+                        )
+                        or (
+                          :includePending = true
+                          and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                          and transaction.dueDate >= :today
+                          and transaction.dueDate <= :endDate
+                        )
+                        or (
+                          :includeAll = true
+                          and (
+                            transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                            or transaction.dueDate < :today
+                            or (
+                              transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                              and transaction.dueDate >= :today
+                              and transaction.dueDate <= :endDate
+                            )
+                          )
+                        )
+                      )
+                    """)
+    Page<FinancialTransaction> findAgendaTransactions(
+            @Param("farmId") Long farmId,
+            @Param("type") TransactionType type,
+            @Param("includeAll") boolean includeAll,
+            @Param("includePending") boolean includePending,
+            @Param("includeOverdue") boolean includeOverdue,
+            @Param("periodDays") Integer periodDays,
+            @Param("today") LocalDate today,
+            @Param("endDate") LocalDate endDate,
+            @Param("filterHarvestSeasonIds") boolean filterHarvestSeasonIds,
+            @Param("harvestSeasonIds") Collection<Long> harvestSeasonIds,
+            Pageable pageable);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(
             """
