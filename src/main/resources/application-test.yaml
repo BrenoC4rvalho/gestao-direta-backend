@@ -36,6 +36,11 @@ info:
     java-version: 21
 
 app:
+  ai:
+    provider: fake
+    ollama:
+      base-url: http://localhost:11434
+      model: llama3.1:8b
   cors:
     allowed-origins: http://localhost:5173
     allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS

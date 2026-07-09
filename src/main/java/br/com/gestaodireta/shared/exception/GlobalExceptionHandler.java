@@ -1,5 +1,6 @@
 package br.com.gestaodireta.shared.exception;
 
+import br.com.gestaodireta.ai.service.AiParsingException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -50,6 +51,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleValidationException(
             ValidationException exception, HttpServletRequest request) {
         return buildResponse(HttpStatus.BAD_REQUEST, exception.getMessage(), request, List.of());
+    }
+
+    @ExceptionHandler(AiParsingException.class)
+    public ResponseEntity<ErrorResponse> handleAiParsingException(
+            AiParsingException exception, HttpServletRequest request) {
+        return buildResponse(
+                HttpStatus.UNPROCESSABLE_ENTITY, exception.getMessage(), request, List.of());
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)

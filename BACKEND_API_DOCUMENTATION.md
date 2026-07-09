@@ -128,6 +128,80 @@ O backend executa diariamente um job para marcar contas vencidas.
 
 ## Endpoints
 
+## IA
+
+### POST /api/ai/transactions/parse
+
+Interpreta um texto livre em pt-BR e retorna uma sugestao estruturada de movimentacao financeira. Este endpoint nao salva movimentacao no banco, nao cria `FinancialTransaction`, nao altera categoria, safra ou fazenda e nao deve ser usado como confirmacao de lancamento.
+
+**Permissao:** `ADMIN` pode usar em fazenda ativa. `PRODUCER` e `EMPLOYEE` podem usar na fazenda ativa onde possuem vinculo ativo. `ACCOUNTANT`, vinculo `INACTIVE`, usuario sem vinculo, usuario `INACTIVE` ou `BLOCKED` nao podem usar.
+
+Request:
+
+```json
+{
+  "farmId": 19,
+  "text": "paguei 250 reais de adubo para a safra de milho ontem no pix"
+}
+```
+
+Validacoes:
+
+- `farmId` e obrigatorio.
+- `text` e obrigatorio, nao pode ser vazio e aceita no maximo 2000 caracteres.
+
+Response `200 OK`:
+
+```json
+{
+  "farmId": 19,
+  "type": "EXPENSE",
+  "amount": 250.00,
+  "description": "Adubo",
+  "transactionDate": "2026-07-06",
+  "dueDate": null,
+  "paymentStatus": "PAID",
+  "paymentMethod": "PIX",
+  "categoryName": "Insumos",
+  "harvestSeasonName": "Milho",
+  "confidence": 0.87,
+  "missingFields": [],
+  "warnings": []
+}
+```
+
+Erros principais:
+
+- `400 Bad Request` para body invalido.
+- `401 Unauthorized` para usuario nao autenticado.
+- `403 Forbidden` para usuario sem permissao na fazenda ou `ACCOUNTANT`.
+- `422 Unprocessable Entity` quando a IA nao retorna JSON valido ou retorna campos/enums invalidos.
+
+Configuracao do provider:
+
+```properties
+APP_AI_PROVIDER=ollama
+APP_AI_OLLAMA_BASE_URL=http://localhost:11434
+APP_AI_OLLAMA_MODEL=llama3.1:8b
+```
+
+Quando o backend roda dentro do Docker Compose, use `APP_AI_OLLAMA_BASE_URL=http://ollama:11434`. Quando o backend roda local fora do Docker, use `http://localhost:11434`. Para trocar de provider futuramente, implemente `AiTextGenerationClient` e selecione por `app.ai.provider`.
+
+Comandos Ollama:
+
+```bash
+docker compose up -d ollama
+docker exec -it gestao-direta-ollama ollama pull llama3.1:8b
+docker exec -it gestao-direta-ollama ollama run llama3.1:8b
+```
+
+Execucao local com Spring:
+
+```bash
+docker compose up -d postgres ollama
+./mvnw spring-boot:run
+```
+
 ## Observabilidade
 
 ### `GET /api/system/status`
