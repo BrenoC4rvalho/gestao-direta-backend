@@ -176,6 +176,7 @@ Erros principais:
 - `401 Unauthorized` para usuario nao autenticado.
 - `403 Forbidden` para usuario sem permissao na fazenda ou `ACCOUNTANT`.
 - `422 Unprocessable Entity` quando a IA nao retorna JSON valido ou retorna campos/enums invalidos.
+- `503 Service Unavailable` quando o modelo configurado nao esta disponivel no Ollama.
 
 Configuracao do provider:
 
@@ -192,8 +193,28 @@ Comandos Ollama:
 ```bash
 docker compose up -d ollama
 docker exec -it gestao-direta-ollama ollama pull llama3.1:8b
-docker exec -it gestao-direta-ollama ollama run llama3.1:8b
+docker exec -it gestao-direta-ollama ollama list
 ```
+
+Modelo menor opcional:
+
+```bash
+docker exec -it gestao-direta-ollama ollama pull llama3.2:3b
+```
+
+Para usar outro modelo, altere a configuracao:
+
+```properties
+app.ai.ollama.model=llama3.2:3b
+```
+
+ou a variavel de ambiente:
+
+```properties
+APP_AI_OLLAMA_MODEL=llama3.2:3b
+```
+
+Quando o modelo configurado nao foi baixado, a API retorna `503 Service Unavailable` com mensagem amigavel e detalhe do modelo configurado.
 
 Execucao local com Spring:
 

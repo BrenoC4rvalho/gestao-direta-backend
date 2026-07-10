@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.com.gestaodireta.ai.service.AiModelNotAvailableException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.Test;
@@ -90,6 +91,20 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void shouldHandleAiModelNotAvailableExceptionAsServiceUnavailable() throws Exception {
+        mockMvc.perform(get("/test/ai-model-unavailable"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.status").value(503))
+                .andExpect(jsonPath("$.error").value("Service Unavailable"))
+                .andExpect(
+                        jsonPath("$.message")
+                                .value(
+                                        "Modelo de IA não encontrado no Ollama. "
+                                                + "Baixe o modelo configurado antes de usar a IA."))
+                .andExpect(jsonPath("$.details[0]").value("Configured model: llama3.1:8b"));
+    }
+
+    @Test
     void shouldHandleGenericExceptionWithoutStackTrace() throws Exception {
         mockMvc.perform(get("/test/generic"))
                 .andExpect(status().isInternalServerError())
@@ -133,6 +148,14 @@ class GlobalExceptionHandlerTest {
 
         @PostMapping("/body-validation")
         void bodyValidation(@Valid @RequestBody TestRequest request) {}
+
+        @GetMapping("/ai-model-unavailable")
+        void aiModelUnavailable() {
+            throw new AiModelNotAvailableException(
+                    "Modelo de IA não encontrado no Ollama. "
+                            + "Baixe o modelo configurado antes de usar a IA.",
+                    "llama3.1:8b");
+        }
 
         @GetMapping("/generic")
         void generic() {
