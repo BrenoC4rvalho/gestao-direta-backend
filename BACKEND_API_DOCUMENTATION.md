@@ -2609,6 +2609,18 @@ GET /api/harvest/seasons/summary-list?farmId=1&search=soja&statuses=PLANNED,IN_P
 - Movimentações com `recordStatus=DELETED`, `status=CANCELED`, sem safra ou vinculadas a outra safra não entram nos totais nem nos contadores.
 - Safras sem movimentações aparecem na lista com totais e contadores zerados.
 
+### GET /api/harvest/seasons/summary
+
+**Descricao:** Retorna o resumo financeiro agregado das safras filtradas da fazenda.
+
+**Autenticacao e permissao:** ADMIN; PRODUCER, EMPLOYEE ou ACCOUNTANT com vinculo ativo na fazenda ativa.
+
+**Query params:** farmId (obrigatorio), status, statuses, productionActivityId, productionActivityIds, periodStart, periodEnd e search. Os filtros usam a mesma semantica de GET /api/harvest/seasons/summary-list, incluindo periodo por intersecao e busca por nome, descricao ou atividade.
+
+**Contrato:** farmId, activeHarvestCount, planning (plannedCost, plannedRevenue, plannedProfit), realized (realizedCost, realizedRevenue, realizedProfit), projection (projectedCost, projectedRevenue, projectedProfit) e comparison (profitPerformancePercentage, profitPerformanceStatus, costVarianceAmount, costVariancePercentage, costVarianceStatus).
+
+**Calculos:** planejamento soma expectedCost e expectedRevenue; realizado soma somente PAID; projecao soma realizado com PENDING e OVERDUE. Desempenho do lucro e realizedProfit / abs(plannedProfit) * 100. Desvio de custo e realizedCost - plannedCost, com percentual sobre plannedCost. Percentuais usam escala 2 e HALF_UP. Quando lucro ou custo planejado e zero, o percentual e null e o status correspondente e NOT_APPLICABLE.
+
 ### GET /api/harvest/seasons/{id}
 
 **Descrição:**

@@ -13,6 +13,7 @@ import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonFinancialSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryListResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryResponse;
@@ -545,6 +546,51 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         assertThat(response.content())
                 .extracting(HarvestSeasonSummaryListResponse::id)
                 .containsExactly(soySeason.getId(), openEndedSeason.getId());
+    }
+
+    @Test
+    void shouldCalculateFinancialSummaryForFilteredHarvestSeasons() {
+        Farm farm = saveFarm("Farm");
+        ProductionActivity activity = saveActivity(farm, "Soy");
+        HarvestSeason first = saveSeason(farm, activity, "180000.00", "100000.00", null, "Safra A");
+        HarvestSeason second = saveSeason(farm, activity, "90000.00", "50000.00", null, "Safra B");
+        first.setStatus(HarvestSeasonStatus.IN_PROGRESS);
+        harvestSeasonRepository.save(first);
+        User user = saveUser();
+
+        saveTransaction(farm, user, first, TransactionType.EXPENSE, PaymentStatus.PAID, "40000.00");
+        saveTransaction(farm, user, first, TransactionType.INCOME, PaymentStatus.PAID, "50000.00");
+        saveTransaction(
+                farm, user, first, TransactionType.EXPENSE, PaymentStatus.PENDING, "20000.00");
+        saveTransaction(
+                farm, user, first, TransactionType.INCOME, PaymentStatus.PENDING, "70000.00");
+        saveTransaction(
+                farm, user, second, TransactionType.EXPENSE, PaymentStatus.PAID, "10000.00");
+        saveTransaction(
+                farm, user, second, TransactionType.EXPENSE, PaymentStatus.OVERDUE, "5000.00");
+        saveTransaction(
+                farm, user, second, TransactionType.INCOME, PaymentStatus.PENDING, "30000.00");
+
+        HarvestSeasonFinancialSummaryResponse response =
+                harvestSeasonService.getFinancialSummary(
+                        farm.getId(), null, null, null, null, null, null, null);
+
+        assertThat(response.activeHarvestCount()).isEqualTo(2L);
+        assertThat(response.planning().plannedCost()).isEqualByComparingTo("150000.00");
+        assertThat(response.planning().plannedRevenue()).isEqualByComparingTo("270000.00");
+        assertThat(response.planning().plannedProfit()).isEqualByComparingTo("120000.00");
+        assertThat(response.realized().realizedCost()).isEqualByComparingTo("50000.00");
+        assertThat(response.realized().realizedRevenue()).isEqualByComparingTo("50000.00");
+        assertThat(response.projection().projectedCost()).isEqualByComparingTo("75000.00");
+        assertThat(response.projection().projectedRevenue()).isEqualByComparingTo("150000.00");
+        assertThat(response.projection().projectedProfit()).isEqualByComparingTo("75000.00");
+        assertThat(response.comparison().profitPerformancePercentage())
+                .isEqualByComparingTo("0.00");
+        assertThat(response.comparison().costVarianceAmount()).isEqualByComparingTo("-100000.00");
+        assertThat(response.comparison().costVariancePercentage()).isEqualByComparingTo("-66.67");
+        assertThat(response.comparison().profitPerformanceStatus().name())
+                .isEqualTo("BELOW_PLANNED");
+        assertThat(response.comparison().costVarianceStatus().name()).isEqualTo("BELOW_PLANNED");
     }
 
     private Farm saveFarm(String name) {
