@@ -93,7 +93,6 @@ public class HarvestSeasonService {
     @Transactional(readOnly = true)
     public PageResponse<HarvestSeasonResponse> findAll(
             Long farmId,
-            HarvestSeasonStatus status,
             List<HarvestSeasonStatus> statuses,
             Long productionActivityId,
             List<Long> productionActivityIds,
@@ -103,7 +102,7 @@ public class HarvestSeasonService {
             PaginationParams paginationParams) {
         farmService.findEntityById(farmId);
         validatePeriod(periodStart, periodEnd);
-        List<HarvestSeasonStatus> resolvedStatuses = resolveStatuses(status, statuses);
+        List<HarvestSeasonStatus> resolvedStatuses = resolveStatuses(statuses);
         List<Long> resolvedProductionActivityIds =
                 resolveProductionActivityIds(productionActivityId, productionActivityIds);
         boolean filterStatuses = !resolvedStatuses.isEmpty();
@@ -128,7 +127,6 @@ public class HarvestSeasonService {
     @Transactional(readOnly = true)
     public PageResponse<HarvestSeasonSummaryListResponse> findSummaryList(
             Long farmId,
-            HarvestSeasonStatus status,
             List<HarvestSeasonStatus> statuses,
             Long productionActivityId,
             List<Long> productionActivityIds,
@@ -138,7 +136,7 @@ public class HarvestSeasonService {
             PaginationParams paginationParams) {
         farmService.findEntityById(farmId);
         validatePeriod(periodStart, periodEnd);
-        List<HarvestSeasonStatus> resolvedStatuses = resolveStatuses(status, statuses);
+        List<HarvestSeasonStatus> resolvedStatuses = resolveStatuses(statuses);
         List<Long> resolvedProductionActivityIds =
                 resolveProductionActivityIds(productionActivityId, productionActivityIds);
         boolean filterStatuses = !resolvedStatuses.isEmpty();
@@ -163,7 +161,6 @@ public class HarvestSeasonService {
     @Transactional(readOnly = true)
     public HarvestSeasonFinancialSummaryResponse getFinancialSummary(
             Long farmId,
-            HarvestSeasonStatus status,
             List<HarvestSeasonStatus> statuses,
             Long productionActivityId,
             List<Long> productionActivityIds,
@@ -173,7 +170,7 @@ public class HarvestSeasonService {
         farmService.findEntityById(farmId);
         validatePeriod(periodStart, periodEnd);
 
-        List<HarvestSeasonStatus> resolvedStatuses = resolveStatuses(status, statuses);
+        List<HarvestSeasonStatus> resolvedStatuses = resolveStatuses(statuses);
         List<Long> resolvedProductionActivityIds =
                 resolveProductionActivityIds(productionActivityId, productionActivityIds);
         validateProductionActivitiesBelongToFarm(resolvedProductionActivityIds, farmId);
@@ -463,20 +460,10 @@ public class HarvestSeasonService {
                 projection.getUpdatedAt());
     }
 
-    List<HarvestSeasonStatus> resolveStatuses(
-            HarvestSeasonStatus status, List<HarvestSeasonStatus> statuses) {
-        List<HarvestSeasonStatus> normalizedStatuses =
-                statuses == null ? List.of() : statuses.stream().filter(Objects::nonNull).toList();
-
-        if (!normalizedStatuses.isEmpty()) {
-            return normalizedStatuses;
-        }
-
-        if (status != null) {
-            return List.of(status);
-        }
-
-        return List.of();
+    List<HarvestSeasonStatus> resolveStatuses(List<HarvestSeasonStatus> statuses) {
+        return statuses == null
+                ? List.of()
+                : statuses.stream().filter(Objects::nonNull).distinct().toList();
     }
 
     List<Long> resolveProductionActivityIds(

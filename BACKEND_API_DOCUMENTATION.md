@@ -2374,7 +2374,6 @@ Lista safras de uma fazenda.
 ```json
 {
   "farmId": 1,
-  "status": "PLANNED",
   "statuses": ["PLANNED", "IN_PROGRESS"],
   "productionActivityId": 1,
   "productionActivityIds": [1, 2],
@@ -2390,7 +2389,7 @@ Lista safras de uma fazenda.
 
 Exemplos:
 ```http
-GET /api/harvest/seasons?farmId=1&status=PLANNED
+GET /api/harvest/seasons?farmId=1&statuses=PLANNED
 GET /api/harvest/seasons?farmId=1&statuses=PLANNED,IN_PROGRESS
 GET /api/harvest/seasons?farmId=1&productionActivityIds=1,2&periodStart=2026-01-01&periodEnd=2026-06-30
 GET /api/harvest/seasons?farmId=1&statuses=PLANNED,IN_PROGRESS&productionActivityIds=1,2&periodStart=2026-01-01&periodEnd=2026-06-30
@@ -2405,7 +2404,6 @@ GET /api/harvest/seasons?farmId=1&statuses=PLANNED,IN_PROGRESS&productionActivit
 - `farmId`
 
 **Campos opcionais:**
-- `status`
 - `statuses`
 - `productionActivityId`
 - `productionActivityIds`
@@ -2457,9 +2455,7 @@ GET /api/harvest/seasons?farmId=1&statuses=PLANNED,IN_PROGRESS&productionActivit
 
 **Observações de regra de negócio:**
 - `farmId` é obrigatório.
-- `status` filtra por um único status de safra.
 - `statuses` filtra por múltiplos status, por exemplo `statuses=PLANNED,IN_PROGRESS`.
-- Quando `status` e `statuses` são enviados juntos, `statuses` tem prioridade.
 - `productionActivityId` filtra por uma única atividade produtiva da fazenda informada.
 - `productionActivityIds` filtra por múltiplas atividades produtivas da fazenda informada, por exemplo `productionActivityIds=1,2`.
 - Quando `productionActivityId` e `productionActivityIds` são enviados juntos, `productionActivityIds` tem prioridade.
@@ -2468,9 +2464,9 @@ GET /api/harvest/seasons?farmId=1&statuses=PLANNED,IN_PROGRESS&productionActivit
 - Se apenas `periodStart` for informado, retorna safras sem data final ou com `endDate` maior ou igual a `periodStart`.
 - Se apenas `periodEnd` for informado, retorna safras com `startDate` menor ou igual a `periodEnd`.
 - `periodStart` posterior a `periodEnd` retorna `400 Bad Request` com a mensagem `A data inicial do período não pode ser posterior à data final.`.
-- Sem `status` ou `statuses`, `includeInactive=false` é o default e oculta safras com status `INACTIVE`.
-- Sem `status` ou `statuses`, `includeInactive=true` inclui safras inativas.
-- Com `status` ou `statuses`, o filtro de status informado define quais status são retornados.
+- Sem `statuses`, `includeInactive=false` é o default e oculta safras com status `INACTIVE`.
+- Sem `statuses`, `includeInactive=true` inclui safras inativas.
+- Com `statuses`, o filtro de status informado define quais status são retornados.
 - Usuário com vínculo `INACTIVE` não acessa a listagem.
 
 ### GET /api/harvest/seasons/summary-list
@@ -2490,7 +2486,6 @@ Lista safras de uma fazenda com dados cadastrais e resumo financeiro agregado po
 ```json
 {
   "farmId": 1,
-  "status": "PLANNED",
   "statuses": ["PLANNED", "IN_PROGRESS"],
   "productionActivityId": 1,
   "productionActivityIds": [1, 2],
@@ -2506,7 +2501,7 @@ Lista safras de uma fazenda com dados cadastrais e resumo financeiro agregado po
 
 Exemplos:
 ```http
-GET /api/harvest/seasons/summary-list?farmId=1&status=PLANNED
+GET /api/harvest/seasons/summary-list?farmId=1&statuses=PLANNED
 GET /api/harvest/seasons/summary-list?farmId=1&statuses=PLANNED,IN_PROGRESS
 GET /api/harvest/seasons/summary-list?farmId=1&productionActivityIds=1,2&periodStart=2026-01-01&periodEnd=2026-06-30
 GET /api/harvest/seasons/summary-list?farmId=1&search=soja&statuses=PLANNED,IN_PROGRESS&productionActivityIds=1,2&periodStart=2026-01-01&periodEnd=2026-06-30
@@ -2521,7 +2516,6 @@ GET /api/harvest/seasons/summary-list?farmId=1&search=soja&statuses=PLANNED,IN_P
 - `farmId`
 
 **Campos opcionais:**
-- `status`
 - `statuses`
 - `productionActivityId`
 - `productionActivityIds`
@@ -2583,9 +2577,7 @@ GET /api/harvest/seasons/summary-list?farmId=1&search=soja&statuses=PLANNED,IN_P
 
 **Observações de regra de negócio:**
 - `farmId` é obrigatório.
-- `status` filtra por um único status de safra.
 - `statuses` filtra por múltiplos status, por exemplo `statuses=PLANNED,IN_PROGRESS`.
-- Quando `status` e `statuses` são enviados juntos, `statuses` tem prioridade.
 - `productionActivityId` filtra por uma única atividade produtiva da fazenda informada.
 - `productionActivityIds` filtra por múltiplas atividades produtivas da fazenda informada, por exemplo `productionActivityIds=1,2`.
 - Quando `productionActivityId` e `productionActivityIds` são enviados juntos, `productionActivityIds` tem prioridade.
@@ -2594,8 +2586,8 @@ GET /api/harvest/seasons/summary-list?farmId=1&search=soja&statuses=PLANNED,IN_P
 - Se apenas `periodStart` for informado, retorna safras sem data final ou com `endDate` maior ou igual a `periodStart`.
 - Se apenas `periodEnd` for informado, retorna safras com `startDate` menor ou igual a `periodEnd`.
 - `periodStart` posterior a `periodEnd` retorna `400 Bad Request` com a mensagem `A data inicial do período não pode ser posterior à data final.`.
-- Sem `status` ou `statuses`, safras com status `INACTIVE` não são retornadas.
-- Com `status=INACTIVE`, somente safras inativas são retornadas.
+- Sem `statuses`, safras com status `INACTIVE` não são retornadas.
+- Com `statuses=INACTIVE`, somente safras inativas são retornadas.
 - `search` é normalizado com `trim` e busca, sem diferenciar maiúsculas e minúsculas, por nome da safra, descrição da safra e nome da atividade produtiva.
 - O retorno é paginado com o mesmo formato de `PageResponse`.
 - `expectedProfit` é calculado como `expectedRevenue - expectedCost`.
@@ -2615,7 +2607,7 @@ GET /api/harvest/seasons/summary-list?farmId=1&search=soja&statuses=PLANNED,IN_P
 
 **Autenticacao e permissao:** ADMIN; PRODUCER, EMPLOYEE ou ACCOUNTANT com vinculo ativo na fazenda ativa.
 
-**Query params:** farmId (obrigatorio), status, statuses, productionActivityId, productionActivityIds, periodStart, periodEnd e search. Os filtros usam a mesma semantica de GET /api/harvest/seasons/summary-list, incluindo periodo por intersecao e busca por nome, descricao ou atividade.
+**Query params:** farmId (obrigatorio), statuses, productionActivityId, productionActivityIds, periodStart, periodEnd e search. Os filtros usam a mesma semantica de GET /api/harvest/seasons/summary-list, incluindo periodo por intersecao e busca por nome, descricao ou atividade.
 
 **Contrato:** farmId, activeHarvestCount, planning (plannedCost, plannedRevenue, plannedProfit), realized (realizedCost, realizedRevenue, realizedProfit), projection (projectedCost, projectedRevenue, projectedProfit) e comparison (profitPerformancePercentage, profitPerformanceStatus, costVarianceAmount, costVariancePercentage, costVarianceStatus).
 

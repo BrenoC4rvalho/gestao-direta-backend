@@ -265,15 +265,7 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
 
         PageResponse<HarvestSeasonSummaryListResponse> response =
                 harvestSeasonService.findSummaryList(
-                        farm.getId(),
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        pagination("id", 20));
+                        farm.getId(), null, null, null, null, null, null, pagination("id", 20));
 
         assertThat(response.totalElements()).isEqualTo(2);
         assertThat(response.content())
@@ -327,25 +319,15 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
                         null,
                         null,
                         null,
-                        null,
                         "  milho ",
                         pagination("id", 10));
         PageResponse<HarvestSeasonSummaryListResponse> descriptionSearch =
                 harvestSeasonService.findSummaryList(
-                        farm.getId(),
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        "CICLO",
-                        pagination("id", 10));
+                        farm.getId(), null, null, null, null, null, "CICLO", pagination("id", 10));
         PageResponse<HarvestSeasonSummaryListResponse> inactiveOnly =
                 harvestSeasonService.findSummaryList(
                         farm.getId(),
-                        HarvestSeasonStatus.INACTIVE,
-                        null,
+                        List.of(HarvestSeasonStatus.INACTIVE),
                         null,
                         null,
                         null,
@@ -354,15 +336,7 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
                         pagination("id", 10));
         PageResponse<HarvestSeasonSummaryListResponse> paged =
                 harvestSeasonService.findSummaryList(
-                        farm.getId(),
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        pagination("id", 1));
+                        farm.getId(), null, null, null, null, null, null, pagination("id", 1));
 
         assertThat(activitySearch.content())
                 .extracting(HarvestSeasonSummaryListResponse::id)
@@ -425,28 +399,15 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void shouldResolvePluralStatusesWithPriorityOverSingleStatus() {
-        List<HarvestSeasonStatus> resolvedStatuses =
-                harvestSeasonService.resolveStatuses(
-                        HarvestSeasonStatus.FINISHED,
-                        List.of(HarvestSeasonStatus.PLANNED, HarvestSeasonStatus.IN_PROGRESS));
-
-        assertThat(resolvedStatuses)
+    void shouldNormalizeStatusesAndRemoveDuplicates() {
+        assertThat(
+                        harvestSeasonService.resolveStatuses(
+                                List.of(
+                                        HarvestSeasonStatus.PLANNED,
+                                        HarvestSeasonStatus.PLANNED,
+                                        HarvestSeasonStatus.IN_PROGRESS)))
                 .containsExactly(HarvestSeasonStatus.PLANNED, HarvestSeasonStatus.IN_PROGRESS);
-    }
-
-    @Test
-    void shouldResolveSingleStatusWhenPluralStatusesAreEmpty() {
-        assertThat(harvestSeasonService.resolveStatuses(HarvestSeasonStatus.PLANNED, null))
-                .containsExactly(HarvestSeasonStatus.PLANNED);
-        assertThat(harvestSeasonService.resolveStatuses(HarvestSeasonStatus.FINISHED, List.of()))
-                .containsExactly(HarvestSeasonStatus.FINISHED);
-    }
-
-    @Test
-    void shouldResolveEmptyStatusesWhenNoStatusFilterIsProvided() {
-        assertThat(harvestSeasonService.resolveStatuses(null, null)).isEmpty();
-        assertThat(harvestSeasonService.resolveStatuses(null, List.of())).isEmpty();
+        assertThat(harvestSeasonService.resolveStatuses(null)).isEmpty();
     }
 
     @Test
@@ -481,7 +442,6 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
                                         null,
                                         null,
                                         null,
-                                        null,
                                         LocalDate.of(2026, 2, 1),
                                         LocalDate.of(2026, 1, 31),
                                         false,
@@ -501,7 +461,6 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         PageResponse<?> response =
                 harvestSeasonService.findAll(
                         farm.getId(),
-                        null,
                         null,
                         null,
                         List.of(),
@@ -534,7 +493,6 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         PageResponse<HarvestSeasonSummaryListResponse> response =
                 harvestSeasonService.findSummaryList(
                         farm.getId(),
-                        null,
                         null,
                         null,
                         List.of(soy.getId()),
@@ -573,7 +531,7 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
 
         HarvestSeasonFinancialSummaryResponse response =
                 harvestSeasonService.getFinancialSummary(
-                        farm.getId(), null, null, null, null, null, null, null);
+                        farm.getId(), null, null, null, null, null, null);
 
         assertThat(response.activeHarvestCount()).isEqualTo(2L);
         assertThat(response.planning().plannedCost()).isEqualByComparingTo("150000.00");

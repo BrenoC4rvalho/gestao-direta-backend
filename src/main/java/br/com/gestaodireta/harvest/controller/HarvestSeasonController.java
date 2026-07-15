@@ -51,7 +51,6 @@ public class HarvestSeasonController {
     @PreAuthorize("@harvestAccess.canViewSeasons(#farmId)")
     public PageResponse<HarvestSeasonResponse> findAll(
             @RequestParam Long farmId,
-            @RequestParam(required = false) HarvestSeasonStatus status,
             @RequestParam(required = false) List<HarvestSeasonStatus> statuses,
             @RequestParam(required = false) Long productionActivityId,
             @RequestParam(required = false) List<Long> productionActivityIds,
@@ -63,7 +62,6 @@ public class HarvestSeasonController {
             @Valid @ModelAttribute PaginationParams paginationParams) {
         return harvestSeasonService.findAll(
                 farmId,
-                status,
                 statuses,
                 productionActivityId,
                 productionActivityIds,
@@ -77,7 +75,6 @@ public class HarvestSeasonController {
     @PreAuthorize("@harvestAccess.canViewSeasons(#farmId)")
     public PageResponse<HarvestSeasonSummaryListResponse> findSummaryList(
             @RequestParam Long farmId,
-            @RequestParam(required = false) HarvestSeasonStatus status,
             @RequestParam(required = false) List<HarvestSeasonStatus> statuses,
             @RequestParam(required = false) Long productionActivityId,
             @RequestParam(required = false) List<Long> productionActivityIds,
@@ -89,7 +86,6 @@ public class HarvestSeasonController {
             @Valid @ModelAttribute PaginationParams paginationParams) {
         return harvestSeasonService.findSummaryList(
                 farmId,
-                status,
                 statuses,
                 productionActivityId,
                 productionActivityIds,
@@ -103,7 +99,6 @@ public class HarvestSeasonController {
     @PreAuthorize("@harvestAccess.canViewSeasons(#farmId)")
     public HarvestSeasonFinancialSummaryResponse getFinancialSummary(
             @RequestParam Long farmId,
-            @RequestParam(required = false) HarvestSeasonStatus status,
             @RequestParam(required = false) List<HarvestSeasonStatus> statuses,
             @RequestParam(required = false) Long productionActivityId,
             @RequestParam(required = false) List<Long> productionActivityIds,
@@ -114,7 +109,6 @@ public class HarvestSeasonController {
             @RequestParam(required = false) String search) {
         return harvestSeasonService.getFinancialSummary(
                 farmId,
-                status,
                 statuses,
                 productionActivityId,
                 productionActivityIds,

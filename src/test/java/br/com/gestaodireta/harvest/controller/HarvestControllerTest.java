@@ -528,7 +528,7 @@ class HarvestControllerTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void shouldFilterHarvestSeasonListByStatusAndStatuses() throws Exception {
+    void shouldFilterHarvestSeasonListByStatuses() throws Exception {
         Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
         ProductionActivity activity = saveActivity("Soja", ProductionActivityStatus.ACTIVE);
         User admin = saveUser("Admin", "admin@example.com", UserType.ADMIN);
@@ -552,7 +552,7 @@ class HarvestControllerTest extends PostgresIntegrationTest {
                         get("/api/harvest/seasons")
                                 .contextPath(CONTEXT_PATH)
                                 .param("farmId", String.valueOf(farm.getId()))
-                                .param("status", "PLANNED")
+                                .param("statuses", "PLANNED")
                                 .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[*].name").value(containsInAnyOrder("Planejada")))
@@ -586,7 +586,6 @@ class HarvestControllerTest extends PostgresIntegrationTest {
                         get("/api/harvest/seasons")
                                 .contextPath(CONTEXT_PATH)
                                 .param("farmId", String.valueOf(farm.getId()))
-                                .param("status", "FINISHED")
                                 .param("statuses", "PLANNED,IN_PROGRESS")
                                 .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
                 .andExpect(status().isOk())
@@ -608,13 +607,13 @@ class HarvestControllerTest extends PostgresIntegrationTest {
                         get("/api/harvest/seasons")
                                 .contextPath(CONTEXT_PATH)
                                 .param("farmId", String.valueOf(farm.getId()))
-                                .param("status", "INVALID")
+                                .param("statuses", "INVALID")
                                 .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    void shouldFilterHarvestSeasonSummaryListByStatusAndStatuses() throws Exception {
+    void shouldFilterHarvestSeasonSummaryListByStatuses() throws Exception {
         Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
         ProductionActivity activity = saveActivity("Soja", ProductionActivityStatus.ACTIVE);
         User accountant = saveUser("Accountant", "accountant@example.com", UserType.USER);
@@ -664,7 +663,7 @@ class HarvestControllerTest extends PostgresIntegrationTest {
                         get("/api/harvest/seasons/summary-list")
                                 .contextPath(CONTEXT_PATH)
                                 .param("farmId", String.valueOf(farm.getId()))
-                                .param("status", "IN_PROGRESS")
+                                .param("statuses", "IN_PROGRESS")
                                 .with(user(String.valueOf(accountant.getId())).roles("USER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[*].name").value(containsInAnyOrder("Andamento")))
@@ -674,7 +673,6 @@ class HarvestControllerTest extends PostgresIntegrationTest {
                         get("/api/harvest/seasons/summary-list")
                                 .contextPath(CONTEXT_PATH)
                                 .param("farmId", String.valueOf(farm.getId()))
-                                .param("status", "FINISHED")
                                 .param("statuses", "PLANNED,IN_PROGRESS")
                                 .with(user(String.valueOf(accountant.getId())).roles("USER")))
                 .andExpect(status().isOk())
