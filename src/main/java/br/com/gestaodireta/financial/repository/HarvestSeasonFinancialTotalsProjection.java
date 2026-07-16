@@ -11,4 +11,18 @@ public interface HarvestSeasonFinancialTotalsProjection {
     BigDecimal getOpenCost();
 
     BigDecimal getOpenRevenue();
+
+    BigDecimal getPendingPayableAmount();
+
+    BigDecimal getPendingReceivableAmount();
+
+    BigDecimal getOverduePayableAmount();
+
+    BigDecimal getOverdueReceivableAmount();
+
+    Long getTransactionCount();
+
+    Long getIncomeCount();
+
+    Long getExpenseCount();
 }

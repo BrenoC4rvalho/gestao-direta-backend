@@ -465,19 +465,16 @@ class HarvestControllerTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.productionActivityName").value("Soja"))
                 .andExpect(jsonPath("$.farmId").value(farm.getId()))
                 .andExpect(jsonPath("$.farmName").value("Farm"))
-                .andExpect(jsonPath("$.expectedCost").value(96500.00))
-                .andExpect(jsonPath("$.expectedRevenue").value(210000.00))
-                .andExpect(jsonPath("$.expectedProfit").value(113500.00))
-                .andExpect(jsonPath("$.realizedCost").value(72500.00))
-                .andExpect(jsonPath("$.realizedRevenue").value(150000.00))
-                .andExpect(jsonPath("$.realizedProfit").value(77500.00))
-                .andExpect(jsonPath("$.pendingExpenses").value(18000.00))
+                .andExpect(jsonPath("$.planning.plannedCost").value(96500.00))
+                .andExpect(jsonPath("$.planning.plannedRevenue").value(210000.00))
+                .andExpect(jsonPath("$.planning.plannedProfit").value(113500.00))
+                .andExpect(jsonPath("$.realized.realizedCost").value(72500.00))
+                .andExpect(jsonPath("$.realized.realizedRevenue").value(150000.00))
+                .andExpect(jsonPath("$.projection.projectedProfit").value(59500.00))
+                .andExpect(jsonPath("$.openAmounts.pending.payableAmount").value(18000.00))
+                .andExpect(jsonPath("$.comparison.profitPerformanceAmount").value(-54000.00))
                 .andExpect(jsonPath("$.transactionCount").value(3))
-                .andExpect(jsonPath("$.incomeCount").value(1))
-                .andExpect(jsonPath("$.expenseCount").value(2))
-                .andExpect(jsonPath("$.costPerHectare").value(604.17))
-                .andExpect(jsonPath("$.revenuePerHectare").value(1250.00))
-                .andExpect(jsonPath("$.profitPerHectare").value(645.83));
+                .andExpect(jsonPath("$.expectedCost").doesNotExist());
     }
 
     @Test

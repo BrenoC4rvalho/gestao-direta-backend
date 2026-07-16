@@ -1,11 +1,11 @@
 package br.com.gestaodireta.harvest.controller;
 
+import br.com.gestaodireta.harvest.dto.HarvestSeasonDetailSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonFinancialSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonStatusUpdateRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryListResponse;
-import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonUpdateRequest;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
 import br.com.gestaodireta.harvest.service.HarvestSeasonService;
@@ -125,7 +125,7 @@ public class HarvestSeasonController {
 
     @GetMapping("/{id}/summary")
     @PreAuthorize("@harvestAccess.canViewSeason(#id)")
-    public HarvestSeasonSummaryResponse getSummary(@PathVariable Long id) {
+    public HarvestSeasonDetailSummaryResponse getSummary(@PathVariable Long id) {
         return harvestSeasonService.getSummary(id);
     }
 

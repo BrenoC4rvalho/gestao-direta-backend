@@ -4,25 +4,21 @@ import br.com.gestaodireta.farm.entity.Farm;
 import br.com.gestaodireta.farm.enumeration.FarmStatus;
 import br.com.gestaodireta.farm.service.FarmService;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
-import br.com.gestaodireta.financial.repository.HarvestSeasonFinancialSummaryProjection;
 import br.com.gestaodireta.financial.repository.HarvestSeasonFinancialTotalsProjection;
-import br.com.gestaodireta.harvest.dto.HarvestComparisonSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestPlanningSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestProjectionSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestRealizedSummaryResponse;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonDetailSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonFinancialSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonStatusUpdateRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryListResponse;
-import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonUpdateRequest;
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
 import br.com.gestaodireta.harvest.entity.ProductionActivity;
-import br.com.gestaodireta.harvest.enumeration.CostVarianceStatus;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
 import br.com.gestaodireta.harvest.enumeration.ProductionActivityStatus;
-import br.com.gestaodireta.harvest.enumeration.ProfitPerformanceStatus;
 import br.com.gestaodireta.harvest.mapper.HarvestSeasonMapper;
 import br.com.gestaodireta.harvest.repository.HarvestSeasonRepository;
 import br.com.gestaodireta.harvest.repository.HarvestSeasonSummaryListProjection;
@@ -31,7 +27,7 @@ import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
@@ -54,17 +50,25 @@ public class HarvestSeasonService {
 
     private final HarvestSeasonMapper harvestSeasonMapper;
 
+    private final HarvestFinancialSummaryCalculator harvestFinancialSummaryCalculator;
+
+    private final Clock clock;
+
     public HarvestSeasonService(
             HarvestSeasonRepository harvestSeasonRepository,
             FarmService farmService,
             FinancialTransactionRepository financialTransactionRepository,
             ProductionActivityService productionActivityService,
-            HarvestSeasonMapper harvestSeasonMapper) {
+            HarvestSeasonMapper harvestSeasonMapper,
+            HarvestFinancialSummaryCalculator harvestFinancialSummaryCalculator,
+            Clock clock) {
         this.harvestSeasonRepository = harvestSeasonRepository;
         this.farmService = farmService;
         this.financialTransactionRepository = financialTransactionRepository;
         this.productionActivityService = productionActivityService;
         this.harvestSeasonMapper = harvestSeasonMapper;
+        this.harvestFinancialSummaryCalculator = harvestFinancialSummaryCalculator;
+        this.clock = clock;
     }
 
     @Transactional
@@ -169,73 +173,48 @@ public class HarvestSeasonService {
             String search) {
         farmService.findEntityById(farmId);
         validatePeriod(periodStart, periodEnd);
-
         List<HarvestSeasonStatus> resolvedStatuses = resolveStatuses(statuses);
-        List<Long> resolvedProductionActivityIds =
+        List<Long> activityIds =
                 resolveProductionActivityIds(productionActivityId, productionActivityIds);
-        validateProductionActivitiesBelongToFarm(resolvedProductionActivityIds, farmId);
-
+        validateProductionActivitiesBelongToFarm(activityIds, farmId);
         List<HarvestSeason> seasons =
                 harvestSeasonRepository.findAllForFinancialSummary(
                         farmId,
                         !resolvedStatuses.isEmpty(),
                         statusesForQuery(resolvedStatuses),
-                        !resolvedProductionActivityIds.isEmpty(),
-                        idsForQuery(resolvedProductionActivityIds),
+                        !activityIds.isEmpty(),
+                        idsForQuery(activityIds),
                         periodStart != null,
                         periodStart,
                         periodEnd != null,
                         periodEnd,
                         normalizeSearch(search));
-
-        BigDecimal plannedCost =
-                seasons.stream()
-                        .map(HarvestSeason::getExpectedCost)
-                        .map(this::zeroIfNull)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal plannedRevenue =
-                seasons.stream()
-                        .map(HarvestSeason::getExpectedRevenue)
-                        .map(this::zeroIfNull)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal plannedProfit = plannedRevenue.subtract(plannedCost);
-        long activeHarvestCount = seasons.stream().filter(this::isActiveHarvestSeason).count();
-
-        BigDecimal realizedCost = BigDecimal.ZERO;
-        BigDecimal realizedRevenue = BigDecimal.ZERO;
-        BigDecimal openCost = BigDecimal.ZERO;
-        BigDecimal openRevenue = BigDecimal.ZERO;
-        List<Long> seasonIds = seasons.stream().map(HarvestSeason::getId).toList();
-
-        if (!seasonIds.isEmpty()) {
-            HarvestSeasonFinancialTotalsProjection totals =
-                    financialTransactionRepository.summarizeHarvestSeasonFinancialTotals(
-                            farmId, seasonIds);
-            realizedCost = zeroIfNull(totals.getRealizedCost());
-            realizedRevenue = zeroIfNull(totals.getRealizedRevenue());
-            openCost = zeroIfNull(totals.getOpenCost());
-            openRevenue = zeroIfNull(totals.getOpenRevenue());
-        }
-
-        BigDecimal realizedProfit = realizedRevenue.subtract(realizedCost);
-        BigDecimal projectedCost = realizedCost.add(openCost);
-        BigDecimal projectedRevenue = realizedRevenue.add(openRevenue);
-        BigDecimal projectedProfit = projectedRevenue.subtract(projectedCost);
-        BigDecimal costVarianceAmount = realizedCost.subtract(plannedCost);
-
+        HarvestPlanningSummaryResponse planning =
+                harvestFinancialSummaryCalculator.planning(
+                        seasons.stream()
+                                .map(HarvestSeason::getExpectedCost)
+                                .map(this::zeroIfNull)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add),
+                        seasons.stream()
+                                .map(HarvestSeason::getExpectedRevenue)
+                                .map(this::zeroIfNull)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        HarvestSeasonFinancialTotalsProjection totals =
+                financialTransactionRepository.summarizeHarvestSeasonFinancialTotals(
+                        farmId,
+                        seasons.stream().map(HarvestSeason::getId).toList(),
+                        LocalDate.now(clock));
+        HarvestRealizedSummaryResponse realized =
+                harvestFinancialSummaryCalculator.realized(totals);
+        HarvestProjectionSummaryResponse projection =
+                harvestFinancialSummaryCalculator.projection(realized, totals);
         return new HarvestSeasonFinancialSummaryResponse(
                 farmId,
-                activeHarvestCount,
-                new HarvestPlanningSummaryResponse(plannedCost, plannedRevenue, plannedProfit),
-                new HarvestRealizedSummaryResponse(realizedCost, realizedRevenue, realizedProfit),
-                new HarvestProjectionSummaryResponse(
-                        projectedCost, projectedRevenue, projectedProfit),
-                new HarvestComparisonSummaryResponse(
-                        percentage(realizedProfit, plannedProfit.abs()),
-                        profitPerformanceStatus(realizedProfit, plannedProfit),
-                        costVarianceAmount,
-                        percentage(costVarianceAmount, plannedCost),
-                        costVarianceStatus(costVarianceAmount, plannedCost)));
+                seasons.stream().filter(this::isActiveHarvestSeason).count(),
+                planning,
+                realized,
+                projection,
+                harvestFinancialSummaryCalculator.comparison(planning, projection));
     }
 
     @Transactional(readOnly = true)
@@ -244,42 +223,34 @@ public class HarvestSeasonService {
     }
 
     @Transactional(readOnly = true)
-    public HarvestSeasonSummaryResponse getSummary(Long id) {
+    public HarvestSeasonDetailSummaryResponse getSummary(Long id) {
         HarvestSeason harvestSeason = findEntityById(id);
-        HarvestSeasonFinancialSummaryProjection summary =
-                financialTransactionRepository.summarizeByHarvestSeasonId(id);
-
-        BigDecimal expectedCost = zeroIfNull(harvestSeason.getExpectedCost());
-        BigDecimal expectedRevenue = zeroIfNull(harvestSeason.getExpectedRevenue());
-        BigDecimal expectedProfit = expectedRevenue.subtract(expectedCost);
-        BigDecimal realizedCost = zeroIfNull(summary.getRealizedCost());
-        BigDecimal realizedRevenue = zeroIfNull(summary.getRealizedRevenue());
-        BigDecimal realizedProfit = realizedRevenue.subtract(realizedCost);
-        BigDecimal areaHectares = harvestSeason.getAreaHectares();
-
-        return new HarvestSeasonSummaryResponse(
+        HarvestSeasonFinancialTotalsProjection totals =
+                financialTransactionRepository.summarizeHarvestSeasonFinancialTotals(
+                        harvestSeason.getFarm().getId(), List.of(id), LocalDate.now(clock));
+        HarvestPlanningSummaryResponse planning =
+                harvestFinancialSummaryCalculator.planning(
+                        harvestSeason.getExpectedCost(), harvestSeason.getExpectedRevenue());
+        HarvestRealizedSummaryResponse realized =
+                harvestFinancialSummaryCalculator.realized(totals);
+        HarvestProjectionSummaryResponse projection =
+                harvestFinancialSummaryCalculator.projection(realized, totals);
+        return new HarvestSeasonDetailSummaryResponse(
                 harvestSeason.getId(),
                 harvestSeason.getName(),
                 harvestSeason.getProductionActivity().getId(),
                 harvestSeason.getProductionActivity().getName(),
                 harvestSeason.getFarm().getId(),
                 harvestSeason.getFarm().getName(),
-                expectedCost,
-                expectedRevenue,
-                expectedProfit,
-                realizedCost,
-                realizedRevenue,
-                realizedProfit,
-                zeroIfNull(summary.getPendingExpenses()),
-                zeroIfNull(summary.getOverdueExpenses()),
-                zeroIfNull(summary.getPendingRevenue()),
-                zeroIfNull(summary.getTransactionCount()),
-                zeroIfNull(summary.getIncomeCount()),
-                zeroIfNull(summary.getExpenseCount()),
-                areaHectares,
-                amountPerHectare(realizedCost, areaHectares),
-                amountPerHectare(realizedRevenue, areaHectares),
-                amountPerHectare(realizedProfit, areaHectares));
+                harvestSeason.getAreaHectares(),
+                planning,
+                realized,
+                projection,
+                harvestFinancialSummaryCalculator.comparison(planning, projection),
+                harvestFinancialSummaryCalculator.openAmounts(totals),
+                zeroIfNull(totals.getTransactionCount()),
+                zeroIfNull(totals.getIncomeCount()),
+                zeroIfNull(totals.getExpenseCount()));
     }
 
     @Transactional
@@ -531,59 +502,11 @@ public class HarvestSeasonService {
                 || HarvestSeasonStatus.IN_PROGRESS.equals(harvestSeason.getStatus());
     }
 
-    private BigDecimal percentage(BigDecimal value, BigDecimal base) {
-        if (BigDecimal.ZERO.compareTo(base) == 0) {
-            return null;
-        }
-
-        return value.multiply(BigDecimal.valueOf(100)).divide(base, 2, RoundingMode.HALF_UP);
-    }
-
-    private ProfitPerformanceStatus profitPerformanceStatus(
-            BigDecimal realizedProfit, BigDecimal plannedProfit) {
-        if (BigDecimal.ZERO.compareTo(plannedProfit) == 0) {
-            return ProfitPerformanceStatus.NOT_APPLICABLE;
-        }
-
-        int comparison = realizedProfit.compareTo(plannedProfit);
-        if (comparison > 0) {
-            return ProfitPerformanceStatus.ABOVE_PLANNED;
-        }
-        if (comparison < 0) {
-            return ProfitPerformanceStatus.BELOW_PLANNED;
-        }
-        return ProfitPerformanceStatus.ON_TARGET;
-    }
-
-    private CostVarianceStatus costVarianceStatus(
-            BigDecimal costVarianceAmount, BigDecimal plannedCost) {
-        if (BigDecimal.ZERO.compareTo(plannedCost) == 0) {
-            return CostVarianceStatus.NOT_APPLICABLE;
-        }
-
-        int comparison = costVarianceAmount.compareTo(BigDecimal.ZERO);
-        if (comparison > 0) {
-            return CostVarianceStatus.ABOVE_PLANNED;
-        }
-        if (comparison < 0) {
-            return CostVarianceStatus.BELOW_PLANNED;
-        }
-        return CostVarianceStatus.ON_TARGET;
-    }
-
     private BigDecimal zeroIfNull(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
     }
 
     private Long zeroIfNull(Long value) {
         return value == null ? 0L : value;
-    }
-
-    private BigDecimal amountPerHectare(BigDecimal amount, BigDecimal areaHectares) {
-        if (areaHectares == null || BigDecimal.ZERO.compareTo(areaHectares) == 0) {
-            return null;
-        }
-
-        return amount.divide(areaHectares, 2, RoundingMode.HALF_UP);
     }
 }

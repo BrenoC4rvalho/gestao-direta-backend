@@ -5,6 +5,7 @@ import br.com.gestaodireta.harvest.enumeration.ProfitPerformanceStatus;
 import java.math.BigDecimal;
 
 public record HarvestComparisonSummaryResponse(
+        BigDecimal profitPerformanceAmount,
         BigDecimal profitPerformancePercentage,
         ProfitPerformanceStatus profitPerformanceStatus,
         BigDecimal costVarianceAmount,

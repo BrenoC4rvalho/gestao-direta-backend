@@ -13,10 +13,10 @@ import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonDetailSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonFinancialSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryListResponse;
-import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonUpdateRequest;
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
 import br.com.gestaodireta.harvest.entity.ProductionActivity;
@@ -145,7 +145,8 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         ProductionActivity activity = saveActivity("Soja");
         HarvestSeason season = saveSeason(farm, activity, null, null, null, "Safra Soja");
 
-        HarvestSeasonSummaryResponse response = harvestSeasonService.getSummary(season.getId());
+        HarvestSeasonDetailSummaryResponse response =
+                harvestSeasonService.getSummary(season.getId());
 
         assertThat(response.harvestSeasonId()).isEqualTo(season.getId());
         assertThat(response.harvestSeasonName()).isEqualTo("Safra Soja");
@@ -204,7 +205,8 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         saveTransaction(
                 otherFarm, user, otherSeason, TransactionType.INCOME, PaymentStatus.PAID, "999.00");
 
-        HarvestSeasonSummaryResponse response = harvestSeasonService.getSummary(season.getId());
+        HarvestSeasonDetailSummaryResponse response =
+                harvestSeasonService.getSummary(season.getId());
 
         assertThat(response.expectedCost()).isEqualByComparingTo("96500.00");
         assertThat(response.expectedRevenue()).isEqualByComparingTo("210000.00");
@@ -378,9 +380,9 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
                 PaymentStatus.PAID,
                 "100.00");
 
-        HarvestSeasonSummaryResponse withoutArea =
+        HarvestSeasonDetailSummaryResponse withoutArea =
                 harvestSeasonService.getSummary(seasonWithoutArea.getId());
-        HarvestSeasonSummaryResponse withZeroArea =
+        HarvestSeasonDetailSummaryResponse withZeroArea =
                 harvestSeasonService.getSummary(seasonWithZeroArea.getId());
 
         assertThat(withoutArea.costPerHectare()).isNull();
@@ -543,9 +545,9 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         assertThat(response.projection().projectedRevenue()).isEqualByComparingTo("150000.00");
         assertThat(response.projection().projectedProfit()).isEqualByComparingTo("75000.00");
         assertThat(response.comparison().profitPerformancePercentage())
-                .isEqualByComparingTo("0.00");
-        assertThat(response.comparison().costVarianceAmount()).isEqualByComparingTo("-100000.00");
-        assertThat(response.comparison().costVariancePercentage()).isEqualByComparingTo("-66.67");
+                .isEqualByComparingTo("-37.50");
+        assertThat(response.comparison().costVarianceAmount()).isEqualByComparingTo("-75000.00");
+        assertThat(response.comparison().costVariancePercentage()).isEqualByComparingTo("-50.00");
         assertThat(response.comparison().profitPerformanceStatus().name())
                 .isEqualTo("BELOW_PLANNED");
         assertThat(response.comparison().costVarianceStatus().name()).isEqualTo("BELOW_PLANNED");

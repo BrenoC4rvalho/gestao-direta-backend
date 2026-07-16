@@ -2609,9 +2609,9 @@ GET /api/harvest/seasons/summary-list?farmId=1&search=soja&statuses=PLANNED,IN_P
 
 **Query params:** farmId (obrigatorio), statuses, productionActivityId, productionActivityIds, periodStart, periodEnd e search. Os filtros usam a mesma semantica de GET /api/harvest/seasons/summary-list, incluindo periodo por intersecao e busca por nome, descricao ou atividade.
 
-**Contrato:** farmId, activeHarvestCount, planning (plannedCost, plannedRevenue, plannedProfit), realized (realizedCost, realizedRevenue, realizedProfit), projection (projectedCost, projectedRevenue, projectedProfit) e comparison (profitPerformancePercentage, profitPerformanceStatus, costVarianceAmount, costVariancePercentage, costVarianceStatus).
+**Contrato:** farmId, activeHarvestCount, planning, realized, projection e comparison (profitPerformanceAmount, profitPerformancePercentage, profitPerformanceStatus, costVarianceAmount, costVariancePercentage, costVarianceStatus).
 
-**Calculos:** planejamento soma expectedCost e expectedRevenue; realizado soma somente PAID; projecao soma realizado com PENDING e OVERDUE. Desempenho do lucro e realizedProfit / abs(plannedProfit) * 100. Desvio de custo e realizedCost - plannedCost, com percentual sobre plannedCost. Percentuais usam escala 2 e HALF_UP. Quando lucro ou custo planejado e zero, o percentual e null e o status correspondente e NOT_APPLICABLE.
+**Calculos:** planejamento soma expectedCost e expectedRevenue; realizado soma somente PAID; projecao soma realizado com PENDING e OVERDUE. Desempenho do lucro e (projectedProfit - plannedProfit) / abs(plannedProfit) * 100. Desvio de custo e projectedCost - plannedCost, com percentual sobre plannedCost. Percentuais usam escala 2 e HALF_UP. Quando lucro ou custo planejado e zero, o percentual e null e o status correspondente e NOT_APPLICABLE.
 
 ### GET /api/harvest/seasons/{id}
 
