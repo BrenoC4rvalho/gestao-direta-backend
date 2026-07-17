@@ -553,6 +553,38 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         assertThat(response.comparison().costVarianceStatus().name()).isEqualTo("BELOW_PLANNED");
     }
 
+    @Test
+    void shouldReturnOnlyThreeMostRecentInProgressDashboardSeasons() {
+        Farm farm = saveFarm("Farm");
+        ProductionActivity activity = saveActivity(farm, "Coffee");
+        HarvestSeason oldest = saveSeason(farm, activity, null, null, null, "Oldest");
+        HarvestSeason middle = saveSeason(farm, activity, null, null, null, "Middle");
+        HarvestSeason latest = saveSeason(farm, activity, null, null, null, "Latest");
+        HarvestSeason excluded = saveSeason(farm, activity, null, null, null, "Excluded");
+        HarvestSeason planned = saveSeason(farm, activity, null, null, null, "Planned");
+        HarvestSeason finished = saveSeason(farm, activity, null, null, null, "Finished");
+        oldest.setStatus(HarvestSeasonStatus.IN_PROGRESS);
+        oldest.setStartDate(LocalDate.of(2026, 1, 1));
+        middle.setStatus(HarvestSeasonStatus.IN_PROGRESS);
+        middle.setStartDate(LocalDate.of(2026, 2, 1));
+        latest.setStatus(HarvestSeasonStatus.IN_PROGRESS);
+        latest.setStartDate(LocalDate.of(2026, 3, 1));
+        excluded.setStatus(HarvestSeasonStatus.IN_PROGRESS);
+        excluded.setStartDate(LocalDate.of(2025, 12, 1));
+        planned.setStatus(HarvestSeasonStatus.PLANNED);
+        finished.setStatus(HarvestSeasonStatus.FINISHED);
+        harvestSeasonRepository.saveAll(
+                List.of(oldest, middle, latest, excluded, planned, finished));
+
+        var response = harvestSeasonService.findDashboardSeasons(farm.getId());
+
+        assertThat(response)
+                .extracting(item -> item.name())
+                .containsExactly("Latest", "Middle", "Oldest");
+        assertThat(response)
+                .allMatch(item -> item.status().equals(HarvestSeasonStatus.IN_PROGRESS));
+    }
+
     private Farm saveFarm(String name) {
         Farm farm = new Farm();
         farm.setName(name);

@@ -2601,6 +2601,36 @@ GET /api/harvest/seasons/summary-list?farmId=1&search=soja&statuses=PLANNED,IN_P
 - Movimentações com `recordStatus=DELETED`, `status=CANCELED`, sem safra ou vinculadas a outra safra não entram nos totais nem nos contadores.
 - Safras sem movimentações aparecem na lista com totais e contadores zerados.
 
+### GET /api/harvest/seasons/dashboard
+
+**Descrição:** Retorna, para os cards de Dashboard, no máximo três safras em andamento da fazenda.
+
+**Autenticação e permissão:** ADMIN; PRODUCER, EMPLOYEE ou ACCOUNTANT com vínculo ativo na fazenda ativa.
+
+**Query params:** `farmId` (obrigatório). Não aceita paginação ou filtros.
+
+**Regras:** retorna exclusivamente safras `IN_PROGRESS`, ordenadas por `startDate DESC`, `createdAt DESC` e `id DESC`. `realized` considera somente movimentações ACTIVE e PAID vinculadas à mesma safra e fazenda. `projection` soma o realizado às movimentações PENDING e OVERDUE. `dueNext7Days` considera somente EXPENSE PENDING com vencimento entre hoje e hoje + 7 dias, inclusive. `overdue` considera somente EXPENSE OVERDUE ou PENDING com vencimento anterior a hoje. Movimentações canceladas, deletadas, sem vencimento nos alertas, de outra safra ou outra fazenda não entram.
+
+**Resposta de sucesso:**
+```json
+[
+  {
+    "id": 25,
+    "farmId": 8,
+    "name": "Café 2026/2027",
+    "status": "IN_PROGRESS",
+    "productionActivityId": 25,
+    "productionActivityName": "Café",
+    "realized": { "cost": 40000.00, "revenue": 50000.00, "profit": 10000.00 },
+    "projection": { "cost": 68000.00, "revenue": 132000.00, "profit": 64000.00 },
+    "dueNext7Days": { "count": 2, "totalAmount": 12500.00 },
+    "overdue": { "count": 1, "totalAmount": 4800.00 }
+  }
+]
+```
+
+**Possíveis erros/status HTTP:** `400` para `farmId` ausente; `401` sem autenticação válida; `403` sem acesso à fazenda; `404` para fazenda inexistente.
+
 ### GET /api/harvest/seasons/summary
 
 **Descricao:** Retorna o resumo financeiro agregado das safras filtradas da fazenda.

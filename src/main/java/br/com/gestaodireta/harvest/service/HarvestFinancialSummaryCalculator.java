@@ -26,19 +26,28 @@ public class HarvestFinancialSummaryCalculator {
     }
 
     public HarvestRealizedSummaryResponse realized(HarvestSeasonFinancialTotalsProjection totals) {
-        BigDecimal realizedCost = zeroIfNull(totals.getRealizedCost());
-        BigDecimal realizedRevenue = zeroIfNull(totals.getRealizedRevenue());
+        return realized(totals.getRealizedCost(), totals.getRealizedRevenue());
+    }
+
+    public HarvestRealizedSummaryResponse realized(
+            BigDecimal realizedCost, BigDecimal realizedRevenue) {
+        BigDecimal resolvedCost = zeroIfNull(realizedCost);
+        BigDecimal resolvedRevenue = zeroIfNull(realizedRevenue);
 
         return new HarvestRealizedSummaryResponse(
-                realizedCost, realizedRevenue, realizedRevenue.subtract(realizedCost));
+                resolvedCost, resolvedRevenue, resolvedRevenue.subtract(resolvedCost));
     }
 
     public HarvestProjectionSummaryResponse projection(
             HarvestRealizedSummaryResponse realized,
             HarvestSeasonFinancialTotalsProjection totals) {
-        BigDecimal projectedCost = realized.realizedCost().add(zeroIfNull(totals.getOpenCost()));
-        BigDecimal projectedRevenue =
-                realized.realizedRevenue().add(zeroIfNull(totals.getOpenRevenue()));
+        return projection(realized, totals.getOpenCost(), totals.getOpenRevenue());
+    }
+
+    public HarvestProjectionSummaryResponse projection(
+            HarvestRealizedSummaryResponse realized, BigDecimal openCost, BigDecimal openRevenue) {
+        BigDecimal projectedCost = realized.realizedCost().add(zeroIfNull(openCost));
+        BigDecimal projectedRevenue = realized.realizedRevenue().add(zeroIfNull(openRevenue));
 
         return new HarvestProjectionSummaryResponse(
                 projectedCost, projectedRevenue, projectedRevenue.subtract(projectedCost));

@@ -35,6 +35,7 @@ import br.com.gestaodireta.user.enumeration.UserType;
 import br.com.gestaodireta.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -1055,6 +1056,57 @@ class HarvestControllerTest extends PostgresIntegrationTest {
         user.setStatus(UserStatus.ACTIVE);
 
         return userRepository.save(user);
+    }
+
+    @Test
+    void shouldProtectAndReturnDashboardHarvestSeasons() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        ProductionActivity activity = saveActivity(farm, "Coffee", ProductionActivityStatus.ACTIVE);
+        User producer = saveUser("Producer", "producer-dashboard@example.com", UserType.USER);
+        User employee = saveUser("Employee", "employee-dashboard@example.com", UserType.USER);
+        User accountant = saveUser("Accountant", "accountant-dashboard@example.com", UserType.USER);
+        User unlinked = saveUser("Unlinked", "unlinked-dashboard@example.com", UserType.USER);
+        User admin = saveUser("Admin", "admin-dashboard@example.com", UserType.ADMIN);
+        saveFarmUser(farm, producer, FarmUserRole.PRODUCER);
+        saveFarmUser(farm, employee, FarmUserRole.EMPLOYEE);
+        saveFarmUser(farm, accountant, FarmUserRole.ACCOUNTANT);
+        saveSeason(farm, activity, "In progress", HarvestSeasonStatus.IN_PROGRESS);
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/dashboard")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(
+                        get("/api/harvest/seasons/dashboard")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", "999999")
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(
+                        get("/api/harvest/seasons/dashboard")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .with(user(String.valueOf(unlinked.getId())).roles("USER")))
+                .andExpect(status().isForbidden());
+        for (User dashboardUser : List.of(producer, employee, accountant)) {
+            mockMvc.perform(
+                            get("/api/harvest/seasons/dashboard")
+                                    .contextPath(CONTEXT_PATH)
+                                    .param("farmId", String.valueOf(farm.getId()))
+                                    .with(
+                                            user(String.valueOf(dashboardUser.getId()))
+                                                    .roles("USER")))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("00].status").value("IN_PROGRESS"));
+        }
+        mockMvc.perform(
+                        get("/api/harvest/seasons/dashboard")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("00].productionActivityName").value("Coffee"));
     }
 
     private Farm saveFarm(String name, FarmStatus status) {

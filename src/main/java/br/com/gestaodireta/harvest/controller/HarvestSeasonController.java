@@ -1,5 +1,6 @@
 package br.com.gestaodireta.harvest.controller;
 
+import br.com.gestaodireta.harvest.dto.DashboardHarvestSeasonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonDetailSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonFinancialSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonRequest;
@@ -115,6 +116,12 @@ public class HarvestSeasonController {
                 periodStart,
                 periodEnd,
                 search);
+    }
+
+    @GetMapping("/dashboard")
+    @PreAuthorize("@harvestAccess.canViewSeasons(#farmId)")
+    public List<DashboardHarvestSeasonResponse> findDashboardSeasons(@RequestParam Long farmId) {
+        return harvestSeasonService.findDashboardSeasons(farmId);
     }
 
     @GetMapping("/{id}")

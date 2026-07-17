@@ -224,6 +224,20 @@ public interface HarvestSeasonRepository extends JpaRepository<HarvestSeason, Lo
             select season
             from HarvestSeason season
             join fetch season.farm
+            join fetch season.productionActivity productionActivity
+            where season.farm.id = :farmId
+              and season.status = br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus.IN_PROGRESS
+              and productionActivity.farm.id = season.farm.id
+            order by season.startDate desc, season.createdAt desc, season.id desc
+            """)
+    List<HarvestSeason> findDashboardInProgressByFarmId(
+            @Param("farmId") Long farmId, Pageable pageable);
+
+    @Query(
+            """
+            select season
+            from HarvestSeason season
+            join fetch season.farm
             join fetch season.productionActivity
             where season.id = :seasonId
             """)

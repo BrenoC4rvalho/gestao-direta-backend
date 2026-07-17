@@ -3,8 +3,14 @@ package br.com.gestaodireta.harvest.service;
 import br.com.gestaodireta.farm.entity.Farm;
 import br.com.gestaodireta.farm.enumeration.FarmStatus;
 import br.com.gestaodireta.farm.service.FarmService;
+import br.com.gestaodireta.financial.entity.FinancialTransaction;
+import br.com.gestaodireta.financial.enumeration.PaymentStatus;
+import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
 import br.com.gestaodireta.financial.repository.HarvestSeasonFinancialTotalsProjection;
+import br.com.gestaodireta.harvest.dto.DashboardHarvestFinancialValuesResponse;
+import br.com.gestaodireta.harvest.dto.DashboardHarvestSeasonResponse;
+import br.com.gestaodireta.harvest.dto.FinancialAmountCountResponse;
 import br.com.gestaodireta.harvest.dto.HarvestPlanningSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestProjectionSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestRealizedSummaryResponse;
@@ -33,7 +39,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.function.Predicate;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -218,6 +226,21 @@ public class HarvestSeasonService {
     }
 
     @Transactional(readOnly = true)
+    public List<DashboardHarvestSeasonResponse> findDashboardSeasons(Long farmId) {
+        farmService.findEntityById(farmId);
+
+        LocalDate today = LocalDate.now(clock);
+        LocalDate next7Days = today.plusDays(7);
+        List<HarvestSeason> seasons =
+                harvestSeasonRepository.findDashboardInProgressByFarmId(
+                        farmId, PageRequest.of(0, 3));
+
+        return seasons.stream()
+                .map(season -> toDashboardResponse(season, today, next7Days))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public HarvestSeasonResponse findById(Long id) {
         return harvestSeasonMapper.toResponse(findEntityById(id));
     }
@@ -394,6 +417,99 @@ public class HarvestSeasonService {
             throw new BusinessException(
                     "Inactive production activity cannot be used in a harvest season.");
         }
+    }
+
+    private DashboardHarvestSeasonResponse toDashboardResponse(
+            HarvestSeason season, LocalDate today, LocalDate next7Days) {
+        List<FinancialTransaction> transactions =
+                financialTransactionRepository.findDashboardTransactionsByFarmIdAndHarvestSeasonId(
+                        season.getFarm().getId(), season.getId());
+        HarvestRealizedSummaryResponse realized =
+                harvestFinancialSummaryCalculator.realized(
+                        sumAmounts(transactions, this::isPaidExpense),
+                        sumAmounts(transactions, this::isPaidIncome));
+        HarvestProjectionSummaryResponse projection =
+                harvestFinancialSummaryCalculator.projection(
+                        realized,
+                        sumAmounts(transactions, this::isOpenExpense),
+                        sumAmounts(transactions, this::isOpenIncome));
+
+        return new DashboardHarvestSeasonResponse(
+                season.getId(),
+                season.getFarm().getId(),
+                season.getName(),
+                season.getStatus(),
+                season.getProductionActivity().getId(),
+                season.getProductionActivity().getName(),
+                new DashboardHarvestFinancialValuesResponse(
+                        realized.realizedCost(),
+                        realized.realizedRevenue(),
+                        realized.realizedProfit()),
+                new DashboardHarvestFinancialValuesResponse(
+                        projection.projectedCost(),
+                        projection.projectedRevenue(),
+                        projection.projectedProfit()),
+                toAmountCountResponse(
+                        transactions, transaction -> isDueNext7Days(transaction, today, next7Days)),
+                toAmountCountResponse(transactions, transaction -> isOverdue(transaction, today)));
+    }
+
+    private FinancialAmountCountResponse toAmountCountResponse(
+            List<FinancialTransaction> transactions, Predicate<FinancialTransaction> filter) {
+        return new FinancialAmountCountResponse(
+                transactions.stream().filter(filter).count(), sumAmounts(transactions, filter));
+    }
+
+    private BigDecimal sumAmounts(
+            List<FinancialTransaction> transactions, Predicate<FinancialTransaction> filter) {
+        return transactions.stream()
+                .filter(filter)
+                .map(FinancialTransaction::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private boolean isPaidExpense(FinancialTransaction transaction) {
+        return TransactionType.EXPENSE.equals(transaction.getType())
+                && PaymentStatus.PAID.equals(transaction.getStatus());
+    }
+
+    private boolean isPaidIncome(FinancialTransaction transaction) {
+        return TransactionType.INCOME.equals(transaction.getType())
+                && PaymentStatus.PAID.equals(transaction.getStatus());
+    }
+
+    private boolean isOpenExpense(FinancialTransaction transaction) {
+        return TransactionType.EXPENSE.equals(transaction.getType()) && isOpen(transaction);
+    }
+
+    private boolean isOpenIncome(FinancialTransaction transaction) {
+        return TransactionType.INCOME.equals(transaction.getType()) && isOpen(transaction);
+    }
+
+    private boolean isOpen(FinancialTransaction transaction) {
+        return PaymentStatus.PENDING.equals(transaction.getStatus())
+                || PaymentStatus.OVERDUE.equals(transaction.getStatus());
+    }
+
+    private boolean isDueNext7Days(
+            FinancialTransaction transaction, LocalDate today, LocalDate next7Days) {
+        LocalDate dueDate = transaction.getDueDate();
+
+        return TransactionType.EXPENSE.equals(transaction.getType())
+                && PaymentStatus.PENDING.equals(transaction.getStatus())
+                && dueDate != null
+                && !dueDate.isBefore(today)
+                && !dueDate.isAfter(next7Days);
+    }
+
+    private boolean isOverdue(FinancialTransaction transaction, LocalDate today) {
+        LocalDate dueDate = transaction.getDueDate();
+
+        return TransactionType.EXPENSE.equals(transaction.getType())
+                && dueDate != null
+                && (PaymentStatus.OVERDUE.equals(transaction.getStatus())
+                        || (PaymentStatus.PENDING.equals(transaction.getStatus())
+                                && dueDate.isBefore(today)));
     }
 
     private HarvestSeasonSummaryListResponse toSummaryListResponse(

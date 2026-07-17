@@ -232,6 +232,23 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
             @Param("harvestSeasonIds") Collection<Long> harvestSeasonIds,
             @Param("today") LocalDate today);
 
+    @Query(
+            """
+            select transaction
+            from FinancialTransaction transaction
+            where transaction.farm.id = :farmId
+              and transaction.harvestSeason.id = :harvestSeasonId
+              and transaction.harvestSeason.farm.id = :farmId
+              and transaction.recordStatus = br.com.gestaodireta.financial.enumeration.FinancialRecordStatus.ACTIVE
+              and transaction.status in (
+                br.com.gestaodireta.financial.enumeration.PaymentStatus.PAID,
+                br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING,
+                br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+              )
+            """)
+    List<FinancialTransaction> findDashboardTransactionsByFarmIdAndHarvestSeasonId(
+            @Param("farmId") Long farmId, @Param("harvestSeasonId") Long harvestSeasonId);
+
     Page<FinancialTransaction> findByFarmIdAndTypeAndRecordStatusAndStatusInAndDueDateIsNotNull(
             Long farmId,
             TransactionType type,
