@@ -4397,3 +4397,14 @@ Lista contas a vencer de uma fazenda.
 - Retorna apenas despesas (`EXPENSE`) com `recordStatus=ACTIVE`.
 - Considera status `PENDING` e `OVERDUE`.
 - Exige `dueDate` preenchido.
+
+
+### GET /api/financial/reports
+
+Retorna o relatório financeiro consolidado. Parâmetros obrigatórios: `farmId`, `startDate`, `endDate` e `basis` (`CASH` ou `ACCRUAL`); `harvestSeasonIds` e `categoryIds` são opcionais e aceitam valores repetidos ou CSV. ADMIN e vínculos ativos PRODUCER, EMPLOYEE e ACCOUNTANT podem consultar.
+
+Em `ACCRUAL`, a data de referência é `transactionDate`. Em `CASH`, PAID usa `paidAt` (com fallback para `transactionDate`) e PENDING/OVERDUE usa `dueDate`. A resposta contém resumo, evolução mensal, categorias, safras, indicadores e `unallocated`. Valores abertos sem `dueDate` no regime de caixa ficam somente em `unallocated`. Margens retornam zero quando não há receita.
+
+### GET /api/financial/reports/transactions
+
+Recebe os mesmos filtros do consolidado e `page`, `size`, `sort` e `direction`. Retorna a paginação padrão com `referenceDate`, permitindo que o frontend use `periodStart` e `periodEnd` de um ponto mensal para exibir exatamente as movimentações daquele mês. Parâmetros inválidos retornam 400, acesso negado 403 e fazenda, categoria ou safra inexistente 404.
