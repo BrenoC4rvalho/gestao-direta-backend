@@ -4057,6 +4057,29 @@ Retorna os indicadores financeiros do dashboard para uma fazenda.
 - `ACCOUNTANT` pode consultar resumo financeiro.
 
 
+### GET /api/financial/cash-flow
+
+**Descrição:** Retorna o fluxo de caixa projetado anual da fazenda, com saldo acumulado ao fim de cada mês.
+
+**Autenticação e permissão:** `ADMIN`, `PRODUCER`, `EMPLOYEE` ou `ACCOUNTANT` com acesso financeiro ativo à fazenda.
+
+**Query params:** `farmId` é obrigatório; `year` é opcional (2000 a 2100) e usa o ano atual da aplicação quando omitido.
+
+**Resposta de sucesso:**
+```json
+{
+  "farmId": 8,
+  "year": 2026,
+  "openingBalance": 20000.00,
+  "closingBalance": 45000.00,
+  "points": [{"month": 1, "label": "Jan", "income": 30000.00, "expense": 5000.00, "netFlow": 25000.00, "balance": 45000.00}]
+}
+```
+
+**Regras de cálculo:** Sempre retorna 12 pontos, de `Jan` a `Dez`. O saldo inicial é a soma de receitas `PAID` menos despesas `PAID` anteriores ao ano, usando `paidAt` ou, em dados legados sem esse valor, `transactionDate`. Dentro do ano, `PAID` usa essa mesma data; `PENDING` e `OVERDUE` usam `dueDate`. Contas abertas sem vencimento não entram; contas abertas anteriores ao ano entram em janeiro. Apenas registros `ACTIVE` da fazenda, com status `PAID`, `PENDING` ou `OVERDUE`, são considerados. `netFlow = income - expense`; cada saldo mensal acumula o saldo anterior e `closingBalance` é o saldo de dezembro.
+
+**Possíveis erros/status HTTP:** `400` para parâmetros ausentes ou ano inválido; `401` sem autenticação; `403` sem acesso à fazenda; `404` para fazenda inexistente.
+
 ### GET /api/financial/agenda/summary
 
 **Descrição:**

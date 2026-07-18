@@ -149,6 +149,71 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
             @Param("next30Days") LocalDate next30Days);
 
     @Query(
+            value =
+                    """
+                    select
+                      coalesce(sum(case when type = 'INCOME' then amount else 0 end), 0) as income,
+                      coalesce(sum(case when type = 'EXPENSE' then amount else 0 end), 0) as expense
+                    from financial_transactions
+                    where farm_id = :farmId
+                      and record_status = 'ACTIVE'
+                      and status = 'PAID'
+                      and coalesce(paid_at, transaction_date) < :startDate
+                    """,
+            nativeQuery = true)
+    CashFlowAmountProjection summarizeCashFlowOpeningBalance(
+            @Param("farmId") Long farmId, @Param("startDate") LocalDate startDate);
+
+    @Query(
+            value =
+                    """
+                    select
+                      cast(extract(month from case
+                        when status = 'PAID' then coalesce(paid_at, transaction_date)
+                        else due_date
+                      end) as integer) as month,
+                      coalesce(sum(case when type = 'INCOME' then amount else 0 end), 0) as income,
+                      coalesce(sum(case when type = 'EXPENSE' then amount else 0 end), 0) as expense
+                    from financial_transactions
+                    where farm_id = :farmId
+                      and record_status = 'ACTIVE'
+                      and (
+                        (status = 'PAID'
+                          and coalesce(paid_at, transaction_date) >= :startDate
+                          and coalesce(paid_at, transaction_date) < :endDate)
+                        or (status in ('PENDING', 'OVERDUE')
+                          and due_date >= :startDate
+                          and due_date < :endDate)
+                      )
+                    group by cast(extract(month from case
+                      when status = 'PAID' then coalesce(paid_at, transaction_date)
+                      else due_date
+                    end) as integer)
+                    order by month asc
+                    """,
+            nativeQuery = true)
+    List<MonthlyCashFlowProjection> summarizeMonthlyCashFlow(
+            @Param("farmId") Long farmId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
+
+    @Query(
+            value =
+                    """
+                    select
+                      coalesce(sum(case when type = 'INCOME' then amount else 0 end), 0) as income,
+                      coalesce(sum(case when type = 'EXPENSE' then amount else 0 end), 0) as expense
+                    from financial_transactions
+                    where farm_id = :farmId
+                      and record_status = 'ACTIVE'
+                      and status in ('PENDING', 'OVERDUE')
+                      and due_date < :startDate
+                    """,
+            nativeQuery = true)
+    CashFlowAmountProjection summarizeOpenCashFlowBeforeYear(
+            @Param("farmId") Long farmId, @Param("startDate") LocalDate startDate);
+
+    @Query(
             """
             select
               transaction.id as transactionId,

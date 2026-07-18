@@ -1,5 +1,6 @@
 package br.com.gestaodireta.financial.controller;
 
+import br.com.gestaodireta.financial.dto.CashFlowResponse;
 import br.com.gestaodireta.financial.dto.FinancialSummaryResponse;
 import br.com.gestaodireta.financial.dto.UpcomingBillResponse;
 import br.com.gestaodireta.financial.service.FinancialSummaryService;
@@ -27,6 +28,13 @@ public class FinancialSummaryController {
     @PreAuthorize("@financialAccess.canViewFinancialData(#farmId)")
     public FinancialSummaryResponse summarize(@RequestParam Long farmId) {
         return financialSummaryService.summarize(farmId);
+    }
+
+    @GetMapping("/cash-flow")
+    @PreAuthorize("@financialAccess.canViewFinancialDataOrMissingFarm(#farmId)")
+    public CashFlowResponse getCashFlow(
+            @RequestParam Long farmId, @RequestParam(required = false) Integer year) {
+        return financialSummaryService.getCashFlow(farmId, year);
     }
 
     @GetMapping("/upcoming-bills")
