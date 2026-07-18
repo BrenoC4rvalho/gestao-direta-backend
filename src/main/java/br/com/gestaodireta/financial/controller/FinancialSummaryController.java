@@ -32,8 +32,7 @@ public class FinancialSummaryController {
 
     @GetMapping("/cash-flow")
     @PreAuthorize("@financialAccess.canViewFinancialDataOrMissingFarm(#farmId)")
-    public CashFlowResponse getCashFlow(
-            @RequestParam Long farmId, @RequestParam(required = false) Integer year) {
+    public CashFlowResponse getCashFlow(@RequestParam Long farmId, @RequestParam Integer year) {
         return financialSummaryService.getCashFlow(farmId, year);
     }
 

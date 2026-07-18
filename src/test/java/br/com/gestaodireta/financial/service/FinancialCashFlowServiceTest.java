@@ -55,31 +55,49 @@ class FinancialCashFlowServiceTest {
     }
 
     @Test
-    void shouldUseCurrentYearAndAddPriorOpenAmountsToJanuary() {
-        when(farmRepository.existsById(8L)).thenReturn(true);
+    void shouldAddPriorOpenAmountsToJanuary() {
+        stubEmptyCashFlow();
         when(transactionRepository.summarizeCashFlowOpeningBalance(Mockito.eq(8L), Mockito.any()))
                 .thenReturn(amount("100", "20"));
-        when(transactionRepository.summarizeMonthlyCashFlow(
-                        Mockito.eq(8L), Mockito.any(), Mockito.any()))
-                .thenReturn(List.of());
         when(transactionRepository.summarizeOpenCashFlowBeforeYear(Mockito.eq(8L), Mockito.any()))
                 .thenReturn(amount("5", "30"));
 
-        CashFlowResponse response = service.getCashFlow(8L, null);
+        CashFlowResponse response = service.getCashFlow(8L, 1);
 
-        assertThat(response.year()).isEqualTo(2026);
+        assertThat(response.year()).isEqualTo(1);
         assertThat(response.points().get(0).income()).isEqualByComparingTo("5");
         assertThat(response.points().get(0).expense()).isEqualByComparingTo("30");
         assertThat(response.points().get(0).balance()).isEqualByComparingTo("55");
     }
 
     @Test
-    void shouldRejectInvalidYear() {
+    void shouldRejectNullZeroAndNegativeYear() {
         when(farmRepository.existsById(8L)).thenReturn(true);
 
-        assertThatThrownBy(() -> service.getCashFlow(8L, 1999))
+        assertThatThrownBy(() -> service.getCashFlow(8L, null))
                 .isInstanceOf(BusinessException.class)
-                .hasMessage("Year must be between 2000 and 2100");
+                .hasMessage("O ano deve ser informado e deve ser maior que zero.");
+        assertThatThrownBy(() -> service.getCashFlow(8L, 0)).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> service.getCashFlow(8L, -1)).isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void shouldAcceptPositiveYearsOutsidePreviousRange() {
+        stubEmptyCashFlow();
+
+        assertThat(service.getCashFlow(8L, 1900).year()).isEqualTo(1900);
+        assertThat(service.getCashFlow(8L, 2500).year()).isEqualTo(2500);
+    }
+
+    private void stubEmptyCashFlow() {
+        when(farmRepository.existsById(8L)).thenReturn(true);
+        when(transactionRepository.summarizeCashFlowOpeningBalance(Mockito.eq(8L), Mockito.any()))
+                .thenReturn(amount("0", "0"));
+        when(transactionRepository.summarizeMonthlyCashFlow(
+                        Mockito.eq(8L), Mockito.any(), Mockito.any()))
+                .thenReturn(List.of());
+        when(transactionRepository.summarizeOpenCashFlowBeforeYear(Mockito.eq(8L), Mockito.any()))
+                .thenReturn(amount("0", "0"));
     }
 
     private CashFlowAmountProjection amount(String income, String expense) {

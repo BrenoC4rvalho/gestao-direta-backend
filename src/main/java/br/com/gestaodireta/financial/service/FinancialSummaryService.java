@@ -85,8 +85,8 @@ public class FinancialSummaryService {
     public CashFlowResponse getCashFlow(Long farmId, Integer requestedYear) {
         validateFarmExists(farmId);
 
-        int year = requestedYear == null ? LocalDate.now(clock).getYear() : requestedYear;
-        validateYear(year);
+        validateYear(requestedYear);
+        int year = requestedYear;
 
         LocalDate startDate = Year.of(year).atDay(1);
         LocalDate endDate = startDate.plusYears(1);
@@ -156,9 +156,9 @@ public class FinancialSummaryService {
         }
     }
 
-    private void validateYear(int year) {
-        if (year < 2000 || year > 2100) {
-            throw new BusinessException("Year must be between 2000 and 2100");
+    private void validateYear(Integer year) {
+        if (year == null || year <= 0) {
+            throw new BusinessException("O ano deve ser informado e deve ser maior que zero.");
         }
     }
 
