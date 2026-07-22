@@ -13,8 +13,8 @@ public class MessagingMessage extends BaseEntity {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "messaging_account_id", nullable = false)
-    private MessagingAccount messagingAccount;
+    @JoinColumn(name = "messaging_conversation_id", nullable = false)
+    private MessagingConversation messagingConversation;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
@@ -66,12 +66,12 @@ public class MessagingMessage extends BaseEntity {
         return id;
     }
 
-    public MessagingAccount getMessagingAccount() {
-        return messagingAccount;
+    public MessagingConversation getMessagingConversation() {
+        return messagingConversation;
     }
 
-    public void setMessagingAccount(MessagingAccount v) {
-        messagingAccount = v;
+    public void setMessagingConversation(MessagingConversation v) {
+        messagingConversation = v;
     }
 
     public MessagingChannel getChannel() {

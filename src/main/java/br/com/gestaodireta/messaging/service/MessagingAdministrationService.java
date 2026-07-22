@@ -19,16 +19,19 @@ public class MessagingAdministrationService {
     private final MessagingMessageRepository messages;
     private final TelegramBotClient client;
     private final TelegramProperties properties;
+    private final MessagingConversationService conversations;
 
     public MessagingAdministrationService(
             MessagingAccountRepository accounts,
             MessagingMessageRepository messages,
             TelegramBotClient client,
-            TelegramProperties properties) {
+            TelegramProperties properties,
+            MessagingConversationService conversations) {
         this.accounts = accounts;
         this.messages = messages;
         this.client = client;
         this.properties = properties;
+        this.conversations = conversations;
     }
 
     @Transactional
@@ -71,7 +74,8 @@ public class MessagingAdministrationService {
     @Transactional
     public MessagingMessage createOutbound(MessagingAccount account, String content) {
         MessagingMessage message = new MessagingMessage();
-        message.setMessagingAccount(account);
+        message.setMessagingConversation(
+                conversations.active(account, LocalDateTime.now(ZoneOffset.UTC)));
         message.setChannel(MessagingChannel.TELEGRAM);
         message.setExternalUserId(account.getExternalUserId());
         message.setExternalChatId(account.getExternalChatId());
@@ -131,7 +135,7 @@ public class MessagingAdministrationService {
     private MessagingMessageResponse toResponse(MessagingMessage m) {
         return new MessagingMessageResponse(
                 m.getId(),
-                m.getMessagingAccount().getId(),
+                m.getMessagingConversation().getMessagingAccount().getId(),
                 m.getChannel(),
                 m.getDirection(),
                 m.getMessageType(),

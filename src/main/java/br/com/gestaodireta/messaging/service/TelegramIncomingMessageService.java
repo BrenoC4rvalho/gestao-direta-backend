@@ -12,11 +12,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class TelegramIncomingMessageService {
     private final MessagingAccountRepository accounts;
     private final MessagingMessageRepository messages;
+    private final MessagingConversationService conversations;
 
     public TelegramIncomingMessageService(
-            MessagingAccountRepository accounts, MessagingMessageRepository messages) {
+            MessagingAccountRepository accounts,
+            MessagingMessageRepository messages,
+            MessagingConversationService conversations) {
         this.accounts = accounts;
         this.messages = messages;
+        this.conversations = conversations;
     }
 
     @Transactional
@@ -35,7 +39,7 @@ public class TelegramIncomingMessageService {
         account.setLastInteractionAt(time);
         account = accounts.save(account);
         MessagingMessage message = new MessagingMessage();
-        message.setMessagingAccount(account);
+        message.setMessagingConversation(conversations.active(account, time));
         message.setChannel(incoming.channel());
         message.setProviderUpdateId(incoming.providerUpdateId());
         message.setProviderMessageId(incoming.providerMessageId());

@@ -3,7 +3,7 @@ package br.com.gestaodireta.messaging.domain;
 import br.com.gestaodireta.messaging.enumeration.MessagingAccountStatus;
 import br.com.gestaodireta.messaging.enumeration.MessagingChannel;
 import br.com.gestaodireta.shared.audit.BaseEntity;
-import br.com.gestaodireta.user.entity.User;
+import br.com.gestaodireta.user.entity.UserContact;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -15,8 +15,8 @@ public class MessagingAccount extends BaseEntity {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
-    private User user;
+    @JoinColumn(name = "user_contact_id")
+    private UserContact userContact;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
@@ -48,12 +48,12 @@ public class MessagingAccount extends BaseEntity {
         return id;
     }
 
-    public User getUser() {
-        return user;
+    public UserContact getUserContact() {
+        return userContact;
     }
 
-    public void setUser(User v) {
-        user = v;
+    public void setUserContact(UserContact v) {
+        userContact = v;
     }
 
     public MessagingChannel getChannel() {
