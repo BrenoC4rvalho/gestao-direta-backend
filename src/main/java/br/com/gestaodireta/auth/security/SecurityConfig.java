@@ -49,6 +49,9 @@ public class SecurityConfig {
                                         .requestMatchers(HttpMethod.GET, "/system/status")
                                         .permitAll()
                                         .requestMatchers(
+                                                HttpMethod.POST, "/webhooks/messaging/telegram")
+                                        .permitAll()
+                                        .requestMatchers(
                                                 HttpMethod.GET,
                                                 "/actuator/health",
                                                 "/actuator/info")

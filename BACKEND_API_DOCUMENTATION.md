@@ -128,6 +128,15 @@ O backend executa diariamente um job para marcar contas vencidas.
 
 ## Endpoints
 
+## Messaging / Telegram
+
+`POST /api/webhooks/messaging/telegram` is public only at the Spring Security layer and requires `X-Telegram-Bot-Api-Secret-Token`. A valid private text update creates a PENDING account and an INBOUND message. Repeated Telegram `update_id` values are idempotent; unsupported updates return 200 and are ignored.
+
+All `/api/messaging/**` endpoints require ADMIN: `POST /api/messaging/telegram/messages` sends `{ "messagingAccountId": 10, "content": "Mensagem" }` only to ACTIVE Telegram accounts; `PATCH /api/messaging/accounts/{id}/status` updates account status; `GET /api/messaging/accounts`, `GET /api/messaging/messages`, and `GET /api/messaging/telegram/status` provide administrative queries and diagnosis.
+
+Configure `TELEGRAM_ENABLED`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, and optional `TELEGRAM_API_BASE_URL`. Create the bot with BotFather, expose HTTPS, register the webhook with its secret, send a first text, activate the PENDING account, then test administrative sending. Credentials and raw payloads are never returned.
+
+
 ## IA
 
 ### POST /api/ai/transactions/parse

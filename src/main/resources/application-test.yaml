@@ -53,3 +53,10 @@ app:
     name: gd_session
     secure: false
     same-site: Lax
+
+messaging:
+  telegram:
+    enabled: false
+    bot-token: test-token
+    webhook-secret: test-secret
+    api-base-url: http://localhost
