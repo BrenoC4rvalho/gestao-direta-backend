@@ -20,27 +20,42 @@ public class MessagingAdministrationService {
     private final TelegramBotClient client;
     private final TelegramProperties properties;
     private final MessagingConversationService conversations;
+    private final MessagingConversationRepository conversationsRepository;
 
     public MessagingAdministrationService(
             MessagingAccountRepository accounts,
             MessagingMessageRepository messages,
             TelegramBotClient client,
             TelegramProperties properties,
-            MessagingConversationService conversations) {
+            MessagingConversationService conversations,
+            MessagingConversationRepository conversationsRepository) {
         this.accounts = accounts;
         this.messages = messages;
         this.client = client;
         this.properties = properties;
         this.conversations = conversations;
+        this.conversationsRepository = conversationsRepository;
     }
 
     @Transactional
     public MessagingAccountResponse updateStatus(
             Long id, MessagingAccountStatusUpdateRequest request) {
         MessagingAccount account = account(id);
-        account.setStatus(request.status());
-        if (request.status() == MessagingAccountStatus.ACTIVE && account.getVerifiedAt() == null)
-            account.setVerifiedAt(LocalDateTime.now(ZoneOffset.UTC));
+        MessagingAccountStatus current = account.getStatus();
+        MessagingAccountStatus target = request.status();
+        boolean allowed =
+                (current == MessagingAccountStatus.ACTIVE
+                                && (target == MessagingAccountStatus.INACTIVE
+                                        || target == MessagingAccountStatus.BLOCKED))
+                        || (current == MessagingAccountStatus.INACTIVE
+                                && target == MessagingAccountStatus.ACTIVE
+                                && account.getUserContact() != null
+                                && account.getVerifiedAt() != null)
+                        || (current == MessagingAccountStatus.BLOCKED
+                                && target == MessagingAccountStatus.INACTIVE);
+        if (!allowed)
+            throw new BusinessException("Messaging account status transition is not allowed");
+        account.setStatus(target);
         return toResponse(accounts.save(account));
     }
 
@@ -103,6 +118,33 @@ public class MessagingAdministrationService {
         return toResponse(messages.save(message));
     }
 
+    @Transactional(readOnly = true)
+    public PageResponse<MessagingConversationResponse> conversations(
+            MessagingConversationFilterRequest filter, PaginationParams params) {
+        return PageResponse.from(
+                conversationsRepository
+                        .findFiltered(
+                                filter.messagingAccountId(),
+                                filter.userId(),
+                                filter.farmId(),
+                                filter.status(),
+                                filter.startDate(),
+                                filter.endDate(),
+                                params.toPageable())
+                        .map(this::toConversationResponse));
+    }
+
+    @Transactional(readOnly = true)
+    public MessagingConversationResponse conversation(Long id) {
+        return toConversationResponse(
+                conversationsRepository
+                        .findById(id)
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Messaging conversation not found")));
+    }
+
     public TelegramStatus status() {
         if (!properties.isEnabled()) return new TelegramStatus(false, false, null, null);
         TelegramBotIdentity identity = client.getMe();
@@ -130,6 +172,29 @@ public class MessagingAdministrationService {
                 a.getStatus(),
                 a.getLastInteractionAt(),
                 a.getCreatedAt());
+    }
+
+    private MessagingConversationResponse toConversationResponse(MessagingConversation c) {
+        MessagingAccount a = c.getMessagingAccount();
+        var contact = a.getUserContact();
+        var user = contact == null ? null : contact.getUser();
+        var farm = c.getFarm();
+        return new MessagingConversationResponse(
+                c.getId(),
+                a.getId(),
+                a.getChannel(),
+                a.getDisplayName(),
+                a.getUsername(),
+                user == null ? null : user.getId(),
+                user == null ? null : user.getName(),
+                farm == null ? null : farm.getId(),
+                farm == null ? null : farm.getName(),
+                c.getStatus(),
+                c.getCurrentStep(),
+                c.getLastInteractionAt(),
+                c.getExpiresAt(),
+                c.getCreatedAt(),
+                c.getUpdatedAt());
     }
 
     private MessagingMessageResponse toResponse(MessagingMessage m) {

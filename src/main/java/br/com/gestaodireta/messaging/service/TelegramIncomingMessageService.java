@@ -13,14 +13,17 @@ public class TelegramIncomingMessageService {
     private final MessagingAccountRepository accounts;
     private final MessagingMessageRepository messages;
     private final MessagingConversationService conversations;
+    private final TelegramCommandDispatcher dispatcher;
 
     public TelegramIncomingMessageService(
             MessagingAccountRepository accounts,
             MessagingMessageRepository messages,
-            MessagingConversationService conversations) {
+            MessagingConversationService conversations,
+            TelegramCommandDispatcher dispatcher) {
         this.accounts = accounts;
         this.messages = messages;
         this.conversations = conversations;
+        this.dispatcher = dispatcher;
     }
 
     @Transactional
@@ -52,6 +55,7 @@ public class TelegramIncomingMessageService {
         message.setReceivedAt(time);
         message.setRawPayload(incoming.rawPayload());
         message = messages.save(message);
+        dispatcher.dispatch(account, message.getMessagingConversation(), incoming.content());
         message.setStatus(MessagingMessageStatus.PROCESSED);
         message.setProcessedAt(LocalDateTime.now(ZoneOffset.UTC));
         messages.save(message);

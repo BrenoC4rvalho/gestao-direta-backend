@@ -2,6 +2,8 @@ package br.com.gestaodireta.messaging.controller;
 
 import br.com.gestaodireta.messaging.dto.MessagingAccountResponse;
 import br.com.gestaodireta.messaging.dto.MessagingAccountStatusUpdateRequest;
+import br.com.gestaodireta.messaging.dto.MessagingConversationFilterRequest;
+import br.com.gestaodireta.messaging.dto.MessagingConversationResponse;
 import br.com.gestaodireta.messaging.dto.MessagingMessageResponse;
 import br.com.gestaodireta.messaging.dto.SendTelegramMessageRequest;
 import br.com.gestaodireta.messaging.service.MessagingAdministrationService;
@@ -50,6 +52,18 @@ public class MessagingController {
     public PageResponse<MessagingMessageResponse> messages(
             @Valid @ModelAttribute PaginationParams paginationParams) {
         return service.messages(paginationParams);
+    }
+
+    @GetMapping("/conversations")
+    public PageResponse<MessagingConversationResponse> conversations(
+            @ModelAttribute MessagingConversationFilterRequest filter,
+            @Valid @ModelAttribute PaginationParams paginationParams) {
+        return service.conversations(filter, paginationParams);
+    }
+
+    @GetMapping("/conversations/{id}")
+    public MessagingConversationResponse conversation(@PathVariable Long id) {
+        return service.conversation(id);
     }
 
     @GetMapping("/telegram/status")
