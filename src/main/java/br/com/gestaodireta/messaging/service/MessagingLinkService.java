@@ -19,6 +19,7 @@ public class MessagingLinkService {
     private final UserContactService contacts;
     private final ContactVerificationCodeRepository codes;
     private final MessagingAccountRepository accounts;
+    private final MessagingConversationRepository conversations;
     private final PasswordEncoder encoder;
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
@@ -27,11 +28,13 @@ public class MessagingLinkService {
             UserContactService contacts,
             ContactVerificationCodeRepository codes,
             MessagingAccountRepository accounts,
+            MessagingConversationRepository conversations,
             PasswordEncoder encoder,
             Clock clock) {
         this.contacts = contacts;
         this.codes = codes;
         this.accounts = accounts;
+        this.conversations = conversations;
         this.encoder = encoder;
         this.clock = clock;
     }
@@ -41,7 +44,11 @@ public class MessagingLinkService {
         if (request.channel() != MessagingChannel.TELEGRAM)
             throw new ValidationException("Messaging channel is not supported");
         UserContact contact = contacts.currentContact();
-        LocalDateTime now = LocalDateTime.now(clock);
+        LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
+        if (accounts.existsByUserContactIdAndChannelAndStatus(
+                contact.getId(), MessagingChannel.TELEGRAM, MessagingAccountStatus.ACTIVE)) {
+            throw new BusinessException("A Telegram account is already linked to this contact");
+        }
         if (codes.existsByUserContactIdAndVerificationTypeAndChannelAndCreatedAtAfter(
                 contact.getId(),
                 ContactVerificationType.MESSAGING_ACCOUNT_LINK,
@@ -67,7 +74,8 @@ public class MessagingLinkService {
         code.setStatus(ContactVerificationStatus.ACTIVE);
         code.setExpiresAt(now.plusMinutes(10));
         codes.save(code);
-        return new MessagingLinkCodeResponse(value, code.getExpiresAt(), "/vincular " + value);
+        return new MessagingLinkCodeResponse(
+                value, request.channel(), code.getExpiresAt().toInstant(ZoneOffset.UTC));
     }
 
     @Transactional
@@ -80,7 +88,7 @@ public class MessagingLinkService {
                 && locked.getStatus() == MessagingAccountStatus.ACTIVE) {
             return MessagingLinkResult.ALREADY_LINKED;
         }
-        LocalDateTime now = LocalDateTime.now(clock);
+        LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
         if (isBlocked(locked, now)) {
             return MessagingLinkResult.TEMPORARILY_BLOCKED;
         }
@@ -156,7 +164,7 @@ public class MessagingLinkService {
     public void unlink(Long accountId) {
         UserContact contact = contacts.currentContact();
         MessagingAccount account =
-                accounts.findById(accountId)
+                accounts.findWithLockById(accountId)
                         .filter(
                                 a ->
                                         a.getUserContact() != null
@@ -165,7 +173,26 @@ public class MessagingLinkService {
                                                         .equals(contact.getId()))
                         .orElseThrow(
                                 () -> new ResourceNotFoundException("Messaging account not found"));
+        conversations
+                .findWithLockByMessagingAccountIdAndStatusIn(
+                        accountId,
+                        java.util.List.of(
+                                MessagingConversationStatus.ACTIVE,
+                                MessagingConversationStatus.WAITING_FARM_SELECTION))
+                .forEach(
+                        conversation -> {
+                            conversation.setStatus(MessagingConversationStatus.CANCELED);
+                            conversation.setCurrentStep(MessagingConversationStep.NONE);
+                            conversation.setFarm(null);
+                        });
         account.setStatus(MessagingAccountStatus.INACTIVE);
+        account.setUserContact(null);
         accounts.save(account);
+
+        if (!accounts.existsByUserContactIdAndChannelAndStatus(
+                contact.getId(), MessagingChannel.TELEGRAM, MessagingAccountStatus.ACTIVE)) {
+            contact.setPreferredChannel(PreferredMessagingChannel.NONE);
+            contact.setStatus(UserContactStatus.PENDING);
+        }
     }
 }

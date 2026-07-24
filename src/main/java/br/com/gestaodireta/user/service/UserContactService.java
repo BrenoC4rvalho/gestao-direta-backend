@@ -33,7 +33,7 @@ public class UserContactService {
                 .orElseGet(() -> create(activeUser()));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public UserContactResponse me() {
         return response(currentContact());
     }
@@ -79,6 +79,7 @@ public class UserContactService {
                 c.getId(),
                 c.getPhoneNumber(),
                 c.getPhoneVerificationStatus(),
+                c.getPhoneVerifiedAt(),
                 c.getPreferredChannel(),
                 c.getStatus(),
                 accounts.findAll().stream()
@@ -94,7 +95,8 @@ public class UserContactService {
                                                 a.getUsername(),
                                                 a.getDisplayName(),
                                                 a.getStatus(),
-                                                a.getVerifiedAt()))
+                                                a.getVerifiedAt(),
+                                                a.getCreatedAt()))
                         .toList());
     }
 }

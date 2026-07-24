@@ -9,4 +9,5 @@ public record UserContactMessagingAccountResponse(
         String username,
         String displayName,
         MessagingAccountStatus status,
-        LocalDateTime verifiedAt) {}
+        LocalDateTime verifiedAt,
+        LocalDateTime createdAt) {}

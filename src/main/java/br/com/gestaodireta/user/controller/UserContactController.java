@@ -5,6 +5,7 @@ import br.com.gestaodireta.messaging.service.MessagingLinkService;
 import br.com.gestaodireta.user.dto.*;
 import br.com.gestaodireta.user.service.UserContactService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -35,6 +36,7 @@ public class UserContactController {
     }
 
     @DeleteMapping("/messaging-accounts/{accountId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     public void unlink(@PathVariable Long accountId) {
         links.unlink(accountId);
     }

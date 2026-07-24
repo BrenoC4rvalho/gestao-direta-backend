@@ -1,5 +1,6 @@
 package br.com.gestaodireta.messaging.dto;
 
-import java.time.LocalDateTime;
+import br.com.gestaodireta.messaging.enumeration.MessagingChannel;
+import java.time.Instant;
 
-public record MessagingLinkCodeResponse(String code, LocalDateTime expiresAt, String command) {}
+public record MessagingLinkCodeResponse(String code, MessagingChannel channel, Instant expiresAt) {}
