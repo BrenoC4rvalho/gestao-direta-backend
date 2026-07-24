@@ -136,11 +136,16 @@ public class TelegramCommandDispatcher {
                         "Informe o código de vinculação.\n\nExemplo:\n/vincular 482913");
                 return;
             }
-            if (links.link(account, values[1])) {
+            MessagingLinkResult result = links.link(account, values[1]);
+            if (result == MessagingLinkResult.LINKED) {
                 outgoing.send(
                         conversation,
                         "Telegram vinculado com sucesso à sua conta do Gestão Direta.");
                 resolve(conversation, true);
+            } else if (result == MessagingLinkResult.TEMPORARILY_BLOCKED) {
+                outgoing.send(
+                        conversation,
+                        "Não foi possível concluir a vinculação agora. Aguarde alguns minutos e tente novamente.");
             } else {
                 outgoing.send(
                         conversation,

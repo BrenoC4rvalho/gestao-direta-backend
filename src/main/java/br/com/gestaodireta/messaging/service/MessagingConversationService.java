@@ -44,6 +44,26 @@ public class MessagingConversationService {
         return conversations.save(c);
     }
 
+    public MessagingConversation forIncoming(MessagingAccount account, LocalDateTime now) {
+        if (account.getStatus() == MessagingAccountStatus.BLOCKED
+                || account.getStatus() == MessagingAccountStatus.INACTIVE) {
+            return conversations
+                    .findFirstByMessagingAccountIdOrderByCreatedAtDesc(account.getId())
+                    .orElseGet(() -> canceled(account, now));
+        }
+        return active(account, now);
+    }
+
+    private MessagingConversation canceled(MessagingAccount account, LocalDateTime now) {
+        MessagingConversation conversation = new MessagingConversation();
+        conversation.setMessagingAccount(account);
+        conversation.setStatus(MessagingConversationStatus.CANCELED);
+        conversation.setCurrentStep(MessagingConversationStep.NONE);
+        conversation.setLastInteractionAt(now);
+        conversation.setExpiresAt(now);
+        return conversations.save(conversation);
+    }
+
     public void touch(MessagingConversation conversation, LocalDateTime now) {
         conversation.setLastInteractionAt(now);
         conversation.setExpiresAt(now.plusHours(expirationHours));

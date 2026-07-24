@@ -44,6 +44,15 @@ public class MessagingAccount extends BaseEntity {
     @Column(name = "last_interaction_at")
     private LocalDateTime lastInteractionAt;
 
+    @Column(name = "link_attempt_count", nullable = false)
+    private int linkAttemptCount;
+
+    @Column(name = "link_blocked_until")
+    private LocalDateTime linkBlockedUntil;
+
+    @Column(name = "last_link_attempt_at")
+    private LocalDateTime lastLinkAttemptAt;
+
     public Long getId() {
         return id;
     }
@@ -118,5 +127,29 @@ public class MessagingAccount extends BaseEntity {
 
     public void setLastInteractionAt(LocalDateTime v) {
         lastInteractionAt = v;
+    }
+
+    public int getLinkAttemptCount() {
+        return linkAttemptCount;
+    }
+
+    public void setLinkAttemptCount(int v) {
+        linkAttemptCount = v;
+    }
+
+    public LocalDateTime getLinkBlockedUntil() {
+        return linkBlockedUntil;
+    }
+
+    public void setLinkBlockedUntil(LocalDateTime v) {
+        linkBlockedUntil = v;
+    }
+
+    public LocalDateTime getLastLinkAttemptAt() {
+        return lastLinkAttemptAt;
+    }
+
+    public void setLastLinkAttemptAt(LocalDateTime v) {
+        lastLinkAttemptAt = v;
     }
 }

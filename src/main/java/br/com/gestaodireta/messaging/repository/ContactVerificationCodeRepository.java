@@ -2,6 +2,7 @@ package br.com.gestaodireta.messaging.repository;
 
 import br.com.gestaodireta.messaging.domain.ContactVerificationCode;
 import br.com.gestaodireta.messaging.enumeration.*;
+import jakarta.persistence.LockModeType;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.jpa.repository.*;
@@ -13,6 +14,14 @@ public interface ContactVerificationCodeRepository
             MessagingChannel channel,
             ContactVerificationStatus status,
             LocalDateTime now);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<ContactVerificationCode>
+            findWithLockByVerificationTypeAndChannelAndStatusAndExpiresAtAfter(
+                    ContactVerificationType type,
+                    MessagingChannel channel,
+                    ContactVerificationStatus status,
+                    LocalDateTime now);
 
     List<ContactVerificationCode> findByUserContactIdAndVerificationTypeAndChannelAndStatus(
             Long contactId,

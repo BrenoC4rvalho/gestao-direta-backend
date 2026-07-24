@@ -132,9 +132,15 @@ O backend executa diariamente um job para marcar contas vencidas.
 
 `POST /api/webhooks/messaging/telegram` is public only at the Spring Security layer and requires `X-Telegram-Bot-Api-Secret-Token`. A valid private text update creates a PENDING account and an INBOUND message. Repeated Telegram `update_id` values are idempotent; unsupported updates return 200 and are ignored.
 
-All `/api/messaging/**` endpoints require ADMIN: `POST /api/messaging/telegram/messages` sends `{ "messagingAccountId": 10, "content": "Mensagem" }` only to ACTIVE Telegram accounts; `PATCH /api/messaging/accounts/{id}/status` updates account status; `GET /api/messaging/accounts`, `GET /api/messaging/messages`, and `GET /api/messaging/telegram/status` provide administrative queries and diagnosis.
+All `/api/messaging/**` endpoints require ADMIN: `POST /api/messaging/telegram/messages` sends `{ "messagingAccountId": 10, "content": "Mensagem" }` only to ACTIVE Telegram accounts; `PATCH /api/messaging/accounts/{id}/status` updates account status; `GET /api/messaging/accounts`, `GET /api/messaging/messages`, `GET /api/messaging/conversations`, `GET /api/messaging/conversations/{id}`, and `GET /api/messaging/telegram/status` provide administrative queries and diagnosis.
 
-Configure `TELEGRAM_ENABLED`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, and optional `TELEGRAM_API_BASE_URL`. Create the bot with BotFather, expose HTTPS, register the webhook with its secret, send a first text, activate the PENDING account, then test administrative sending. Credentials and raw payloads are never returned.
+`GET /api/messaging/messages` uses the standard pagination (`page`, `size`, `sort`, `direction`) and accepts optional `messagingConversationId`, `messageDirection` (`INBOUND` or `OUTBOUND`) and message `status`. Filters are combined with AND, for example: `/api/messaging/messages?messagingConversationId=10&messageDirection=INBOUND&status=PROCESSED&page=0&size=20`. Each item includes `messagingConversationId`; raw webhook payloads, tokens and credentials are never returned.
+
+Changing an ACTIVE messaging account to INACTIVE or BLOCKED cancels its ACTIVE and WAITING_FARM_SELECTION conversations, clearing their selected farm and step while preserving messages. Reactivating an account never reopens historical conversations. The administrative PENDING-to-ACTIVE transition remains forbidden.
+
+Telegram linking has independent limits per verification code and per Telegram account. An account accepts at most five invalid link attempts in a 15-minute window and is temporarily blocked for 15 minutes after reaching that limit. The response during this block is generic and a successful link clears the account attempt state.
+
+Configure `TELEGRAM_ENABLED`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, and optional `TELEGRAM_API_BASE_URL`. Create the bot with BotFather, expose HTTPS, register the webhook with its secret, send a first text, create a link code in Gestão Direta, and send `/vincular CODIGO`. Credentials and raw payloads are never returned.
 
 
 ## IA

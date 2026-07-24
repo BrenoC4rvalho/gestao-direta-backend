@@ -4,6 +4,7 @@ import br.com.gestaodireta.messaging.dto.MessagingAccountResponse;
 import br.com.gestaodireta.messaging.dto.MessagingAccountStatusUpdateRequest;
 import br.com.gestaodireta.messaging.dto.MessagingConversationFilterRequest;
 import br.com.gestaodireta.messaging.dto.MessagingConversationResponse;
+import br.com.gestaodireta.messaging.dto.MessagingMessageFilterRequest;
 import br.com.gestaodireta.messaging.dto.MessagingMessageResponse;
 import br.com.gestaodireta.messaging.dto.SendTelegramMessageRequest;
 import br.com.gestaodireta.messaging.service.MessagingAdministrationService;
@@ -50,8 +51,9 @@ public class MessagingController {
 
     @GetMapping("/messages")
     public PageResponse<MessagingMessageResponse> messages(
+            @ModelAttribute MessagingMessageFilterRequest filter,
             @Valid @ModelAttribute PaginationParams paginationParams) {
-        return service.messages(paginationParams);
+        return service.messages(filter, paginationParams);
     }
 
     @GetMapping("/conversations")

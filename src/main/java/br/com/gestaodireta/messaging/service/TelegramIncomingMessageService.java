@@ -14,25 +14,28 @@ public class TelegramIncomingMessageService {
     private final MessagingMessageRepository messages;
     private final MessagingConversationService conversations;
     private final TelegramCommandDispatcher dispatcher;
+    private final Clock clock;
 
     public TelegramIncomingMessageService(
             MessagingAccountRepository accounts,
             MessagingMessageRepository messages,
             MessagingConversationService conversations,
-            TelegramCommandDispatcher dispatcher) {
+            TelegramCommandDispatcher dispatcher,
+            Clock clock) {
         this.accounts = accounts;
         this.messages = messages;
         this.conversations = conversations;
         this.dispatcher = dispatcher;
+        this.clock = clock;
     }
 
     @Transactional
     public void receive(IncomingMessagingMessage incoming) {
         if (messages.existsByChannelAndProviderUpdateId(
                 incoming.channel(), incoming.providerUpdateId())) return;
-        LocalDateTime time = LocalDateTime.ofInstant(incoming.receivedAt(), ZoneOffset.UTC);
+        LocalDateTime time = LocalDateTime.ofInstant(incoming.receivedAt(), clock.getZone());
         MessagingAccount account =
-                accounts.findByChannelAndExternalUserIdAndExternalChatId(
+                accounts.findWithLockByChannelAndExternalUserIdAndExternalChatId(
                                 incoming.channel(),
                                 incoming.externalUserId(),
                                 incoming.externalChatId())
@@ -42,7 +45,7 @@ public class TelegramIncomingMessageService {
         account.setLastInteractionAt(time);
         account = accounts.save(account);
         MessagingMessage message = new MessagingMessage();
-        message.setMessagingConversation(conversations.active(account, time));
+        message.setMessagingConversation(conversations.forIncoming(account, time));
         message.setChannel(incoming.channel());
         message.setProviderUpdateId(incoming.providerUpdateId());
         message.setProviderMessageId(incoming.providerMessageId());
@@ -57,7 +60,7 @@ public class TelegramIncomingMessageService {
         message = messages.save(message);
         dispatcher.dispatch(account, message.getMessagingConversation(), incoming.content());
         message.setStatus(MessagingMessageStatus.PROCESSED);
-        message.setProcessedAt(LocalDateTime.now(ZoneOffset.UTC));
+        message.setProcessedAt(LocalDateTime.now(clock));
         messages.save(message);
     }
 

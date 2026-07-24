@@ -21,6 +21,7 @@ public class MessagingAdministrationService {
     private final TelegramProperties properties;
     private final MessagingConversationService conversations;
     private final MessagingConversationRepository conversationsRepository;
+    private final Clock clock;
 
     public MessagingAdministrationService(
             MessagingAccountRepository accounts,
@@ -28,19 +29,21 @@ public class MessagingAdministrationService {
             TelegramBotClient client,
             TelegramProperties properties,
             MessagingConversationService conversations,
-            MessagingConversationRepository conversationsRepository) {
+            MessagingConversationRepository conversationsRepository,
+            Clock clock) {
         this.accounts = accounts;
         this.messages = messages;
         this.client = client;
         this.properties = properties;
         this.conversations = conversations;
         this.conversationsRepository = conversationsRepository;
+        this.clock = clock;
     }
 
     @Transactional
     public MessagingAccountResponse updateStatus(
             Long id, MessagingAccountStatusUpdateRequest request) {
-        MessagingAccount account = account(id);
+        MessagingAccount account = lockedAccount(id);
         MessagingAccountStatus current = account.getStatus();
         MessagingAccountStatus target = request.status();
         boolean allowed =
@@ -56,6 +59,15 @@ public class MessagingAdministrationService {
         if (!allowed)
             throw new BusinessException("Messaging account status transition is not allowed");
         account.setStatus(target);
+        if (target == MessagingAccountStatus.INACTIVE || target == MessagingAccountStatus.BLOCKED) {
+            conversationsRepository
+                    .findWithLockByMessagingAccountIdAndStatusIn(
+                            account.getId(),
+                            java.util.List.of(
+                                    MessagingConversationStatus.ACTIVE,
+                                    MessagingConversationStatus.WAITING_FARM_SELECTION))
+                    .forEach(this::cancelConversation);
+        }
         return toResponse(accounts.save(account));
     }
 
@@ -65,8 +77,13 @@ public class MessagingAdministrationService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<MessagingMessageResponse> messages(PaginationParams params) {
-        return PageResponse.from(messages.findAll(params.toPageable()).map(this::toResponse));
+    public PageResponse<MessagingMessageResponse> messages(
+            MessagingMessageFilterRequest filter, PaginationParams params) {
+        return PageResponse.from(
+                messages.findAll(
+                                MessagingMessageSpecifications.filtered(filter),
+                                params.toPageable())
+                        .map(this::toResponse));
     }
 
     public MessagingMessageResponse send(SendTelegramMessageRequest request) {
@@ -89,8 +106,7 @@ public class MessagingAdministrationService {
     @Transactional
     public MessagingMessage createOutbound(MessagingAccount account, String content) {
         MessagingMessage message = new MessagingMessage();
-        message.setMessagingConversation(
-                conversations.active(account, LocalDateTime.now(ZoneOffset.UTC)));
+        message.setMessagingConversation(conversations.active(account, LocalDateTime.now(clock)));
         message.setChannel(MessagingChannel.TELEGRAM);
         message.setExternalUserId(account.getExternalUserId());
         message.setExternalChatId(account.getExternalChatId());
@@ -106,7 +122,7 @@ public class MessagingAdministrationService {
         MessagingMessage message = message(id);
         message.setProviderMessageId(providerMessageId);
         message.setStatus(MessagingMessageStatus.SENT);
-        message.setSentAt(LocalDateTime.now(ZoneOffset.UTC));
+        message.setSentAt(LocalDateTime.now(clock));
         return toResponse(messages.save(message));
     }
 
@@ -149,6 +165,17 @@ public class MessagingAdministrationService {
         if (!properties.isEnabled()) return new TelegramStatus(false, false, null, null);
         TelegramBotIdentity identity = client.getMe();
         return new TelegramStatus(true, true, identity.id(), identity.username());
+    }
+
+    private void cancelConversation(MessagingConversation conversation) {
+        conversation.setStatus(MessagingConversationStatus.CANCELED);
+        conversation.setCurrentStep(MessagingConversationStep.NONE);
+        conversation.setFarm(null);
+    }
+
+    private MessagingAccount lockedAccount(Long id) {
+        return accounts.findWithLockById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Messaging account not found"));
     }
 
     private MessagingAccount account(Long id) {
@@ -201,6 +228,7 @@ public class MessagingAdministrationService {
         return new MessagingMessageResponse(
                 m.getId(),
                 m.getMessagingConversation().getMessagingAccount().getId(),
+                m.getMessagingConversation().getId(),
                 m.getChannel(),
                 m.getDirection(),
                 m.getMessageType(),

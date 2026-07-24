@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 public record MessagingMessageResponse(
         Long id,
         Long messagingAccountId,
+        Long messagingConversationId,
         MessagingChannel channel,
         MessagingDirection direction,
         MessagingMessageType messageType,
