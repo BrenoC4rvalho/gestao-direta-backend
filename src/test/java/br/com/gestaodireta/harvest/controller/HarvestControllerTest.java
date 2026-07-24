@@ -1098,7 +1098,7 @@ class HarvestControllerTest extends PostgresIntegrationTest {
                                             user(String.valueOf(dashboardUser.getId()))
                                                     .roles("USER")))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("00].status").value("IN_PROGRESS"));
+                    .andExpect(jsonPath("$[0].status").value("IN_PROGRESS"));
         }
         mockMvc.perform(
                         get("/api/harvest/seasons/dashboard")
@@ -1106,7 +1106,7 @@ class HarvestControllerTest extends PostgresIntegrationTest {
                                 .param("farmId", String.valueOf(farm.getId()))
                                 .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("00].productionActivityName").value("Coffee"));
+                .andExpect(jsonPath("$[0].productionActivityName").value("Coffee"));
     }
 
     private Farm saveFarm(String name, FarmStatus status) {
