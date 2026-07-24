@@ -1,8 +1,10 @@
 package br.com.gestaodireta.messaging.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -20,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
@@ -79,16 +82,69 @@ class MessagingControllerTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.content", hasSize(0)));
     }
 
+    @Test
+    void shouldCancelOpenConversationsWhenAdminInactivatesAccount() throws Exception {
+        MessagingConversation active =
+                conversation(MessagingAccountStatus.ACTIVE, MessagingConversationStatus.ACTIVE);
+        MessagingAccount account = active.getMessagingAccount();
+        MessagingConversation completed =
+                conversation(account, MessagingConversationStatus.COMPLETED);
+        message(active, MessagingDirection.INBOUND, MessagingMessageStatus.PROCESSED, "history");
+
+        mockMvc.perform(
+                        patch("/api/messaging/accounts/{id}/status", account.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"status\":\"INACTIVE\"}")
+                                .with(user("1").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("INACTIVE"));
+
+        assertThat(accounts.findById(account.getId()))
+                .get()
+                .extracting(MessagingAccount::getStatus)
+                .isEqualTo(MessagingAccountStatus.INACTIVE);
+        assertThat(conversations.findById(active.getId()))
+                .get()
+                .extracting(MessagingConversation::getStatus)
+                .isEqualTo(MessagingConversationStatus.CANCELED);
+        assertThat(conversations.findById(completed.getId()))
+                .get()
+                .extracting(MessagingConversation::getStatus)
+                .isEqualTo(MessagingConversationStatus.COMPLETED);
+        assertThat(messages.count()).isEqualTo(1);
+    }
+
     private MessagingConversation conversation() {
+        return conversation(MessagingConversationStatus.ACTIVE);
+    }
+
+    private MessagingConversation conversation(MessagingConversationStatus status) {
+        return conversation(MessagingAccountStatus.PENDING, status);
+    }
+
+    private MessagingConversation conversation(
+            MessagingAccountStatus accountStatus, MessagingConversationStatus status) {
         MessagingAccount account = new MessagingAccount();
         account.setChannel(MessagingChannel.TELEGRAM);
         account.setExternalUserId("user-" + System.nanoTime());
         account.setExternalChatId("chat-" + System.nanoTime());
-        account.setStatus(MessagingAccountStatus.PENDING);
+        account.setStatus(accountStatus);
         account = accounts.save(account);
         MessagingConversation conversation = new MessagingConversation();
         conversation.setMessagingAccount(account);
-        conversation.setStatus(MessagingConversationStatus.ACTIVE);
+        conversation.setStatus(status);
+        conversation.setCurrentStep(MessagingConversationStep.NONE);
+        conversation.setLastInteractionAt(LocalDateTime.now());
+        conversation.setExpiresAt(LocalDateTime.now().plusHours(1));
+        return conversations.save(conversation);
+    }
+
+    private MessagingConversation conversation(
+            MessagingAccount account, MessagingConversationStatus status) {
+        MessagingConversation conversation = new MessagingConversation();
+        conversation.setMessagingAccount(account);
+        conversation.setStatus(status);
         conversation.setCurrentStep(MessagingConversationStep.NONE);
         conversation.setLastInteractionAt(LocalDateTime.now());
         conversation.setExpiresAt(LocalDateTime.now().plusHours(1));
