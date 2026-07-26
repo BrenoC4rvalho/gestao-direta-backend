@@ -37,6 +37,11 @@ info:
 
 app:
   ai:
+    financial-extraction:
+      enabled: false
+      model: ""
+      timeout-seconds: 20
+      minimum-confidence: 0.60
     provider: fake
     ollama:
       base-url: http://localhost:11434

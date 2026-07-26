@@ -14,6 +14,7 @@ public class TelegramIncomingMessageService {
     private final MessagingMessageRepository messages;
     private final MessagingConversationService conversations;
     private final TelegramCommandDispatcher dispatcher;
+    private final TelegramFinancialExtractionProcessor financialExtractionProcessor;
     private final Clock clock;
 
     public TelegramIncomingMessageService(
@@ -21,11 +22,13 @@ public class TelegramIncomingMessageService {
             MessagingMessageRepository messages,
             MessagingConversationService conversations,
             TelegramCommandDispatcher dispatcher,
+            TelegramFinancialExtractionProcessor financialExtractionProcessor,
             Clock clock) {
         this.accounts = accounts;
         this.messages = messages;
         this.conversations = conversations;
         this.dispatcher = dispatcher;
+        this.financialExtractionProcessor = financialExtractionProcessor;
         this.clock = clock;
     }
 
@@ -59,6 +62,7 @@ public class TelegramIncomingMessageService {
         message.setRawPayload(incoming.rawPayload());
         message = messages.save(message);
         dispatcher.dispatch(account, message.getMessagingConversation(), incoming.content());
+        financialExtractionProcessor.process(account, message.getMessagingConversation(), message);
         message.setStatus(MessagingMessageStatus.PROCESSED);
         message.setProcessedAt(LocalDateTime.now(clock));
         messages.save(message);

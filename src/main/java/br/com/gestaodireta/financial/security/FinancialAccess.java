@@ -8,6 +8,7 @@ import br.com.gestaodireta.financial.dto.FinancialCategoryCreateRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionRequest;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
+import br.com.gestaodireta.financial.repository.PendingFinancialTransactionRepository;
 import br.com.gestaodireta.shared.security.SecurityUtils;
 import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.enumeration.UserStatus;
@@ -28,17 +29,21 @@ public class FinancialAccess {
 
     private final FinancialCategoryRepository financialCategoryRepository;
 
+    private final PendingFinancialTransactionRepository pendingFinancialTransactionRepository;
+
     public FinancialAccess(
             FarmRepository farmRepository,
             FarmUserRepository farmUserRepository,
             UserRepository userRepository,
             FinancialTransactionRepository financialTransactionRepository,
-            FinancialCategoryRepository financialCategoryRepository) {
+            FinancialCategoryRepository financialCategoryRepository,
+            PendingFinancialTransactionRepository pendingFinancialTransactionRepository) {
         this.farmRepository = farmRepository;
         this.farmUserRepository = farmUserRepository;
         this.userRepository = userRepository;
         this.financialTransactionRepository = financialTransactionRepository;
         this.financialCategoryRepository = financialCategoryRepository;
+        this.pendingFinancialTransactionRepository = pendingFinancialTransactionRepository;
     }
 
     public boolean canCreateTransaction(FinancialTransactionRequest request) {
@@ -109,6 +114,20 @@ public class FinancialAccess {
 
     public boolean canCancelTransaction(Long transactionId) {
         return canUpdateTransaction(transactionId);
+    }
+
+    public boolean canViewPendingTransaction(Long pendingTransactionId) {
+        return pendingFinancialTransactionRepository
+                .findFarmIdById(pendingTransactionId)
+                .filter(this::canViewFinancialData)
+                .isPresent();
+    }
+
+    public boolean canManagePendingTransaction(Long pendingTransactionId) {
+        return pendingFinancialTransactionRepository
+                .findFarmIdById(pendingTransactionId)
+                .filter(this::canManageFinancialData)
+                .isPresent();
     }
 
     public boolean canCreateCategory(FinancialCategoryCreateRequest request) {
