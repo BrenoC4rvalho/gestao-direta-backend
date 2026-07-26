@@ -52,8 +52,10 @@ public class PendingFinancialTransactionController {
 
     @PostMapping("/{id}/approve")
     @PreAuthorize("@financialAccess.canManagePendingTransaction(#id)")
-    public PendingFinancialTransactionResponse approve(@PathVariable Long id) {
-        return service.approve(id);
+    public PendingFinancialTransactionResponse approve(
+            @PathVariable Long id,
+            @Valid @RequestBody ApprovePendingFinancialTransactionRequest request) {
+        return service.approve(id, request);
     }
 
     @PostMapping("/{id}/reject")

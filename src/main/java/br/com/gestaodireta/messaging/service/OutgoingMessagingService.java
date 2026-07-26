@@ -18,16 +18,21 @@ public class OutgoingMessagingService {
         this.client = client;
     }
 
+    @Transactional
     public void send(MessagingConversation conversation, String content) {
         MessagingMessage message = create(conversation, content);
         try {
             TelegramSendMessageResult result =
                     client.sendMessage(
                             conversation.getMessagingAccount().getExternalChatId(), content);
-            markSent(message.getId(), result.messageId());
+            message.setProviderMessageId(result.messageId());
+            message.setStatus(MessagingMessageStatus.SENT);
+            message.setSentAt(LocalDateTime.now(ZoneOffset.UTC));
         } catch (RuntimeException exception) {
-            markFailed(message.getId());
+            message.setStatus(MessagingMessageStatus.FAILED);
+            message.setErrorMessage("Telegram message could not be sent");
         }
+        messages.save(message);
     }
 
     @Transactional
@@ -42,7 +47,7 @@ public class OutgoingMessagingService {
         message.setMessageType(MessagingMessageType.TEXT);
         message.setContent(content.trim());
         message.setStatus(MessagingMessageStatus.PENDING);
-        return messages.save(message);
+        return messages.saveAndFlush(message);
     }
 
     @Transactional

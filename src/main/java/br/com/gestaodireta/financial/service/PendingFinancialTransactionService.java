@@ -8,6 +8,7 @@ import br.com.gestaodireta.financial.mapper.PendingFinancialTransactionMapper;
 import br.com.gestaodireta.financial.repository.PendingFinancialTransactionRepository;
 import br.com.gestaodireta.messaging.service.OutgoingMessagingService;
 import br.com.gestaodireta.shared.exception.BusinessException;
+import br.com.gestaodireta.shared.exception.ConflictException;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
@@ -91,9 +92,11 @@ public class PendingFinancialTransactionService {
     }
 
     @Transactional
-    public PendingFinancialTransactionResponse approve(Long id) {
+    public PendingFinancialTransactionResponse approve(
+            Long id, ApprovePendingFinancialTransactionRequest approval) {
         PendingFinancialTransaction pending = findForUpdate(id);
         ensurePending(pending);
+        validateApproval(approval);
         FinancialCategory category =
                 resolveCategory(
                         pending.getSuggestedCategory() == null
@@ -106,11 +109,11 @@ public class PendingFinancialTransactionService {
                         pending.getDescription(),
                         pending.getAmount(),
                         pending.getType(),
-                        PaymentStatus.PENDING,
+                        approval.status(),
                         null,
                         pending.getTransactionDate(),
-                        null,
-                        null,
+                        approval.dueDate(),
+                        paidAt(approval, pending),
                         null,
                         pending.getFarm().getId(),
                         category == null ? null : category.getId(),
@@ -186,8 +189,36 @@ public class PendingFinancialTransactionService {
 
     private void ensurePending(PendingFinancialTransaction pending) {
         if (pending.getStatus() != PendingFinancialTransactionStatus.PENDING_REVIEW) {
-            throw new BusinessException(PROCESSED_MESSAGE);
+            throw new ConflictException(PROCESSED_MESSAGE);
         }
+    }
+
+    private void validateApproval(ApprovePendingFinancialTransactionRequest approval) {
+        if (approval.status() != PaymentStatus.PAID && approval.status() != PaymentStatus.PENDING) {
+            throw new BusinessException("Only paid or pending approval statuses are allowed");
+        }
+
+        if (approval.status() == PaymentStatus.PAID && approval.dueDate() != null) {
+            throw new BusinessException("Due date must be null for a paid approval");
+        }
+
+        if (approval.status() == PaymentStatus.PENDING && approval.dueDate() == null) {
+            throw new BusinessException("Due date is required for a pending approval");
+        }
+
+        if (approval.status() == PaymentStatus.PENDING && approval.paidAt() != null) {
+            throw new BusinessException("Paid at must be null for a pending approval");
+        }
+    }
+
+    private java.time.LocalDate paidAt(
+            ApprovePendingFinancialTransactionRequest approval,
+            PendingFinancialTransaction pending) {
+        if (approval.status() != PaymentStatus.PAID) {
+            return null;
+        }
+
+        return approval.paidAt() == null ? pending.getTransactionDate() : approval.paidAt();
     }
 
     private User currentUser() {

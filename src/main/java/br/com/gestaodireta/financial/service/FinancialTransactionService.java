@@ -95,7 +95,7 @@ public class FinancialTransactionService {
         applyRequest(transaction, request, category, harvestSeason);
 
         return financialTransactionMapper.toResponse(
-                financialTransactionRepository.save(transaction));
+                financialTransactionRepository.saveAndFlush(transaction));
     }
 
     @Transactional(readOnly = true)
