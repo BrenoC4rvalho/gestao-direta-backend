@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class PendingFinancialTransactionService {
@@ -33,6 +34,7 @@ public class PendingFinancialTransactionService {
     private final UserRepository userRepository;
     private final Clock clock;
     private final OutgoingMessagingService outgoing;
+    private final TransactionTemplate transactionTemplate;
 
     public PendingFinancialTransactionService(
             PendingFinancialTransactionRepository repository,
@@ -41,7 +43,8 @@ public class PendingFinancialTransactionService {
             PendingFinancialTransactionMapper mapper,
             UserRepository userRepository,
             Clock clock,
-            OutgoingMessagingService outgoing) {
+            OutgoingMessagingService outgoing,
+            TransactionTemplate transactionTemplate) {
         this.repository = repository;
         this.categoryService = categoryService;
         this.transactionService = transactionService;
@@ -49,6 +52,7 @@ public class PendingFinancialTransactionService {
         this.userRepository = userRepository;
         this.clock = clock;
         this.outgoing = outgoing;
+        this.transactionTemplate = transactionTemplate;
     }
 
     @Transactional(readOnly = true)
@@ -153,7 +157,14 @@ public class PendingFinancialTransactionService {
                 new TransactionSynchronization() {
                     @Override
                     public void afterCommit() {
-                        outgoing.send(pending.getMessagingConversation(), content);
+                        try {
+                            transactionTemplate.executeWithoutResult(
+                                    status ->
+                                            outgoing.send(
+                                                    pending.getMessagingConversation(), content));
+                        } catch (RuntimeException exception) {
+                            // A notification failure must not affect an already committed decision.
+                        }
                     }
                 });
     }

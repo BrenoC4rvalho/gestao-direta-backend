@@ -131,7 +131,10 @@ public class TelegramFinancialExtractionProcessor {
                 && result.type() != null
                 && result.transactionDate() != null
                 && result.description() != null
-                && !result.description().isBlank();
+                && !result.description().isBlank()
+                && result.confidence() != null
+                && result.confidence().compareTo(BigDecimal.ZERO) >= 0
+                && result.confidence().compareTo(BigDecimal.ONE) <= 0;
     }
 
     private FinancialCategory resolveCategory(

@@ -96,7 +96,7 @@ class PendingFinancialTransactionControllerTest extends PostgresIntegrationTest 
                                 .content(
                                         "{\"status\":\"PAID\",\"paidAt\":\"2026-07-21\",\"dueDate\":null}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("1status").value("APPROVED"));
+                .andExpect(jsonPath("status").value("APPROVED"));
 
         assertThat(transactionRepository.count()).isEqualTo(1);
         var transaction = transactionRepository.findAll().getFirst();
