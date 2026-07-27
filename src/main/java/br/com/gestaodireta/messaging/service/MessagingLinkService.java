@@ -19,7 +19,7 @@ public class MessagingLinkService {
     private final UserContactService contacts;
     private final ContactVerificationCodeRepository codes;
     private final MessagingAccountRepository accounts;
-    private final MessagingConversationRepository conversations;
+    private final MessagingConversationService conversations;
     private final PasswordEncoder encoder;
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
@@ -28,7 +28,7 @@ public class MessagingLinkService {
             UserContactService contacts,
             ContactVerificationCodeRepository codes,
             MessagingAccountRepository accounts,
-            MessagingConversationRepository conversations,
+            MessagingConversationService conversations,
             PasswordEncoder encoder,
             Clock clock) {
         this.contacts = contacts;
@@ -107,6 +107,7 @@ public class MessagingLinkService {
                     contact.getId(), MessagingChannel.TELEGRAM, MessagingAccountStatus.ACTIVE)) {
                 return invalid(locked, now);
             }
+            conversations.closeResidualOpenConversations(locked, now);
             locked.setUserContact(contact);
             locked.setStatus(MessagingAccountStatus.ACTIVE);
             locked.setVerifiedAt(now);
@@ -173,18 +174,7 @@ public class MessagingLinkService {
                                                         .equals(contact.getId()))
                         .orElseThrow(
                                 () -> new ResourceNotFoundException("Messaging account not found"));
-        conversations
-                .findWithLockByMessagingAccountIdAndStatusIn(
-                        accountId,
-                        java.util.List.of(
-                                MessagingConversationStatus.ACTIVE,
-                                MessagingConversationStatus.WAITING_FARM_SELECTION))
-                .forEach(
-                        conversation -> {
-                            conversation.setStatus(MessagingConversationStatus.CANCELED);
-                            conversation.setCurrentStep(MessagingConversationStep.NONE);
-                            conversation.setFarm(null);
-                        });
+        conversations.cancelOpenConversations(account);
         account.setStatus(MessagingAccountStatus.INACTIVE);
         account.setUserContact(null);
         accounts.save(account);

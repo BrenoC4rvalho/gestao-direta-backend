@@ -8,7 +8,6 @@ import br.com.gestaodireta.messaging.domain.MessagingAccount;
 import br.com.gestaodireta.messaging.enumeration.*;
 import br.com.gestaodireta.messaging.repository.ContactVerificationCodeRepository;
 import br.com.gestaodireta.messaging.repository.MessagingAccountRepository;
-import br.com.gestaodireta.messaging.repository.MessagingConversationRepository;
 import br.com.gestaodireta.user.service.UserContactService;
 import java.lang.reflect.Field;
 import java.time.*;
@@ -28,7 +27,7 @@ class MessagingLinkServiceTest {
     @Mock private UserContactService contacts;
     @Mock private ContactVerificationCodeRepository codes;
     @Mock private MessagingAccountRepository accounts;
-    @Mock private MessagingConversationRepository conversations;
+    @Mock private MessagingConversationService conversations;
     @Mock private PasswordEncoder encoder;
 
     private MessagingLinkService service;

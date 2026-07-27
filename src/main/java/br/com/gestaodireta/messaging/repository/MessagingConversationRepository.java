@@ -17,6 +17,13 @@ public interface MessagingConversationRepository
             Long accountId, Collection<MessagingConversationStatus> statuses);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+            "select conversation from MessagingConversation conversation where conversation.messagingAccount.id = :accountId and conversation.status in :statuses")
+    Optional<MessagingConversation> findOpenByMessagingAccountIdForUpdate(
+            @Param("accountId") Long accountId,
+            @Param("statuses") Collection<MessagingConversationStatus> statuses);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<MessagingConversation> findWithLockByMessagingAccountIdAndStatusIn(
             Long accountId, List<MessagingConversationStatus> statuses);
 
