@@ -13,21 +13,33 @@ import br.com.gestaodireta.messaging.domain.*;
 import br.com.gestaodireta.messaging.enumeration.*;
 import br.com.gestaodireta.user.enumeration.UserContactStatus;
 import br.com.gestaodireta.user.enumeration.UserStatus;
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 @Service
 public class TelegramFinancialExtractionProcessor {
+    private static final Logger LOGGER =
+            LoggerFactory.getLogger(TelegramFinancialExtractionProcessor.class);
+    private static final String INSUFFICIENT_MESSAGE =
+            "Não identifiquei uma movimentação financeira completa.\n\nEnvie uma mensagem como:\n“Gastei R$ 250,00 com combustível hoje.”\nou\n“Recebi R$ 1.000,00 pela venda de milho.”";
+    private static final String LOW_CONFIDENCE_MESSAGE =
+            "Não consegui interpretar a movimentação com segurança.";
+    private static final String AI_FAILURE_MESSAGE =
+            "Não foi possível interpretar sua mensagem agora.";
+
     private final FinancialTransactionExtractionService extractionService;
     private final PendingFinancialTransactionRepository pendingRepository;
     private final FinancialCategoryRepository categoryRepository;
     private final FarmUserRepository farmUsers;
     private final OutgoingMessagingService outgoing;
+    private final TelegramFinancialMessageEligibilityValidator eligibilityValidator;
+    private final FinancialTransactionExtractionResultValidator resultValidator;
     private final Clock clock;
 
     public TelegramFinancialExtractionProcessor(
@@ -36,12 +48,16 @@ public class TelegramFinancialExtractionProcessor {
             FinancialCategoryRepository categoryRepository,
             FarmUserRepository farmUsers,
             OutgoingMessagingService outgoing,
+            TelegramFinancialMessageEligibilityValidator eligibilityValidator,
+            FinancialTransactionExtractionResultValidator resultValidator,
             Clock clock) {
         this.extractionService = extractionService;
         this.pendingRepository = pendingRepository;
         this.categoryRepository = categoryRepository;
         this.farmUsers = farmUsers;
         this.outgoing = outgoing;
+        this.eligibilityValidator = eligibilityValidator;
+        this.resultValidator = resultValidator;
         this.clock = clock;
     }
 
@@ -51,6 +67,13 @@ public class TelegramFinancialExtractionProcessor {
             MessagingMessage message) {
         if (!eligible(account, conversation, message)
                 || pendingRepository.findBySourceMessageId(message.getId()).isPresent()) return;
+        if (!eligibilityValidator.isEligible(message.getContent())) {
+            LOGGER.info(
+                    "financial extraction rejected: stage=ELIGIBILITY reason=INSUFFICIENT_CONTEXT messageId={}",
+                    message.getId());
+            outgoing.send(conversation, INSUFFICIENT_MESSAGE);
+            return;
+        }
         if (!extractionService.isEnabled()) {
             outgoing.send(conversation, "O registro inteligente está indisponível no momento.");
             return;
@@ -64,16 +87,34 @@ public class TelegramFinancialExtractionProcessor {
             FinancialTransactionExtractionResult result =
                     extractionService.extract(
                             message.getContent(), conversation.getFarm().getName(), categories);
-            if (!result.isFinancialTransaction()) {
-                outgoing.send(
-                        conversation,
-                        "Não identifiquei uma movimentação financeira.\n\nEnvie uma mensagem como:\n“Gastei R$ 250,00 com combustível hoje.”");
+            LOGGER.info(
+                    "financial extraction result: messageId={} financial={} type={} amount={} confidence={} missingFields={}",
+                    message.getId(),
+                    result.isFinancialTransaction(),
+                    result.type(),
+                    result.amount(),
+                    result.confidence(),
+                    result.missingFields());
+            if (extractionService.isDiagnosticOnly()) {
+                LOGGER.info(
+                        "financial extraction diagnostic-only: stage=RESULT_RECEIVED messageId={}",
+                        message.getId());
                 return;
             }
-            if (!result.missingFields().isEmpty() || !valid(result)) {
+            FinancialTransactionExtractionResultValidator.ValidationResult validation =
+                    resultValidator.validate(message.getContent(), result);
+            if (!validation.valid()) {
+                LOGGER.info(
+                        "financial extraction rejected: stage=RESULT_VALIDATION reason={} messageId={}",
+                        validation.reason(),
+                        message.getId());
                 outgoing.send(
                         conversation,
-                        "Não consegui identificar todos os dados da movimentação.\n\nEnvie uma mensagem como:\n“Gastei R$ 250,00 com adubo hoje.”");
+                        validation.reason()
+                                        == FinancialTransactionExtractionResultValidator
+                                                .RejectionReason.LOW_CONFIDENCE
+                                ? LOW_CONFIDENCE_MESSAGE
+                                : INSUFFICIENT_MESSAGE);
                 return;
             }
             PendingFinancialTransaction pending = new PendingFinancialTransaction();
@@ -86,20 +127,27 @@ public class TelegramFinancialExtractionProcessor {
             pending.setType(result.type());
             pending.setAmount(result.amount());
             pending.setTransactionDate(result.transactionDate());
-            pending.setDescription(result.description());
-            pending.setRawCategoryName(result.categoryName());
+            pending.setDescription(result.description().trim());
             pending.setSuggestedCategory(resolveCategory(categories, result));
-            if (pending.getSuggestedCategory() != null) pending.setRawCategoryName(null);
+            pending.setRawCategoryName(
+                    pending.getSuggestedCategory() == null ? normalizedCategoryName(result) : null);
             pending.setStatus(PendingFinancialTransactionStatus.PENDING_REVIEW);
             pending.setConfidence(result.confidence());
             pending.setAiModel(extractionService.model());
             pending.setAiProcessedAt(LocalDateTime.now(clock));
             pendingRepository.save(pending);
+            LOGGER.info(
+                    "financial extraction persisted: stage=PENDING_CREATED messageId={} amount={} type={}",
+                    message.getId(),
+                    pending.getAmount(),
+                    pending.getType());
             outgoing.send(conversation, confirmation(pending));
         } catch (RuntimeException exception) {
-            outgoing.send(
-                    conversation,
-                    "Não foi possível interpretar sua mensagem agora. Tente novamente em alguns instantes.");
+            LOGGER.warn(
+                    "financial extraction rejected: stage=AI_FAILURE reason={} messageId={}",
+                    exception.getClass().getSimpleName(),
+                    message.getId());
+            outgoing.send(conversation, AI_FAILURE_MESSAGE);
         }
     }
 
@@ -125,18 +173,6 @@ public class TelegramFinancialExtractionProcessor {
                 .orElse(false);
     }
 
-    private boolean valid(FinancialTransactionExtractionResult result) {
-        return result.amount() != null
-                && result.amount().compareTo(BigDecimal.ZERO) > 0
-                && result.type() != null
-                && result.transactionDate() != null
-                && result.description() != null
-                && !result.description().isBlank()
-                && result.confidence() != null
-                && result.confidence().compareTo(BigDecimal.ZERO) >= 0
-                && result.confidence().compareTo(BigDecimal.ONE) <= 0;
-    }
-
     private FinancialCategory resolveCategory(
             List<FinancialCategory> categories, FinancialTransactionExtractionResult result) {
         if (result.categoryName() == null) return null;
@@ -151,6 +187,13 @@ public class TelegramFinancialExtractionProcessor {
                                         .equals(normalized))
                 .findFirst()
                 .orElse(null);
+    }
+
+    private String normalizedCategoryName(FinancialTransactionExtractionResult result) {
+        if (result.categoryName() == null || result.categoryName().isBlank()) {
+            return null;
+        }
+        return result.categoryName().trim();
     }
 
     private String confirmation(PendingFinancialTransaction pending) {

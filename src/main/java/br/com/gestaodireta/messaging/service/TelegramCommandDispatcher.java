@@ -111,11 +111,7 @@ public class TelegramCommandDispatcher {
             resolve(conversation, true);
             return;
         }
-        outgoing.send(
-                conversation,
-                "Fazenda atual: "
-                        + conversation.getFarm().getName()
-                        + ".\n\nO registro de movimentações por mensagem será disponibilizado em breve.");
+        // Non-command text is handled by TelegramFinancialExtractionProcessor.
     }
 
     private void pending(

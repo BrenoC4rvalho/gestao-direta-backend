@@ -10,6 +10,7 @@ public class FinancialExtractionProperties {
     private String model;
     private int timeoutSeconds = 20;
     private double minimumConfidence = 0.60;
+    private boolean diagnosticOnly;
 
     public boolean isEnabled() {
         return enabled;
@@ -41,5 +42,13 @@ public class FinancialExtractionProperties {
 
     public void setMinimumConfidence(double value) {
         minimumConfidence = value;
+    }
+
+    public boolean isDiagnosticOnly() {
+        return diagnosticOnly;
+    }
+
+    public void setDiagnosticOnly(boolean value) {
+        diagnosticOnly = value;
     }
 }

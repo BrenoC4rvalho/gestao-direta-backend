@@ -42,6 +42,7 @@ app:
       model: ""
       timeout-seconds: 20
       minimum-confidence: 0.60
+      diagnostic-only: false
     provider: fake
     ollama:
       base-url: http://localhost:11434

@@ -10,6 +10,8 @@ import br.com.gestaodireta.messaging.domain.MessagingMessage;
 import br.com.gestaodireta.shared.audit.BaseEntity;
 import br.com.gestaodireta.user.entity.User;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -55,6 +57,8 @@ public class PendingFinancialTransaction extends BaseEntity {
     @Column(name = "transaction_date", nullable = false)
     private LocalDate transactionDate;
 
+    @NotBlank
+    @Size(max = 160)
     @Column(nullable = false, length = 160)
     private String description;
 

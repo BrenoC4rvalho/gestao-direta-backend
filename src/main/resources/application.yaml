@@ -67,6 +67,7 @@ app:
       model: ${AI_FINANCIAL_EXTRACTION_MODEL:}
       timeout-seconds: ${AI_FINANCIAL_EXTRACTION_TIMEOUT_SECONDS:20}
       minimum-confidence: ${AI_FINANCIAL_EXTRACTION_MINIMUM_CONFIDENCE:0.60}
+      diagnostic-only: ${AI_FINANCIAL_EXTRACTION_DIAGNOSTIC_ONLY:false}
     provider: ${APP_AI_PROVIDER:ollama}
     ollama:
       base-url: ${APP_AI_OLLAMA_BASE_URL:http://localhost:11434}
