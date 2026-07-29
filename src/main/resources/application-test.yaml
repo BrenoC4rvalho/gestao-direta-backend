@@ -55,6 +55,13 @@ app:
     issuer: gestao-direta-api-test
     secret: test-secret-test-secret-test-secret-test-secret
     expiration-minutes: 60
+    remember-me-expiration-days: 15
+  auth:
+    password-recovery:
+      code-expiration-minutes: 10
+      max-attempts: 5
+      request-window-minutes: 15
+      max-requests-per-window: 3
   cookie:
     name: gd_session
     secure: false

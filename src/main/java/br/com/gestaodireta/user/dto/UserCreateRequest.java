@@ -18,4 +18,5 @@ public record UserCreateRequest(
                                         + " number and special character")
                 String password,
         @Size(max = 20) String document,
+        @NotBlank @Size(max = 30) String phoneNumber,
         @NotNull UserType userType) {}

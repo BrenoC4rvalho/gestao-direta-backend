@@ -82,6 +82,14 @@ app:
     issuer: gestao-direta-api
     secret: ${APP_JWT_SECRET:change-this-secret-in-production-change-this-secret}
     expiration-minutes: ${APP_JWT_EXPIRATION_MINUTES:120}
+    remember-me-expiration-days: ${APP_JWT_REMEMBER_ME_EXPIRATION_DAYS:15}
+
+  auth:
+    password-recovery:
+      code-expiration-minutes: ${PASSWORD_RECOVERY_CODE_EXPIRATION_MINUTES:10}
+      max-attempts: ${PASSWORD_RECOVERY_MAX_ATTEMPTS:5}
+      request-window-minutes: ${PASSWORD_RECOVERY_REQUEST_WINDOW_MINUTES:15}
+      max-requests-per-window: ${PASSWORD_RECOVERY_MAX_REQUESTS_PER_WINDOW:3}
 
   cookie:
     name: gd_session

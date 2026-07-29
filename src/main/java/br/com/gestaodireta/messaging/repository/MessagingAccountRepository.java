@@ -21,6 +21,10 @@ public interface MessagingAccountRepository extends JpaRepository<MessagingAccou
     Optional<MessagingAccount> findWithLockByChannelAndExternalUserIdAndExternalChatId(
             MessagingChannel channel, String externalUserId, String externalChatId);
 
+    java.util.Optional<MessagingAccount>
+            findFirstByUserContactUserIdAndChannelAndStatusAndVerifiedAtIsNotNullAndExternalChatIdIsNotNull(
+                    Long userId, MessagingChannel channel, MessagingAccountStatus status);
+
     boolean existsByUserContactIdAndChannelAndStatus(
             Long userContactId, MessagingChannel channel, MessagingAccountStatus status);
 }

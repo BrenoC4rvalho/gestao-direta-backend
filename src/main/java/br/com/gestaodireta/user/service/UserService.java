@@ -14,8 +14,13 @@ import br.com.gestaodireta.user.dto.UserStatusUpdateRequest;
 import br.com.gestaodireta.user.dto.UserTypeUpdateRequest;
 import br.com.gestaodireta.user.dto.UserUpdateRequest;
 import br.com.gestaodireta.user.entity.User;
+import br.com.gestaodireta.user.entity.UserContact;
+import br.com.gestaodireta.user.enumeration.PhoneVerificationStatus;
+import br.com.gestaodireta.user.enumeration.PreferredMessagingChannel;
+import br.com.gestaodireta.user.enumeration.UserContactStatus;
 import br.com.gestaodireta.user.enumeration.UserStatus;
 import br.com.gestaodireta.user.mapper.UserMapper;
+import br.com.gestaodireta.user.repository.UserContactRepository;
 import br.com.gestaodireta.user.repository.UserRepository;
 import java.util.List;
 import java.util.Locale;
@@ -40,11 +45,21 @@ public class UserService {
 
     private final PasswordEncoder passwordEncoder;
 
+    private final UserContactRepository userContactRepository;
+
+    private final UserContactService userContactService;
+
     public UserService(
-            UserRepository userRepository, UserMapper userMapper, PasswordEncoder passwordEncoder) {
+            UserRepository userRepository,
+            UserMapper userMapper,
+            PasswordEncoder passwordEncoder,
+            UserContactRepository userContactRepository,
+            UserContactService userContactService) {
         this.userRepository = userRepository;
         this.userMapper = userMapper;
         this.passwordEncoder = passwordEncoder;
+        this.userContactRepository = userContactRepository;
+        this.userContactService = userContactService;
     }
 
     @Transactional
@@ -61,7 +76,16 @@ public class UserService {
         user.setUserType(request.userType());
         user.setStatus(UserStatus.ACTIVE);
 
-        return userMapper.toResponse(userRepository.save(user));
+        User savedUser = userRepository.save(user);
+        UserContact contact = new UserContact();
+        contact.setUser(savedUser);
+        contact.setPhoneNumber(userContactService.normalize(request.phoneNumber()));
+        contact.setPhoneVerificationStatus(PhoneVerificationStatus.PENDING);
+        contact.setPreferredChannel(PreferredMessagingChannel.NONE);
+        contact.setStatus(UserContactStatus.PENDING);
+        userContactRepository.save(contact);
+
+        return userMapper.toResponse(savedUser);
     }
 
     @Transactional(readOnly = true)
@@ -133,6 +157,7 @@ public class UserService {
 
         String newPassword = normalizePassword(request.newPassword());
         user.setPassword(passwordEncoder.encode(newPassword));
+        user.incrementCredentialsVersion();
 
         return userMapper.toResponse(userRepository.save(user));
     }

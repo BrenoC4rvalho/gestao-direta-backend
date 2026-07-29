@@ -46,6 +46,9 @@ public class SecurityConfig {
                                 authorization
                                         .requestMatchers(HttpMethod.POST, "/auth/login")
                                         .permitAll()
+                                        .requestMatchers(
+                                                HttpMethod.POST, "/auth/password-recovery/**")
+                                        .permitAll()
                                         .requestMatchers(HttpMethod.GET, "/system/status")
                                         .permitAll()
                                         .requestMatchers(

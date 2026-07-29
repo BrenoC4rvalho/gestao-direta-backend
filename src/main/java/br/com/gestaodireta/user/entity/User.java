@@ -40,6 +40,9 @@ public class User extends BaseEntity {
     @Column(nullable = false, length = 30)
     private UserStatus status;
 
+    @Column(name = "credentials_version", nullable = false)
+    private int credentialsVersion = 1;
+
     public Long getId() {
         return id;
     }
@@ -90,5 +93,17 @@ public class User extends BaseEntity {
 
     public void setStatus(UserStatus status) {
         this.status = status;
+    }
+
+    public int getCredentialsVersion() {
+        return credentialsVersion;
+    }
+
+    public void setCredentialsVersion(int credentialsVersion) {
+        this.credentialsVersion = credentialsVersion;
+    }
+
+    public void incrementCredentialsVersion() {
+        credentialsVersion++;
     }
 }

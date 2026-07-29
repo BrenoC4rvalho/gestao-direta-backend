@@ -43,7 +43,10 @@ public class AuthService {
         validateActiveUser(user);
         validatePassword(request.password(), user.getPassword());
 
-        return new LoginResult(toResponse(user), jwtService.generateToken(user));
+        return new LoginResult(
+                toResponse(user),
+                jwtService.generateToken(user, request.isRememberMe()),
+                jwtService.getExpirationSeconds(request.isRememberMe()));
     }
 
     @Transactional(readOnly = true)
@@ -65,11 +68,8 @@ public class AuthService {
         }
 
         user.setPassword(passwordEncoder.encode(request.newPassword()));
+        user.incrementCredentialsVersion();
         userRepository.save(user);
-    }
-
-    public long getTokenExpirationSeconds() {
-        return jwtService.getExpirationSeconds();
     }
 
     private User findAuthenticatedUser() {
@@ -103,5 +103,5 @@ public class AuthService {
                         user.getStatus()));
     }
 
-    public record LoginResult(AuthResponse response, String token) {}
+    public record LoginResult(AuthResponse response, String token, long expirationSeconds) {}
 }

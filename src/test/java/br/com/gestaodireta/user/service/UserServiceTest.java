@@ -52,6 +52,7 @@ class UserServiceTest extends PostgresIntegrationTest {
                         "maria@example.com",
                         "Strong1!",
                         "12345678900",
+                        "+5524999999999",
                         UserType.USER);
 
         UserResponse response = userService.create(request);
@@ -74,11 +75,21 @@ class UserServiceTest extends PostgresIntegrationTest {
     void shouldRejectDuplicatedEmail() {
         userService.create(
                 new UserCreateRequest(
-                        "Maria Silva", "maria@example.com", "Strong1!", null, UserType.USER));
+                        "Maria Silva",
+                        "maria@example.com",
+                        "Strong1!",
+                        null,
+                        "+5524999999999",
+                        UserType.USER));
 
         UserCreateRequest duplicatedRequest =
                 new UserCreateRequest(
-                        "Maria Souza", "maria@example.com", "Strong2!", null, UserType.USER);
+                        "Maria Souza",
+                        "maria@example.com",
+                        "Strong2!",
+                        null,
+                        "+5524988888888",
+                        UserType.USER);
 
         assertThatThrownBy(() -> userService.create(duplicatedRequest))
                 .isInstanceOf(BusinessException.class)
@@ -412,7 +423,8 @@ class UserServiceTest extends PostgresIntegrationTest {
     }
 
     private UserResponse createNamedUser(String name, String email, UserType userType) {
-        return userService.create(new UserCreateRequest(name, email, "Strong1!", null, userType));
+        return userService.create(
+                new UserCreateRequest(name, email, "Strong1!", null, "+5524999999999", userType));
     }
 
     private void authenticateAs(Long userId, String role) {

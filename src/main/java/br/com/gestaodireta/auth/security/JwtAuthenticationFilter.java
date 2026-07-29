@@ -65,6 +65,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throw new IllegalStateException("User is not active");
         }
 
+        if (decodedJwt.getClaim("credentialsVersion").asInt()
+                != userDetails.getUser().getCredentialsVersion()) {
+            throw new IllegalStateException("Credentials have changed");
+        }
+
         UserAuthenticationToken authentication =
                 new UserAuthenticationToken(userDetails, null, userDetails.getAuthorities());
         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
