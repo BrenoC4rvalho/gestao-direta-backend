@@ -18,8 +18,8 @@ import br.com.gestaodireta.user.dto.UserUpdateRequest;
 import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.enumeration.UserStatus;
 import br.com.gestaodireta.user.enumeration.UserType;
-import br.com.gestaodireta.user.repository.UserRepository;
 import br.com.gestaodireta.user.repository.UserContactRepository;
+import br.com.gestaodireta.user.repository.UserRepository;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -429,12 +429,7 @@ class UserServiceTest extends PostgresIntegrationTest {
     private UserResponse createNamedUser(String name, String email, UserType userType) {
         return userService.create(
                 new UserCreateRequest(
-                        name,
-                        email,
-                        "Strong1!",
-                        null,
-                        phoneNumberFor(email),
-                        userType));
+                        name, email, "Strong1!", null, phoneNumberFor(email), userType));
     }
 
     private String phoneNumberFor(String email) {

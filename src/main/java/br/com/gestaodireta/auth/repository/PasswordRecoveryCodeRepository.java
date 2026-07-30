@@ -17,6 +17,9 @@ public interface PasswordRecoveryCodeRepository extends JpaRepository<PasswordRe
             Long userId, PasswordRecoveryCodeStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<PasswordRecoveryCode> findFirstByUserIdOrderByRequestedAtDesc(Long userId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<PasswordRecoveryCode> findByUserIdAndStatus(
             Long userId, PasswordRecoveryCodeStatus status);
 }

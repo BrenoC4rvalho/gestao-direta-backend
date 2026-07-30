@@ -1,11 +1,17 @@
 package br.com.gestaodireta.auth.service;
 
-import br.com.gestaodireta.auth.dto.*;
-import br.com.gestaodireta.auth.entity.*;
+import br.com.gestaodireta.auth.dto.PasswordRecoveryRequest;
+import br.com.gestaodireta.auth.dto.PasswordRecoveryResetRequest;
+import br.com.gestaodireta.auth.dto.PasswordRecoveryVerifyRequest;
+import br.com.gestaodireta.auth.dto.PasswordRecoveryVerifyResponse;
+import br.com.gestaodireta.auth.entity.PasswordRecoveryCode;
+import br.com.gestaodireta.auth.entity.PasswordResetToken;
 import br.com.gestaodireta.auth.enumeration.PasswordRecoveryCodeStatus;
-import br.com.gestaodireta.auth.repository.*;
+import br.com.gestaodireta.auth.repository.PasswordRecoveryCodeRepository;
+import br.com.gestaodireta.auth.repository.PasswordResetTokenRepository;
 import br.com.gestaodireta.messaging.domain.MessagingAccount;
-import br.com.gestaodireta.messaging.enumeration.*;
+import br.com.gestaodireta.messaging.enumeration.MessagingAccountStatus;
+import br.com.gestaodireta.messaging.enumeration.MessagingChannel;
 import br.com.gestaodireta.messaging.repository.MessagingAccountRepository;
 import br.com.gestaodireta.messaging.service.MessagingConversationService;
 import br.com.gestaodireta.messaging.service.OutgoingMessagingService;
@@ -16,7 +22,8 @@ import br.com.gestaodireta.user.repository.UserRepository;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
-import java.time.*;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.Base64;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -25,15 +32,23 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PasswordRecoveryService {
+
     public static final String GENERIC_MESSAGE =
             "Se houver uma conta válida com Telegram vinculado, um código será enviado.";
-    private final UserRepository users;
-    private final PasswordRecoveryCodeRepository codes;
-    private final PasswordResetTokenRepository tokens;
-    private final MessagingAccountRepository accounts;
-    private final MessagingConversationService conversations;
-    private final OutgoingMessagingService outgoing;
-    private final PasswordEncoder encoder;
+
+    private static final String INVALID_CODE_MESSAGE = "Código inválido.";
+    private static final String EXPIRED_CODE_MESSAGE = "Código expirado.";
+    private static final String BLOCKED_CODE_MESSAGE = "Código bloqueado.";
+    private static final String INVALID_RESET_TOKEN_MESSAGE =
+            "Token de redefinição inválido ou expirado.";
+
+    private final UserRepository userRepository;
+    private final PasswordRecoveryCodeRepository codeRepository;
+    private final PasswordResetTokenRepository tokenRepository;
+    private final MessagingAccountRepository messagingAccountRepository;
+    private final MessagingConversationService messagingConversationService;
+    private final OutgoingMessagingService outgoingMessagingService;
+    private final PasswordEncoder passwordEncoder;
     private final Clock clock;
     private final int codeMinutes;
     private final int maxAttempts;
@@ -42,25 +57,25 @@ public class PasswordRecoveryService {
     private final SecureRandom random = new SecureRandom();
 
     public PasswordRecoveryService(
-            UserRepository users,
-            PasswordRecoveryCodeRepository codes,
-            PasswordResetTokenRepository tokens,
-            MessagingAccountRepository accounts,
-            MessagingConversationService conversations,
-            OutgoingMessagingService outgoing,
-            PasswordEncoder encoder,
+            UserRepository userRepository,
+            PasswordRecoveryCodeRepository codeRepository,
+            PasswordResetTokenRepository tokenRepository,
+            MessagingAccountRepository messagingAccountRepository,
+            MessagingConversationService messagingConversationService,
+            OutgoingMessagingService outgoingMessagingService,
+            PasswordEncoder passwordEncoder,
             Clock clock,
             @Value("${app.auth.password-recovery.code-expiration-minutes}") int codeMinutes,
             @Value("${app.auth.password-recovery.max-attempts}") int maxAttempts,
             @Value("${app.auth.password-recovery.request-window-minutes}") int windowMinutes,
             @Value("${app.auth.password-recovery.max-requests-per-window}") int maxRequests) {
-        this.users = users;
-        this.codes = codes;
-        this.tokens = tokens;
-        this.accounts = accounts;
-        this.conversations = conversations;
-        this.outgoing = outgoing;
-        this.encoder = encoder;
+        this.userRepository = userRepository;
+        this.codeRepository = codeRepository;
+        this.tokenRepository = tokenRepository;
+        this.messagingAccountRepository = messagingAccountRepository;
+        this.messagingConversationService = messagingConversationService;
+        this.outgoingMessagingService = outgoingMessagingService;
+        this.passwordEncoder = passwordEncoder;
         this.clock = clock;
         this.codeMinutes = codeMinutes;
         this.maxAttempts = maxAttempts;
@@ -70,117 +85,188 @@ public class PasswordRecoveryService {
 
     @Transactional
     public void request(PasswordRecoveryRequest request) {
-        User user = users.findByEmailIgnoreCase(request.email().trim()).orElse(null);
-        if (user == null || user.getStatus() != UserStatus.ACTIVE) return;
+        User user = userRepository.findByEmailIgnoreCase(request.email().trim()).orElse(null);
+        if (user == null || user.getStatus() != UserStatus.ACTIVE) {
+            return;
+        }
+
         LocalDateTime now = LocalDateTime.now(clock);
-        if (codes.countByUserIdAndRequestedAtAfter(user.getId(), now.minusMinutes(windowMinutes))
-                >= maxRequests) return;
+        if (codeRepository.countByUserIdAndRequestedAtAfter(
+                        user.getId(), now.minusMinutes(windowMinutes))
+                >= maxRequests) {
+            return;
+        }
+
         MessagingAccount account =
-                accounts.findFirstByUserContactUserIdAndChannelAndStatusAndVerifiedAtIsNotNullAndExternalChatIdIsNotNull(
+                messagingAccountRepository
+                        .findFirstByUserContactUserIdAndChannelAndStatusAndVerifiedAtIsNotNullAndExternalChatIdIsNotNull(
                                 user.getId(),
                                 MessagingChannel.TELEGRAM,
                                 MessagingAccountStatus.ACTIVE)
                         .orElse(null);
-        if (account == null || account.getExternalChatId().isBlank()) return;
-        codes.findByUserIdAndStatus(user.getId(), PasswordRecoveryCodeStatus.ACTIVE)
-                .forEach(
-                        c -> {
-                            c.setStatus(PasswordRecoveryCodeStatus.INVALIDATED);
-                            c.setInvalidatedAt(now);
-                        });
-        String raw = "%06d".formatted(random.nextInt(1_000_000));
+        if (account == null || account.getExternalChatId().isBlank()) {
+            return;
+        }
+
+        invalidateActiveCredentials(user.getId(), now);
+
+        String rawCode = "%06d".formatted(random.nextInt(1_000_000));
         PasswordRecoveryCode code = new PasswordRecoveryCode();
         code.setUser(user);
-        code.setCodeHash(encoder.encode(raw));
+        code.setCodeHash(passwordEncoder.encode(rawCode));
         code.setStatus(PasswordRecoveryCodeStatus.ACTIVE);
         code.setExpiresAt(now.plusMinutes(codeMinutes));
         code.setAttemptCount(0);
         code.setMaxAttempts(maxAttempts);
         code.setRequestedAt(now);
-        codes.save(code);
-        outgoing.send(
-                conversations.active(account, now),
-                "Código para redefinir sua senha no Gestão Direta:\n\n"
-                        + raw
-                        + "\n\nO código expira em "
-                        + codeMinutes
-                        + " minutos.\n\nSe você não solicitou a redefinição, ignore esta mensagem.");
+        codeRepository.save(code);
+
+        boolean sent =
+                outgoingMessagingService.send(
+                        messagingConversationService.active(account, now),
+                        "Código para redefinir sua senha no Gestão Direta:\n\n"
+                                + rawCode
+                                + "\n\nO código expira em "
+                                + codeMinutes
+                                + " minutos.\n\nSe você não solicitou a redefinição, ignore esta mensagem.");
+        if (!sent) {
+            code.setStatus(PasswordRecoveryCodeStatus.INVALIDATED);
+            code.setInvalidatedAt(now);
+        }
     }
 
     @Transactional
     public PasswordRecoveryVerifyResponse verify(PasswordRecoveryVerifyRequest request) {
         User user =
-                users.findByEmailIgnoreCase(request.email().trim()).orElseThrow(() -> invalid());
+                userRepository
+                        .findByEmailIgnoreCase(request.email().trim())
+                        .filter(foundUser -> foundUser.getStatus() == UserStatus.ACTIVE)
+                        .orElseThrow(this::invalidCode);
         LocalDateTime now = LocalDateTime.now(clock);
         PasswordRecoveryCode code =
-                codes.findFirstByUserIdAndStatusOrderByRequestedAtDesc(
-                                user.getId(), PasswordRecoveryCodeStatus.ACTIVE)
-                        .orElseThrow(() -> invalid());
-        if (!code.getExpiresAt().isAfter(now)) {
-            code.setStatus(PasswordRecoveryCodeStatus.EXPIRED);
-            throw invalid();
-        }
-        if (!encoder.matches(request.code(), code.getCodeHash())) {
-            code.setAttemptCount(code.getAttemptCount() + 1);
-            if (code.getAttemptCount() >= code.getMaxAttempts())
-                code.setStatus(PasswordRecoveryCodeStatus.BLOCKED);
-            throw invalid();
-        }
+                codeRepository
+                        .findFirstByUserIdOrderByRequestedAtDesc(user.getId())
+                        .orElseThrow(this::invalidCode);
+
+        validateCode(code, request.code(), now);
         code.setStatus(PasswordRecoveryCodeStatus.USED);
         code.setUsedAt(now);
-        String raw = newToken();
+        invalidateActiveTokens(user.getId(), now);
+
+        String rawToken = newToken();
         PasswordResetToken token = new PasswordResetToken();
         token.setUser(user);
         token.setRecoveryCode(code);
-        token.setTokenHash(hash(raw));
+        token.setTokenHash(hash(rawToken));
         token.setExpiresAt(now.plusMinutes(5));
-        tokens.save(token);
+        tokenRepository.save(token);
+
         return new PasswordRecoveryVerifyResponse(
-                raw, token.getExpiresAt().atZone(clock.getZone()).toInstant());
+                rawToken, token.getExpiresAt().atZone(clock.getZone()).toInstant());
     }
 
     @Transactional
     public void reset(PasswordRecoveryResetRequest request) {
-        if (!request.newPassword().equals(request.confirmPassword()))
+        if (!request.newPassword().equals(request.confirmPassword())) {
             throw new BusinessException("Passwords do not match");
+        }
+
         LocalDateTime now = LocalDateTime.now(clock);
         PasswordResetToken token =
-                tokens.findByTokenHash(hash(request.resetToken()))
-                        .orElseThrow(
-                                () -> new BusinessException("Reset token is invalid or expired."));
+                tokenRepository
+                        .findByTokenHash(hash(request.resetToken()))
+                        .orElseThrow(this::invalidResetToken);
         if (token.getUsedAt() != null
                 || token.getInvalidatedAt() != null
-                || !token.getExpiresAt().isAfter(now))
-            throw new BusinessException("Reset token is invalid or expired.");
+                || !token.getExpiresAt().isAfter(now)) {
+            if (!token.getExpiresAt().isAfter(now) && token.getInvalidatedAt() == null) {
+                token.setInvalidatedAt(now);
+            }
+            throw invalidResetToken();
+        }
+
         User user = token.getUser();
-        if (encoder.matches(request.newPassword(), user.getPassword()))
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw invalidResetToken();
+        }
+        if (passwordEncoder.matches(request.newPassword(), user.getPassword())) {
             throw new BusinessException("New password must be different from current password");
-        user.setPassword(encoder.encode(request.newPassword()));
+        }
+
+        user.setPassword(passwordEncoder.encode(request.newPassword()));
         user.incrementCredentialsVersion();
         token.setUsedAt(now);
-        tokens.findByUserIdAndUsedAtIsNullAndInvalidatedAtIsNull(user.getId())
+        invalidateActiveTokens(user.getId(), now);
+        codeRepository
+                .findByUserIdAndStatus(user.getId(), PasswordRecoveryCodeStatus.ACTIVE)
                 .forEach(
-                        remaining -> {
-                            if (!remaining.getId().equals(token.getId())) {
-                                remaining.setInvalidatedAt(now);
-                            }
-                        });
-        codes.findByUserIdAndStatus(user.getId(), PasswordRecoveryCodeStatus.ACTIVE)
-                .forEach(
-                        remaining -> {
-                            remaining.setStatus(PasswordRecoveryCodeStatus.INVALIDATED);
-                            remaining.setInvalidatedAt(now);
+                        code -> {
+                            code.setStatus(PasswordRecoveryCodeStatus.INVALIDATED);
+                            code.setInvalidatedAt(now);
                         });
     }
 
-    private BusinessException invalid() {
-        return new BusinessException("Código inválido ou expirado.");
+    private void validateCode(PasswordRecoveryCode code, String rawCode, LocalDateTime now) {
+        if (code.getStatus() == PasswordRecoveryCodeStatus.BLOCKED) {
+            throw blockedCode();
+        }
+        if (code.getStatus() == PasswordRecoveryCodeStatus.EXPIRED) {
+            throw expiredCode();
+        }
+        if (code.getStatus() != PasswordRecoveryCodeStatus.ACTIVE) {
+            throw invalidCode();
+        }
+        if (!code.getExpiresAt().isAfter(now)) {
+            code.setStatus(PasswordRecoveryCodeStatus.EXPIRED);
+            throw expiredCode();
+        }
+        if (!passwordEncoder.matches(rawCode, code.getCodeHash())) {
+            code.setAttemptCount(code.getAttemptCount() + 1);
+            if (code.getAttemptCount() >= code.getMaxAttempts()) {
+                code.setStatus(PasswordRecoveryCodeStatus.BLOCKED);
+                throw blockedCode();
+            }
+            throw invalidCode();
+        }
+    }
+
+    private void invalidateActiveCredentials(Long userId, LocalDateTime now) {
+        codeRepository
+                .findByUserIdAndStatus(userId, PasswordRecoveryCodeStatus.ACTIVE)
+                .forEach(
+                        code -> {
+                            code.setStatus(PasswordRecoveryCodeStatus.INVALIDATED);
+                            code.setInvalidatedAt(now);
+                        });
+        invalidateActiveTokens(userId, now);
+    }
+
+    private void invalidateActiveTokens(Long userId, LocalDateTime now) {
+        tokenRepository
+                .findByUserIdAndUsedAtIsNullAndInvalidatedAtIsNull(userId)
+                .forEach(token -> token.setInvalidatedAt(now));
+    }
+
+    private BusinessException invalidCode() {
+        return new BusinessException(INVALID_CODE_MESSAGE);
+    }
+
+    private BusinessException expiredCode() {
+        return new BusinessException(EXPIRED_CODE_MESSAGE);
+    }
+
+    private BusinessException blockedCode() {
+        return new BusinessException(BLOCKED_CODE_MESSAGE);
+    }
+
+    private BusinessException invalidResetToken() {
+        return new BusinessException(INVALID_RESET_TOKEN_MESSAGE);
     }
 
     private String newToken() {
-        byte[] b = new byte[32];
-        random.nextBytes(b);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(b);
+        byte[] bytes = new byte[32];
+        random.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     private String hash(String value) {
@@ -189,8 +275,8 @@ public class PasswordRecoveryService {
                     .encodeToString(
                             MessageDigest.getInstance("SHA-256")
                                     .digest(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
+        } catch (Exception exception) {
+            throw new IllegalStateException(exception);
         }
     }
 }

@@ -1,15 +1,23 @@
 package br.com.gestaodireta.messaging.service;
 
-import br.com.gestaodireta.messaging.domain.*;
-import br.com.gestaodireta.messaging.enumeration.*;
+import br.com.gestaodireta.messaging.domain.MessagingAccount;
+import br.com.gestaodireta.messaging.domain.MessagingConversation;
+import br.com.gestaodireta.messaging.domain.MessagingMessage;
+import br.com.gestaodireta.messaging.enumeration.MessagingChannel;
+import br.com.gestaodireta.messaging.enumeration.MessagingDirection;
+import br.com.gestaodireta.messaging.enumeration.MessagingMessageStatus;
+import br.com.gestaodireta.messaging.enumeration.MessagingMessageType;
 import br.com.gestaodireta.messaging.repository.MessagingMessageRepository;
-import br.com.gestaodireta.messaging.telegram.client.*;
-import java.time.*;
+import br.com.gestaodireta.messaging.telegram.client.TelegramBotClient;
+import br.com.gestaodireta.messaging.telegram.client.TelegramSendMessageResult;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class OutgoingMessagingService {
+
     private final MessagingMessageRepository messages;
     private final TelegramBotClient client;
 
@@ -19,7 +27,7 @@ public class OutgoingMessagingService {
     }
 
     @Transactional
-    public void send(MessagingConversation conversation, String content) {
+    public boolean send(MessagingConversation conversation, String content) {
         MessagingMessage message = create(conversation, content);
         try {
             TelegramSendMessageResult result =
@@ -28,11 +36,14 @@ public class OutgoingMessagingService {
             message.setProviderMessageId(result.messageId());
             message.setStatus(MessagingMessageStatus.SENT);
             message.setSentAt(LocalDateTime.now(ZoneOffset.UTC));
+            messages.save(message);
+            return true;
         } catch (RuntimeException exception) {
             message.setStatus(MessagingMessageStatus.FAILED);
             message.setErrorMessage("Telegram message could not be sent");
+            messages.save(message);
+            return false;
         }
-        messages.save(message);
     }
 
     @Transactional
