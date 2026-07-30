@@ -16,7 +16,7 @@ public class UserContact extends BaseEntity {
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
-    @Column(name = "phone_number", unique = true, length = 20)
+    @Column(name = "phone_number", nullable = false, unique = true, length = 20)
     private String phoneNumber;
 
     @Enumerated(EnumType.STRING)

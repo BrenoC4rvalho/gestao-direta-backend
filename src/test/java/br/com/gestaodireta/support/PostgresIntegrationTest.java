@@ -1,5 +1,9 @@
 package br.com.gestaodireta.support;
 
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -12,6 +16,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public abstract class PostgresIntegrationTest {
+
+    @Autowired private JdbcTemplate jdbcTemplate;
+
+    @BeforeEach
+    void removeUserContacts() {
+        jdbcTemplate.execute("TRUNCATE TABLE user_contacts CASCADE");
+    }
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES =

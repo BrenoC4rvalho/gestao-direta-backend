@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: secret
       POSTGRES_USER: gestaodireta
     ports:
-      - "5432"
+      - "5432:5432"
     networks:
       - gestao-direta-network
 

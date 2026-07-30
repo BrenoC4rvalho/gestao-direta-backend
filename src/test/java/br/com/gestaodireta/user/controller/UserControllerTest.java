@@ -22,6 +22,7 @@ import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.enumeration.UserStatus;
 import br.com.gestaodireta.user.enumeration.UserType;
 import br.com.gestaodireta.user.repository.UserRepository;
+import br.com.gestaodireta.user.repository.UserContactRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,6 +45,8 @@ class UserControllerTest extends PostgresIntegrationTest {
 
     @Autowired private UserRepository userRepository;
 
+    @Autowired private UserContactRepository userContactRepository;
+
     @Autowired private FarmRepository farmRepository;
 
     @Autowired private FarmUserRepository farmUserRepository;
@@ -54,6 +57,7 @@ class UserControllerTest extends PostgresIntegrationTest {
     void setUp() {
         farmUserRepository.deleteAll();
         farmRepository.deleteAll();
+        userContactRepository.deleteAll();
         userRepository.deleteAll();
     }
 
@@ -730,10 +734,11 @@ class UserControllerTest extends PostgresIntegrationTest {
                   "email": "%s",
                   "password": "Strong1!",
                   "document": "12345678900",
+                  "phoneNumber": "%s",
                   "userType": "%s"
                 }
                 """
-                .formatted(name, email, userType.name());
+                .formatted(name, email, phoneNumberFor(email), userType.name());
     }
 
     private User saveUser(String name, String email, UserType userType) {
@@ -745,6 +750,12 @@ class UserControllerTest extends PostgresIntegrationTest {
         user.setStatus(UserStatus.ACTIVE);
 
         return userRepository.save(user);
+    }
+
+    private String phoneNumberFor(String email) {
+        int number = Math.floorMod(email.hashCode(), 100_000_000);
+
+        return "+5524" + String.format("%08d", number);
     }
 
     private Farm saveFarm(String name, FarmStatus status) {

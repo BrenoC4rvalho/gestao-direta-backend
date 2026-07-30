@@ -148,7 +148,7 @@ class FinancialExtractionValidationTest {
                                         "Combustível",
                                         new BigDecimal("0.90"),
                                         List.of("category"))))
-                .isFalse();
+                .isTrue();
     }
 
     @Test

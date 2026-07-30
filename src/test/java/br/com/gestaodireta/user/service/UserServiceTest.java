@@ -19,6 +19,7 @@ import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.enumeration.UserStatus;
 import br.com.gestaodireta.user.enumeration.UserType;
 import br.com.gestaodireta.user.repository.UserRepository;
+import br.com.gestaodireta.user.repository.UserContactRepository;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,11 +37,14 @@ class UserServiceTest extends PostgresIntegrationTest {
 
     @Autowired private UserRepository userRepository;
 
+    @Autowired private UserContactRepository userContactRepository;
+
     @Autowired private PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void setUp() {
         SecurityContextHolder.clearContext();
+        userContactRepository.deleteAll();
         userRepository.deleteAll();
     }
 
@@ -424,7 +428,19 @@ class UserServiceTest extends PostgresIntegrationTest {
 
     private UserResponse createNamedUser(String name, String email, UserType userType) {
         return userService.create(
-                new UserCreateRequest(name, email, "Strong1!", null, "+5524999999999", userType));
+                new UserCreateRequest(
+                        name,
+                        email,
+                        "Strong1!",
+                        null,
+                        phoneNumberFor(email),
+                        userType));
+    }
+
+    private String phoneNumberFor(String email) {
+        int number = Math.floorMod(email.hashCode(), 100_000_000);
+
+        return "+5524" + String.format("%08d", number);
     }
 
     private void authenticateAs(Long userId, String role) {

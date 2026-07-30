@@ -108,6 +108,18 @@ trim() {
 scriptDir="$(dirname "$0")"
 scriptName="$(basename "$0")"
 
+# Flyway Maven commands need database variables outside the Spring Boot runtime.
+# Read local values only when CI or the shell has not already provided them.
+if [ -f "$scriptDir/.env" ]; then
+  while IFS= read -r dotenvLine || [ -n "$dotenvLine" ]; do
+    case "$dotenvLine" in
+    DB_URL=*) [ -n "${DB_URL-}" ] || export DB_URL="${dotenvLine#DB_URL=}" ;;
+    DB_USERNAME=*) [ -n "${DB_USERNAME-}" ] || export DB_USERNAME="${dotenvLine#DB_USERNAME=}" ;;
+    DB_PASSWORD=*) [ -n "${DB_PASSWORD-}" ] || export DB_PASSWORD="${dotenvLine#DB_PASSWORD=}" ;;
+    esac
+  done <"$scriptDir/.env"
+fi
+
 # parse distributionUrl and optional distributionSha256Sum, requires .mvn/wrapper/maven-wrapper.properties
 while IFS="=" read -r key value; do
   case "${key-}" in
