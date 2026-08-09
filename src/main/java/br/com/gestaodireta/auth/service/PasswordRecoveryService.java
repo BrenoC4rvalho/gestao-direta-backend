@@ -1,5 +1,6 @@
 package br.com.gestaodireta.auth.service;
 
+import br.com.gestaodireta.auth.dto.PasswordRecoveryOptionsResponse;
 import br.com.gestaodireta.auth.dto.PasswordRecoveryRequest;
 import br.com.gestaodireta.auth.dto.PasswordRecoveryResetRequest;
 import br.com.gestaodireta.auth.dto.PasswordRecoveryVerifyRequest;
@@ -34,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PasswordRecoveryService {
 
     public static final String GENERIC_MESSAGE =
-            "Se houver uma conta válida com Telegram vinculado, um código será enviado.";
+            "Se existir uma conta associada a este e-mail, serão apresentadas as opções disponíveis.";
 
     private static final String INVALID_CODE_MESSAGE = "Código inválido.";
     private static final String EXPIRED_CODE_MESSAGE = "Código expirado.";
@@ -83,10 +84,16 @@ public class PasswordRecoveryService {
         this.maxRequests = maxRequests;
     }
 
+    @Transactional(readOnly = true)
+    public PasswordRecoveryOptionsResponse options(PasswordRecoveryRequest request) {
+        return new PasswordRecoveryOptionsResponse(
+                findAvailableTelegramAccount(request.email()) != null);
+    }
+
     @Transactional
-    public void request(PasswordRecoveryRequest request) {
-        User user = userRepository.findByEmailIgnoreCase(request.email().trim()).orElse(null);
-        if (user == null || user.getStatus() != UserStatus.ACTIVE) {
+    public void requestTelegramCode(PasswordRecoveryRequest request) {
+        User user = findActiveUser(request.email());
+        if (user == null) {
             return;
         }
 
@@ -97,14 +104,8 @@ public class PasswordRecoveryService {
             return;
         }
 
-        MessagingAccount account =
-                messagingAccountRepository
-                        .findFirstByUserContactUserIdAndChannelAndStatusAndVerifiedAtIsNotNullAndExternalChatIdIsNotNull(
-                                user.getId(),
-                                MessagingChannel.TELEGRAM,
-                                MessagingAccountStatus.ACTIVE)
-                        .orElse(null);
-        if (account == null || account.getExternalChatId().isBlank()) {
+        MessagingAccount account = findAvailableTelegramAccount(user.getId());
+        if (account == null) {
             return;
         }
 
@@ -128,7 +129,8 @@ public class PasswordRecoveryService {
                                 + rawCode
                                 + "\n\nO código expira em "
                                 + codeMinutes
-                                + " minutos.\n\nSe você não solicitou a redefinição, ignore esta mensagem.");
+                                + " minutos.\n\nSe você não solicitou a redefinição, ignore esta mensagem.",
+                        "Código para redefinir sua senha no Gestão Direta: [REDACTED]");
         if (!sent) {
             code.setStatus(PasswordRecoveryCodeStatus.INVALIDATED);
             code.setInvalidatedAt(now);
@@ -174,7 +176,7 @@ public class PasswordRecoveryService {
         LocalDateTime now = LocalDateTime.now(clock);
         PasswordResetToken token =
                 tokenRepository
-                        .findByTokenHash(hash(request.resetToken()))
+                        .findByTokenHash(hash(request.recoveryToken()))
                         .orElseThrow(this::invalidResetToken);
         if (token.getUsedAt() != null
                 || token.getInvalidatedAt() != null
@@ -204,6 +206,26 @@ public class PasswordRecoveryService {
                             code.setStatus(PasswordRecoveryCodeStatus.INVALIDATED);
                             code.setInvalidatedAt(now);
                         });
+    }
+
+    private User findActiveUser(String email) {
+        return userRepository
+                .findByEmailIgnoreCase(email.trim())
+                .filter(user -> user.getStatus() == UserStatus.ACTIVE)
+                .orElse(null);
+    }
+
+    private MessagingAccount findAvailableTelegramAccount(String email) {
+        User user = findActiveUser(email);
+        return user == null ? null : findAvailableTelegramAccount(user.getId());
+    }
+
+    private MessagingAccount findAvailableTelegramAccount(Long userId) {
+        return messagingAccountRepository
+                .findFirstByUserContactUserIdAndChannelAndStatusAndVerifiedAtIsNotNullAndExternalChatIdIsNotNull(
+                        userId, MessagingChannel.TELEGRAM, MessagingAccountStatus.ACTIVE)
+                .filter(account -> !account.getExternalChatId().isBlank())
+                .orElse(null);
     }
 
     private void validateCode(PasswordRecoveryCode code, String rawCode, LocalDateTime now) {

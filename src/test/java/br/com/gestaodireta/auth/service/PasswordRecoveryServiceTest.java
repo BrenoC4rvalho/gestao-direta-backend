@@ -71,7 +71,7 @@ class PasswordRecoveryServiceTest {
 
     @Test
     void shouldKeepRequestNeutralWhenUserDoesNotExist() {
-        service.request(new PasswordRecoveryRequest("missing@example.com"));
+        service.requestTelegramCode(new PasswordRecoveryRequest("missing@example.com"));
 
         verifyNoInteractions(
                 codeRepository,
@@ -166,14 +166,15 @@ class PasswordRecoveryServiceTest {
                 .thenReturn(List.of(previousToken));
         when(passwordEncoder.encode(any())).thenReturn("hashed-code");
 
-        when(outgoingMessagingService.send(any(), any())).thenReturn(true);
+        when(outgoingMessagingService.send(any(), any(), any())).thenReturn(true);
 
-        service.request(new PasswordRecoveryRequest(user.getEmail()));
+        service.requestTelegramCode(new PasswordRecoveryRequest(user.getEmail()));
 
         assertThat(previousCode.getStatus()).isEqualTo(PasswordRecoveryCodeStatus.INVALIDATED);
         assertThat(previousToken.getInvalidatedAt()).isEqualTo(LocalDateTime.now(clock));
         verify(codeRepository).save(any(PasswordRecoveryCode.class));
-        verify(outgoingMessagingService).send(any(), contains("Código para redefinir sua senha"));
+        verify(outgoingMessagingService)
+                .send(any(), contains("Código para redefinir sua senha"), contains("[REDACTED]"));
     }
 
     private User activeUser() {

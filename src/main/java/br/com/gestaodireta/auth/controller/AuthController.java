@@ -4,6 +4,7 @@ import br.com.gestaodireta.auth.cookie.AuthCookieService;
 import br.com.gestaodireta.auth.dto.AuthResponse;
 import br.com.gestaodireta.auth.dto.ChangePasswordRequest;
 import br.com.gestaodireta.auth.dto.LoginRequest;
+import br.com.gestaodireta.auth.dto.PasswordRecoveryOptionsResponse;
 import br.com.gestaodireta.auth.dto.PasswordRecoveryRequest;
 import br.com.gestaodireta.auth.dto.PasswordRecoveryResetRequest;
 import br.com.gestaodireta.auth.dto.PasswordRecoveryVerifyRequest;
@@ -48,10 +49,16 @@ public class AuthController {
         return ResponseEntity.ok().headers(headers).body(loginResult.response());
     }
 
-    @PostMapping("/password-recovery/requests")
-    public ResponseEntity<String> requestPasswordRecovery(
+    @PostMapping("/password-recovery/options")
+    public PasswordRecoveryOptionsResponse passwordRecoveryOptions(
             @Valid @RequestBody PasswordRecoveryRequest request) {
-        passwordRecoveryService.request(request);
+        return passwordRecoveryService.options(request);
+    }
+
+    @PostMapping("/password-recovery/telegram")
+    public ResponseEntity<String> requestTelegramPasswordRecoveryCode(
+            @Valid @RequestBody PasswordRecoveryRequest request) {
+        passwordRecoveryService.requestTelegramCode(request);
         return ResponseEntity.accepted().body(PasswordRecoveryService.GENERIC_MESSAGE);
     }
 

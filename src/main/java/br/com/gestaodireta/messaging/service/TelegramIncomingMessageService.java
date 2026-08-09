@@ -65,15 +65,13 @@ public class TelegramIncomingMessageService {
 
     private MessagingAccount accountFor(IncomingMessagingMessage incoming) {
         if (isLinkCommand(incoming.content())) {
-            return accounts
-                    .findFirstWithLockByChannelAndExternalUserIdAndStatusOrderByCreatedAtDesc(
+            return accounts.findFirstWithLockByChannelAndExternalUserIdAndStatusOrderByCreatedAtDesc(
                             incoming.channel(),
                             incoming.externalUserId(),
                             MessagingAccountStatus.ACTIVE)
                     .orElseGet(() -> createAccount(incoming));
         }
-        return accounts
-                .findFirstWithLockByChannelAndExternalUserIdAndExternalChatIdOrderByCreatedAtDesc(
+        return accounts.findFirstWithLockByChannelAndExternalUserIdAndExternalChatIdOrderByCreatedAtDesc(
                         incoming.channel(), incoming.externalUserId(), incoming.externalChatId())
                 .orElseGet(() -> createAccount(incoming));
     }
@@ -81,8 +79,11 @@ public class TelegramIncomingMessageService {
     private boolean isLinkCommand(String content) {
         String text = content == null ? "" : content.trim();
         return text.startsWith("/")
-                && "/vincular".equals(
-                        text.split("\\s+", 2)[0].replaceFirst("@[^\\s]+$", "").toLowerCase());
+                && "/vincular"
+                        .equals(
+                                text.split("\\s+", 2)[0]
+                                        .replaceFirst("@[^\\s]+$", "")
+                                        .toLowerCase());
     }
 
     private MessagingAccount createAccount(IncomingMessagingMessage incoming) {

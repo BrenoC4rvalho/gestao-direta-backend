@@ -12,14 +12,14 @@ public interface MessagingAccountRepository extends JpaRepository<MessagingAccou
     Optional<MessagingAccount> findWithLockById(Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    Optional<MessagingAccount> findFirstWithLockByChannelAndExternalUserIdAndExternalChatIdOrderByCreatedAtDesc(
-            MessagingChannel channel, String externalUserId, String externalChatId);
+    Optional<MessagingAccount>
+            findFirstWithLockByChannelAndExternalUserIdAndExternalChatIdOrderByCreatedAtDesc(
+                    MessagingChannel channel, String externalUserId, String externalChatId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    Optional<MessagingAccount> findFirstWithLockByChannelAndExternalUserIdAndStatusOrderByCreatedAtDesc(
-            MessagingChannel channel,
-            String externalUserId,
-            MessagingAccountStatus status);
+    Optional<MessagingAccount>
+            findFirstWithLockByChannelAndExternalUserIdAndStatusOrderByCreatedAtDesc(
+                    MessagingChannel channel, String externalUserId, MessagingAccountStatus status);
 
     java.util.Optional<MessagingAccount>
             findFirstByUserContactUserIdAndChannelAndStatusAndVerifiedAtIsNotNullAndExternalChatIdIsNotNull(

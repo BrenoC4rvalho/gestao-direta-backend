@@ -50,7 +50,8 @@ class MessagingLinkServiceTest {
     @Test
     void shouldIncrementAccountAttemptsAfterInvalidLink() {
         prepareNoCodes();
-        assertThat(service.link(account, "123456")).isEqualTo(MessagingLinkResult.LINK_CODE_NOT_FOUND);
+        assertThat(service.link(account, "123456"))
+                .isEqualTo(MessagingLinkResult.LINK_CODE_NOT_FOUND);
 
         assertThat(account.getLinkAttemptCount()).isEqualTo(1);
         assertThat(account.getLastLinkAttemptAt())

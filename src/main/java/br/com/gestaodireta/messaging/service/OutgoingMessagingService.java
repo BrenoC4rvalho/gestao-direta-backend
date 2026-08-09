@@ -28,7 +28,13 @@ public class OutgoingMessagingService {
 
     @Transactional
     public boolean send(MessagingConversation conversation, String content) {
-        MessagingMessage message = create(conversation, content);
+        return send(conversation, content, content);
+    }
+
+    @Transactional
+    public boolean send(
+            MessagingConversation conversation, String content, String persistedContent) {
+        MessagingMessage message = create(conversation, persistedContent);
         try {
             TelegramSendMessageResult result =
                     client.sendMessage(
