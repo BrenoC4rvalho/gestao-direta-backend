@@ -114,13 +114,7 @@ public class FinancialTransactionExtractionResultValidator {
     }
 
     private boolean hasMissingRequiredField(FinancialTransactionExtractionResult result) {
-        if (result.missingFields() == null) {
-            return true;
-        }
-        return result.missingFields().stream()
-                .filter(field -> field != null)
-                .map(field -> field.trim().toLowerCase(java.util.Locale.ROOT))
-                .anyMatch(field -> !field.equals("category"));
+        return result.type() == null || result.amount() == null;
     }
 
     private ValidationResult rejected(RejectionReason reason) {

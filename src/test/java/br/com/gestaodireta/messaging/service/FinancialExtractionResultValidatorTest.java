@@ -29,7 +29,22 @@ class FinancialExtractionResultValidatorTest {
                                         .NONE));
     }
 
-    @Test
+    void shouldAcceptFinancialResultWhenAiMarksOnlyFinancialContextAsMissing() {
+        FinancialTransactionExtractionResult result =
+                new FinancialTransactionExtractionResult(
+                        true,
+                        TransactionType.INCOME,
+                        new BigDecimal("1000.00"),
+                        LocalDate.of(2026, 8, 9),
+                        "Venda de milho",
+                        null,
+                        new BigDecimal("0.95"),
+                        List.of("financialContext"));
+
+        assertThat(validator.isValid("recebi 1000 reais pela venda de milho hoje", result))
+                .isTrue();
+    }
+
     void shouldRejectOnlyRequiredMissingFieldsAndLowConfidence() {
         String text = "vendi 20kg de milho por 100 reais hoje";
 

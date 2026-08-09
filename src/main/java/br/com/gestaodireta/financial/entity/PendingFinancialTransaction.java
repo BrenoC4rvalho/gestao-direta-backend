@@ -12,7 +12,6 @@ import br.com.gestaodireta.messaging.domain.MessagingMessage;
 import br.com.gestaodireta.shared.audit.BaseEntity;
 import br.com.gestaodireta.user.entity.User;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -53,16 +52,17 @@ public class PendingFinancialTransaction extends BaseEntity {
     @Column(nullable = false, length = 20)
     private TransactionType type;
 
-    @Column(nullable = false, precision = 15, scale = 2)
+    @Column(precision = 15, scale = 2)
     private BigDecimal amount;
 
-    @Column(name = "transaction_date", nullable = false)
+    @Column(name = "transaction_date")
     private LocalDate transactionDate;
 
-    @NotBlank
-    @Size(max = 160)
-    @Column(nullable = false, length = 160)
+    @Column(length = 160)
     private String description;
+
+    @Column(name = "missing_fields", length = 500)
+    private String missingFields;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "suggested_category_id")
@@ -192,6 +192,14 @@ public class PendingFinancialTransaction extends BaseEntity {
 
     public void setDescription(String value) {
         description = value;
+    }
+
+    public String getMissingFields() {
+        return missingFields;
+    }
+
+    public void setMissingFields(String value) {
+        missingFields = value;
     }
 
     public FinancialCategory getSuggestedCategory() {

@@ -7,6 +7,7 @@ import br.com.gestaodireta.financial.enumeration.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record PendingFinancialTransactionResponse(
         Long id,
@@ -16,6 +17,7 @@ public record PendingFinancialTransactionResponse(
         BigDecimal amount,
         LocalDate transactionDate,
         String description,
+        List<String> missingFields,
         Long categoryId,
         String categoryName,
         String rawCategoryName,

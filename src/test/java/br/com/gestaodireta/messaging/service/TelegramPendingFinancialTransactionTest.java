@@ -35,7 +35,6 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -53,7 +52,35 @@ class TelegramPendingFinancialTransactionTest {
         verify(fixture.outgoing, times(1)).send(any(), any());
     }
 
-    @Test
+    void shouldCreatePendingWhenOnlyFinancialContextIsReportedMissing() {
+        Fixture fixture = fixture();
+        when(fixture.extractionService.isEnabled()).thenReturn(true);
+        when(fixture.extractionService.model()).thenReturn("fake");
+        when(fixture.extractionService.provider()).thenReturn("fake");
+        when(fixture.extractionService.extract(any(), any(), any()))
+                .thenReturn(
+                        new FinancialTransactionExtractionResult(
+                                true,
+                                TransactionType.INCOME,
+                                new BigDecimal("1000.00"),
+                                LocalDate.of(2026, 8, 9),
+                                "Venda de milho",
+                                null,
+                                new BigDecimal("0.95"),
+                                List.of("financialContext")));
+
+        fixture.processor.process(
+                fixture.account,
+                fixture.conversation,
+                message("recebi 1000 reais pela venda de milho hoje"));
+
+        ArgumentCaptor<PendingFinancialTransaction> pending =
+                ArgumentCaptor.forClass(PendingFinancialTransaction.class);
+        verify(fixture.pendingRepository).save(pending.capture());
+        assertThat(pending.getValue().getAmount()).isEqualByComparingTo("1000.00");
+        assertThat(pending.getValue().getType()).isEqualTo(TransactionType.INCOME);
+    }
+
     void shouldCreateOnlyPendingForConsistentFinancialMessage() {
         Fixture fixture = fixture();
         when(fixture.extractionService.isEnabled()).thenReturn(true);

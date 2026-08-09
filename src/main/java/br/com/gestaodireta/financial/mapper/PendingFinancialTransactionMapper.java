@@ -2,6 +2,8 @@ package br.com.gestaodireta.financial.mapper;
 
 import br.com.gestaodireta.financial.dto.PendingFinancialTransactionResponse;
 import br.com.gestaodireta.financial.entity.PendingFinancialTransaction;
+import java.util.Arrays;
+import java.util.List;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -15,6 +17,7 @@ public class PendingFinancialTransactionMapper {
                 pending.getAmount(),
                 pending.getTransactionDate(),
                 pending.getDescription(),
+                missingFields(pending),
                 pending.getSuggestedCategory() == null
                         ? null
                         : pending.getSuggestedCategory().getId(),
@@ -43,5 +46,15 @@ public class PendingFinancialTransactionMapper {
                         : pending.getApprovedFinancialTransaction().getId(),
                 pending.getCreatedAt(),
                 pending.getUpdatedAt());
+    }
+
+    private List<String> missingFields(PendingFinancialTransaction pending) {
+        if (pending.getMissingFields() == null || pending.getMissingFields().isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(pending.getMissingFields().split(","))
+                .map(String::trim)
+                .filter(field -> !field.isBlank())
+                .toList();
     }
 }
