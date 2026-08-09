@@ -3,6 +3,7 @@ package br.com.gestaodireta.auth.service;
 import br.com.gestaodireta.auth.dto.PasswordRecoveryOptionsResponse;
 import br.com.gestaodireta.auth.dto.PasswordRecoveryRequest;
 import br.com.gestaodireta.auth.dto.PasswordRecoveryResetRequest;
+import br.com.gestaodireta.auth.dto.PasswordRecoveryTelegramResponse;
 import br.com.gestaodireta.auth.dto.PasswordRecoveryVerifyRequest;
 import br.com.gestaodireta.auth.dto.PasswordRecoveryVerifyResponse;
 import br.com.gestaodireta.auth.entity.PasswordRecoveryCode;
@@ -91,22 +92,22 @@ public class PasswordRecoveryService {
     }
 
     @Transactional
-    public void requestTelegramCode(PasswordRecoveryRequest request) {
+    public PasswordRecoveryTelegramResponse requestTelegramCode(PasswordRecoveryRequest request) {
         User user = findActiveUser(request.email());
         if (user == null) {
-            return;
+            return new PasswordRecoveryTelegramResponse(null);
         }
 
         LocalDateTime now = LocalDateTime.now(clock);
         if (codeRepository.countByUserIdAndRequestedAtAfter(
                         user.getId(), now.minusMinutes(windowMinutes))
                 >= maxRequests) {
-            return;
+            return new PasswordRecoveryTelegramResponse(null);
         }
 
         MessagingAccount account = findAvailableTelegramAccount(user.getId());
         if (account == null) {
-            return;
+            return new PasswordRecoveryTelegramResponse(null);
         }
 
         invalidateActiveCredentials(user.getId(), now);
@@ -134,7 +135,10 @@ public class PasswordRecoveryService {
         if (!sent) {
             code.setStatus(PasswordRecoveryCodeStatus.INVALIDATED);
             code.setInvalidatedAt(now);
+            return new PasswordRecoveryTelegramResponse(null);
         }
+
+        return new PasswordRecoveryTelegramResponse(phoneLastFour(account));
     }
 
     @Transactional
@@ -206,6 +210,12 @@ public class PasswordRecoveryService {
                             code.setStatus(PasswordRecoveryCodeStatus.INVALIDATED);
                             code.setInvalidatedAt(now);
                         });
+    }
+
+    private String phoneLastFour(MessagingAccount account) {
+        String phoneNumber = account.getUserContact().getPhoneNumber();
+        String digits = phoneNumber.replaceAll("\\D", "");
+        return digits.substring(Math.max(0, digits.length() - 4));
     }
 
     private User findActiveUser(String email) {

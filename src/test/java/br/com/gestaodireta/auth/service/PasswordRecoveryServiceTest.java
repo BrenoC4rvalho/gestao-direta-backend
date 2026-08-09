@@ -151,7 +151,11 @@ class PasswordRecoveryServiceTest {
         PasswordRecoveryCode previousCode = activeCode(user);
         PasswordResetToken previousToken = new PasswordResetToken();
         MessagingAccount account = mock(MessagingAccount.class);
+        br.com.gestaodireta.user.entity.UserContact contact =
+                mock(br.com.gestaodireta.user.entity.UserContact.class);
         when(account.getExternalChatId()).thenReturn("123");
+        when(account.getUserContact()).thenReturn(contact);
+        when(contact.getPhoneNumber()).thenReturn("+55 11 99999-6875");
         when(userRepository.findByEmailIgnoreCase(user.getEmail())).thenReturn(Optional.of(user));
         when(codeRepository.countByUserIdAndRequestedAtAfter(any(), any())).thenReturn(0L);
         when(messagingAccountRepository
