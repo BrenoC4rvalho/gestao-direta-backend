@@ -6,6 +6,10 @@ import br.com.gestaodireta.financial.entity.PendingFinancialTransaction;
 import br.com.gestaodireta.financial.enumeration.*;
 import br.com.gestaodireta.financial.mapper.PendingFinancialTransactionMapper;
 import br.com.gestaodireta.financial.repository.PendingFinancialTransactionRepository;
+import br.com.gestaodireta.harvest.entity.HarvestSeason;
+import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
+import br.com.gestaodireta.harvest.repository.HarvestSeasonRepository;
+import br.com.gestaodireta.messaging.repository.MessagingConversationRepository;
 import br.com.gestaodireta.messaging.service.OutgoingMessagingService;
 import br.com.gestaodireta.shared.exception.BusinessException;
 import br.com.gestaodireta.shared.exception.ConflictException;
@@ -19,6 +23,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -32,6 +37,8 @@ public class PendingFinancialTransactionService {
     private final FinancialTransactionService transactionService;
     private final PendingFinancialTransactionMapper mapper;
     private final UserRepository userRepository;
+    private final HarvestSeasonRepository harvestSeasonRepository;
+    private final MessagingConversationRepository messagingConversationRepository;
     private final Clock clock;
     private final OutgoingMessagingService outgoing;
     private final TransactionTemplate transactionTemplate;
@@ -42,6 +49,8 @@ public class PendingFinancialTransactionService {
             FinancialTransactionService transactionService,
             PendingFinancialTransactionMapper mapper,
             UserRepository userRepository,
+            HarvestSeasonRepository harvestSeasonRepository,
+            MessagingConversationRepository messagingConversationRepository,
             Clock clock,
             OutgoingMessagingService outgoing,
             TransactionTemplate transactionTemplate) {
@@ -50,9 +59,13 @@ public class PendingFinancialTransactionService {
         this.transactionService = transactionService;
         this.mapper = mapper;
         this.userRepository = userRepository;
+        this.harvestSeasonRepository = harvestSeasonRepository;
+        this.messagingConversationRepository = messagingConversationRepository;
         this.clock = clock;
         this.outgoing = outgoing;
         this.transactionTemplate = transactionTemplate;
+        this.transactionTemplate.setPropagationBehavior(
+                TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     @Transactional(readOnly = true)
@@ -89,6 +102,10 @@ public class PendingFinancialTransactionService {
         pending.setTransactionDate(request.transactionDate());
         pending.setDescription(request.description().trim());
         pending.setSuggestedCategory(category);
+        pending.setHarvestSeason(
+                resolveHarvestSeason(request.harvestSeasonId(), pending.getFarm().getId()));
+        pending.setPaymentMethod(request.paymentMethod());
+        pending.setNotes(trimNullable(request.notes()));
         if (category != null) {
             pending.setRawCategoryName(null);
         }
@@ -101,27 +118,25 @@ public class PendingFinancialTransactionService {
         PendingFinancialTransaction pending = findForUpdate(id);
         ensurePending(pending);
         validateApproval(approval);
-        FinancialCategory category =
-                resolveCategory(
-                        pending.getSuggestedCategory() == null
-                                ? null
-                                : pending.getSuggestedCategory().getId(),
-                        pending.getFarm().getId(),
-                        pending.getType());
+        applyApprovalDetails(pending, approval);
         FinancialTransactionRequest request =
                 new FinancialTransactionRequest(
                         pending.getDescription(),
                         pending.getAmount(),
                         pending.getType(),
                         approval.status(),
-                        null,
+                        pending.getPaymentMethod(),
                         pending.getTransactionDate(),
                         approval.dueDate(),
                         paidAt(approval, pending),
-                        null,
+                        pending.getNotes(),
                         pending.getFarm().getId(),
-                        category == null ? null : category.getId(),
-                        null);
+                        pending.getSuggestedCategory() == null
+                                ? null
+                                : pending.getSuggestedCategory().getId(),
+                        pending.getHarvestSeason() == null
+                                ? null
+                                : pending.getHarvestSeason().getId());
         Long transactionId = transactionService.create(request).id();
         pending.setApprovedFinancialTransaction(transactionService.findEntityById(transactionId));
         pending.setStatus(PendingFinancialTransactionStatus.APPROVED);
@@ -148,11 +163,16 @@ public class PendingFinancialTransactionService {
         pending.setRejectionReason(
                 request == null || request.reason() == null ? null : request.reason().trim());
         PendingFinancialTransactionResponse response = mapper.toResponse(repository.save(pending));
-        notifyAfterCommit(pending, "A movimentação enviada foi rejeitada no Gestão Direta.");
+        String content = "A movimentação enviada foi rejeitada no Gestão Direta.";
+        if (pending.getRejectionReason() != null && !pending.getRejectionReason().isBlank()) {
+            content += "\nMotivo: " + pending.getRejectionReason();
+        }
+        notifyAfterCommit(pending, content);
         return response;
     }
 
     private void notifyAfterCommit(PendingFinancialTransaction pending, String content) {
+        Long conversationId = pending.getMessagingConversation().getId();
         TransactionSynchronizationManager.registerSynchronization(
                 new TransactionSynchronization() {
                     @Override
@@ -160,8 +180,13 @@ public class PendingFinancialTransactionService {
                         try {
                             transactionTemplate.executeWithoutResult(
                                     status ->
-                                            outgoing.send(
-                                                    pending.getMessagingConversation(), content));
+                                            messagingConversationRepository
+                                                    .findById(conversationId)
+                                                    .ifPresent(
+                                                            conversation ->
+                                                                    outgoing.send(
+                                                                            conversation,
+                                                                            content)));
                         } catch (RuntimeException exception) {
                             // A notification failure must not affect an already committed decision.
                         }
@@ -220,6 +245,75 @@ public class PendingFinancialTransactionService {
         if (approval.status() == PaymentStatus.PENDING && approval.paidAt() != null) {
             throw new BusinessException("Paid at must be null for a pending approval");
         }
+    }
+
+    private void applyApprovalDetails(
+            PendingFinancialTransaction pending,
+            ApprovePendingFinancialTransactionRequest approval) {
+        if (approval.type() != null) {
+            pending.setType(approval.type());
+        }
+        if (approval.amount() != null) {
+            pending.setAmount(approval.amount());
+        }
+        if (approval.description() != null) {
+            pending.setDescription(approval.description().trim());
+        }
+        if (approval.transactionDate() != null) {
+            pending.setTransactionDate(approval.transactionDate());
+        }
+
+        Long categoryId =
+                approval.categoryId() == null
+                        ? pending.getSuggestedCategory() == null
+                                ? null
+                                : pending.getSuggestedCategory().getId()
+                        : approval.categoryId();
+        FinancialCategory category =
+                resolveCategory(categoryId, pending.getFarm().getId(), pending.getType());
+        pending.setSuggestedCategory(category);
+        if (category != null) {
+            pending.setRawCategoryName(null);
+        }
+
+        Long harvestSeasonId =
+                approval.harvestSeasonId() == null
+                        ? pending.getHarvestSeason() == null
+                                ? null
+                                : pending.getHarvestSeason().getId()
+                        : approval.harvestSeasonId();
+        pending.setHarvestSeason(resolveHarvestSeason(harvestSeasonId, pending.getFarm().getId()));
+        if (approval.paymentMethod() != null) {
+            pending.setPaymentMethod(approval.paymentMethod());
+        }
+        if (approval.notes() != null) {
+            pending.setNotes(trimNullable(approval.notes()));
+        }
+    }
+
+    private HarvestSeason resolveHarvestSeason(Long harvestSeasonId, Long farmId) {
+        if (harvestSeasonId == null) {
+            return null;
+        }
+
+        HarvestSeason harvestSeason =
+                harvestSeasonRepository
+                        .findByIdWithRelations(harvestSeasonId)
+                        .orElseThrow(
+                                () -> new ResourceNotFoundException("Harvest season not found"));
+        if (!harvestSeason.getFarm().getId().equals(farmId)) {
+            throw new BusinessException(
+                    "Harvest season does not belong to pending transaction farm");
+        }
+        if (harvestSeason.getStatus() == HarvestSeasonStatus.INACTIVE) {
+            throw new BusinessException(
+                    "Inactive harvest season cannot be linked to pending transaction");
+        }
+        return harvestSeason;
+    }
+
+    private String trimNullable(String value) {
+        return value == null ? null : value.trim();
     }
 
     private java.time.LocalDate paidAt(

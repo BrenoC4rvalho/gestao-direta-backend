@@ -1,9 +1,11 @@
 package br.com.gestaodireta.financial.entity;
 
 import br.com.gestaodireta.farm.entity.Farm;
+import br.com.gestaodireta.financial.enumeration.PaymentMethod;
 import br.com.gestaodireta.financial.enumeration.PendingFinancialTransactionStatus;
 import br.com.gestaodireta.financial.enumeration.PendingTransactionSource;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
+import br.com.gestaodireta.harvest.entity.HarvestSeason;
 import br.com.gestaodireta.messaging.domain.MessagingAccount;
 import br.com.gestaodireta.messaging.domain.MessagingConversation;
 import br.com.gestaodireta.messaging.domain.MessagingMessage;
@@ -68,6 +70,18 @@ public class PendingFinancialTransaction extends BaseEntity {
 
     @Column(name = "raw_category_name", length = 100)
     private String rawCategoryName;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "harvest_season_id")
+    private HarvestSeason harvestSeason;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", length = 30)
+    private PaymentMethod paymentMethod;
+
+    @Size(max = 500)
+    @Column(length = 500)
+    private String notes;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
@@ -194,6 +208,30 @@ public class PendingFinancialTransaction extends BaseEntity {
 
     public void setRawCategoryName(String value) {
         rawCategoryName = value;
+    }
+
+    public HarvestSeason getHarvestSeason() {
+        return harvestSeason;
+    }
+
+    public void setHarvestSeason(HarvestSeason value) {
+        harvestSeason = value;
+    }
+
+    public PaymentMethod getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(PaymentMethod value) {
+        paymentMethod = value;
+    }
+
+    public String getNotes() {
+        return notes;
+    }
+
+    public void setNotes(String value) {
+        notes = value;
     }
 
     public PendingFinancialTransactionStatus getStatus() {

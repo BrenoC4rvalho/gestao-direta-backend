@@ -1,5 +1,6 @@
 package br.com.gestaodireta.financial.dto;
 
+import br.com.gestaodireta.financial.enumeration.PaymentMethod;
 import br.com.gestaodireta.financial.enumeration.PendingFinancialTransactionStatus;
 import br.com.gestaodireta.financial.enumeration.PendingTransactionSource;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
@@ -18,9 +19,14 @@ public record PendingFinancialTransactionResponse(
         Long categoryId,
         String categoryName,
         String rawCategoryName,
+        Long harvestSeasonId,
+        String harvestSeasonName,
+        PaymentMethod paymentMethod,
+        String notes,
         PendingFinancialTransactionStatus status,
         BigDecimal confidence,
         PendingTransactionSource sourceChannel,
+        Long sourceMessageId,
         String sourceMessageContent,
         LocalDateTime sourceMessageReceivedAt,
         Long requestedByUserId,

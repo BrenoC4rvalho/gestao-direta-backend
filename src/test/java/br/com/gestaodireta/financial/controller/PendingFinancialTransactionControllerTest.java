@@ -15,6 +15,7 @@ import br.com.gestaodireta.farm.repository.FarmRepository;
 import br.com.gestaodireta.financial.entity.FinancialCategory;
 import br.com.gestaodireta.financial.entity.PendingFinancialTransaction;
 import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
+import br.com.gestaodireta.financial.enumeration.PaymentMethod;
 import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.PendingFinancialTransactionStatus;
 import br.com.gestaodireta.financial.enumeration.PendingTransactionSource;
@@ -94,13 +95,16 @@ class PendingFinancialTransactionControllerTest extends PostgresIntegrationTest 
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
-                                        "{\"status\":\"PAID\",\"paidAt\":\"2026-07-21\",\"dueDate\":null}"))
+                                        "{\"type\":\"EXPENSE\",\"amount\":1000.00,\"description\":\"Fuel updated\",\"paymentMethod\":\"PIX\",\"transactionDate\":\"2026-07-21\",\"notes\":\"Paid by PIX\",\"status\":\"PAID\",\"paidAt\":\"2026-07-21\",\"dueDate\":null}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("status").value("APPROVED"));
 
         assertThat(transactionRepository.count()).isEqualTo(1);
         var transaction = transactionRepository.findAll().getFirst();
         assertThat(transaction.getStatus()).isEqualTo(PaymentStatus.PAID);
+        assertThat(transaction.getDescription()).isEqualTo("Fuel updated");
+        assertThat(transaction.getPaymentMethod()).isEqualTo(PaymentMethod.PIX);
+        assertThat(transaction.getNotes()).isEqualTo("Paid by PIX");
         assertThat(transaction.getPaidAt()).isEqualTo(LocalDate.of(2026, 7, 21));
         assertThat(transaction.getDueDate()).isNull();
         assertThat(transaction.getFarm().getId()).isEqualTo(fixture.farm.getId());
@@ -153,6 +157,54 @@ class PendingFinancialTransactionControllerTest extends PostgresIntegrationTest 
                                 .content("{\"status\":\"PAID\",\"paidAt\":null,\"dueDate\":null}"))
                 .andExpect(status().isConflict());
         assertThat(transactionRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void rejectsWithoutCreatingTransactionAndNotifiesReasonWhenProvided() throws Exception {
+        Fixture fixture = fixture();
+
+        mockMvc.perform(
+                        post(
+                                        "/api/pending-financial-transactions/{id}/reject",
+                                        fixture.pending.getId())
+                                .contextPath("/api")
+                                .with(user(String.valueOf(fixture.reviewer.getId())).roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reason\":\"Duplicated receipt\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("status").value("REJECTED"))
+                .andExpect(jsonPath("rejectionReason").value("Duplicated receipt"));
+
+        assertThat(transactionRepository.count()).isZero();
+        assertThat(messageRepository.findAll())
+                .anySatisfy(
+                        message ->
+                                assertThat(message.getContent())
+                                        .contains("Motivo: Duplicated receipt"));
+    }
+
+    @Test
+    void rejectsWithoutReasonUsingTheBaseNotification() throws Exception {
+        Fixture fixture = fixture();
+
+        mockMvc.perform(
+                        post(
+                                        "/api/pending-financial-transactions/{id}/reject",
+                                        fixture.pending.getId())
+                                .contextPath("/api")
+                                .with(user(String.valueOf(fixture.reviewer.getId())).roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}"))
+                .andExpect(status().isOk());
+
+        assertThat(messageRepository.findAll())
+                .anySatisfy(
+                        message ->
+                                assertThat(message.getContent())
+                                        .isEqualTo(
+                                                "A movimentação enviada foi rejeitada no Gestão Direta."));
     }
 
     private Fixture fixture() {
