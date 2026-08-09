@@ -8,18 +8,18 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 
 public interface MessagingAccountRepository extends JpaRepository<MessagingAccount, Long> {
-    Optional<MessagingAccount> findByChannelAndExternalUserIdAndExternalChatId(
-            MessagingChannel channel, String externalUserId, String externalChatId);
-
-    Optional<MessagingAccount> findByChannelAndExternalUserId(
-            MessagingChannel channel, String externalUserId);
-
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<MessagingAccount> findWithLockById(Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    Optional<MessagingAccount> findWithLockByChannelAndExternalUserIdAndExternalChatId(
+    Optional<MessagingAccount> findFirstWithLockByChannelAndExternalUserIdAndExternalChatIdOrderByCreatedAtDesc(
             MessagingChannel channel, String externalUserId, String externalChatId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<MessagingAccount> findFirstWithLockByChannelAndExternalUserIdAndStatusOrderByCreatedAtDesc(
+            MessagingChannel channel,
+            String externalUserId,
+            MessagingAccountStatus status);
 
     java.util.Optional<MessagingAccount>
             findFirstByUserContactUserIdAndChannelAndStatusAndVerifiedAtIsNotNullAndExternalChatIdIsNotNull(

@@ -37,12 +37,7 @@ public class TelegramIncomingMessageService {
         if (messages.existsByChannelAndProviderUpdateId(
                 incoming.channel(), incoming.providerUpdateId())) return;
         LocalDateTime time = LocalDateTime.ofInstant(incoming.receivedAt(), clock.getZone());
-        MessagingAccount account =
-                accounts.findWithLockByChannelAndExternalUserIdAndExternalChatId(
-                                incoming.channel(),
-                                incoming.externalUserId(),
-                                incoming.externalChatId())
-                        .orElseGet(() -> createAccount(incoming));
+        MessagingAccount account = accountFor(incoming);
         account.setUsername(incoming.username());
         account.setDisplayName(incoming.displayName());
         account.setLastInteractionAt(time);
@@ -66,6 +61,28 @@ public class TelegramIncomingMessageService {
         message.setStatus(MessagingMessageStatus.PROCESSED);
         message.setProcessedAt(LocalDateTime.now(clock));
         messages.save(message);
+    }
+
+    private MessagingAccount accountFor(IncomingMessagingMessage incoming) {
+        if (isLinkCommand(incoming.content())) {
+            return accounts
+                    .findFirstWithLockByChannelAndExternalUserIdAndStatusOrderByCreatedAtDesc(
+                            incoming.channel(),
+                            incoming.externalUserId(),
+                            MessagingAccountStatus.ACTIVE)
+                    .orElseGet(() -> createAccount(incoming));
+        }
+        return accounts
+                .findFirstWithLockByChannelAndExternalUserIdAndExternalChatIdOrderByCreatedAtDesc(
+                        incoming.channel(), incoming.externalUserId(), incoming.externalChatId())
+                .orElseGet(() -> createAccount(incoming));
+    }
+
+    private boolean isLinkCommand(String content) {
+        String text = content == null ? "" : content.trim();
+        return text.startsWith("/")
+                && "/vincular".equals(
+                        text.split("\\s+", 2)[0].replaceFirst("@[^\\s]+$", "").toLowerCase());
     }
 
     private MessagingAccount createAccount(IncomingMessagingMessage incoming) {

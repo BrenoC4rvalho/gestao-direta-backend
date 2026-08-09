@@ -50,7 +50,7 @@ class MessagingLinkServiceTest {
     @Test
     void shouldIncrementAccountAttemptsAfterInvalidLink() {
         prepareNoCodes();
-        assertThat(service.link(account, "123456")).isEqualTo(MessagingLinkResult.INVALID);
+        assertThat(service.link(account, "123456")).isEqualTo(MessagingLinkResult.LINK_CODE_NOT_FOUND);
 
         assertThat(account.getLinkAttemptCount()).isEqualTo(1);
         assertThat(account.getLastLinkAttemptAt())
@@ -92,11 +92,10 @@ class MessagingLinkServiceTest {
     }
 
     private void prepareNoCodes() {
-        when(codes.findWithLockByVerificationTypeAndChannelAndStatusAndExpiresAtAfter(
+        when(codes.findWithLockByVerificationTypeAndChannelAndStatus(
                         eq(ContactVerificationType.MESSAGING_ACCOUNT_LINK),
                         eq(MessagingChannel.TELEGRAM),
-                        eq(ContactVerificationStatus.ACTIVE),
-                        any()))
+                        eq(ContactVerificationStatus.ACTIVE)))
                 .thenReturn(List.of());
     }
 

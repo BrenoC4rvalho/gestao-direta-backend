@@ -93,14 +93,18 @@ public class MessagingLinkService {
             return MessagingLinkResult.TEMPORARILY_BLOCKED;
         }
         resetExpiredAttemptWindow(locked, now);
-        for (ContactVerificationCode code :
-                codes.findWithLockByVerificationTypeAndChannelAndStatusAndExpiresAtAfter(
+        var activeCodes =
+                codes.findWithLockByVerificationTypeAndChannelAndStatus(
                         ContactVerificationType.MESSAGING_ACCOUNT_LINK,
                         MessagingChannel.TELEGRAM,
-                        ContactVerificationStatus.ACTIVE,
-                        now)) {
+                        ContactVerificationStatus.ACTIVE);
+        for (ContactVerificationCode code : activeCodes) {
             if (!encoder.matches(value, code.getCodeHash())) {
                 continue;
+            }
+            if (!code.getExpiresAt().isAfter(now)) {
+                code.setStatus(ContactVerificationStatus.EXPIRED);
+                return MessagingLinkResult.LINK_CODE_EXPIRED;
             }
             UserContact contact = code.getUserContact();
             if (accounts.existsByUserContactIdAndChannelAndStatus(
@@ -120,11 +124,8 @@ public class MessagingLinkService {
             }
             return MessagingLinkResult.LINKED;
         }
-        codes.findWithLockByVerificationTypeAndChannelAndStatusAndExpiresAtAfter(
-                        ContactVerificationType.MESSAGING_ACCOUNT_LINK,
-                        MessagingChannel.TELEGRAM,
-                        ContactVerificationStatus.ACTIVE,
-                        now)
+        activeCodes.stream()
+                .filter(code -> code.getExpiresAt().isAfter(now))
                 .forEach(
                         code -> {
                             code.setAttemptCount(code.getAttemptCount() + 1);
@@ -141,7 +142,7 @@ public class MessagingLinkService {
         if (account.getLinkAttemptCount() >= 5) {
             account.setLinkBlockedUntil(now.plusMinutes(15));
         }
-        return MessagingLinkResult.INVALID;
+        return MessagingLinkResult.LINK_CODE_NOT_FOUND;
     }
 
     private boolean isBlocked(MessagingAccount account, LocalDateTime now) {

@@ -6,11 +6,14 @@ import br.com.gestaodireta.messaging.enumeration.*;
 import br.com.gestaodireta.messaging.repository.MessagingConversationRepository;
 import java.time.*;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class TelegramCommandDispatcher {
+    private static final Logger LOGGER = LoggerFactory.getLogger(TelegramCommandDispatcher.class);
     private static final String LINK_GUIDANCE =
             "Bem-vindo ao Gestão Direta.\n\nSua conta do Telegram ainda não está vinculada.\n\nAcesse o sistema, gere um código de vinculação e envie:\n\n/vincular SEU_CODIGO";
     private final MessagingConversationService conversations;
@@ -40,8 +43,13 @@ public class TelegramCommandDispatcher {
                 text.startsWith("/")
                         ? text.split("\\s+", 2)[0].replaceFirst("@[^\\s]+$", "").toLowerCase()
                         : null;
+        if ("/vincular".equals(command)) {
+            pending(account, conversation, command, text);
+            return;
+        }
         if (account.getStatus() == MessagingAccountStatus.BLOCKED
                 || account.getStatus() == MessagingAccountStatus.INACTIVE) {
+            rejection(account, "ACCOUNT_" + account.getStatus());
             outgoing.send(
                     conversation,
                     "Sua conta de mensagens está indisponível. Acesse o Gestão Direta para verificar seu acesso.");
@@ -139,10 +147,12 @@ public class TelegramCommandDispatcher {
                         "Telegram vinculado com sucesso à sua conta do Gestão Direta.");
                 resolve(conversation, true);
             } else if (result == MessagingLinkResult.TEMPORARILY_BLOCKED) {
+                rejection(account, "ACCOUNT_BLOCKED");
                 outgoing.send(
                         conversation,
                         "Não foi possível concluir a vinculação agora. Aguarde alguns minutos e tente novamente.");
             } else {
+                rejection(account, linkRejectionReason(result));
                 outgoing.send(
                         conversation,
                         "Código inválido ou expirado. Gere um novo código no Gestão Direta.");
@@ -154,6 +164,23 @@ public class TelegramCommandDispatcher {
         } else {
             outgoing.send(conversation, "Sua conta ainda não está vinculada ao Gestão Direta.");
         }
+    }
+
+    private String linkRejectionReason(MessagingLinkResult result) {
+        return switch (result) {
+            case ALREADY_LINKED -> "ACCOUNT_ALREADY_LINKED";
+            case LINK_CODE_NOT_FOUND -> "LINK_CODE_NOT_FOUND";
+            case LINK_CODE_EXPIRED -> "LINK_CODE_EXPIRED";
+            case TEMPORARILY_BLOCKED -> "ACCOUNT_BLOCKED";
+            case LINKED -> throw new IllegalArgumentException("Linked result is not a rejection");
+        };
+    }
+
+    private void rejection(MessagingAccount account, String reason) {
+        LOGGER.info(
+                "telegram command rejected: reason={} messagingAccountId={}",
+                reason,
+                account.getId());
     }
 
     private void resolve(MessagingConversation conversation, boolean notify) {

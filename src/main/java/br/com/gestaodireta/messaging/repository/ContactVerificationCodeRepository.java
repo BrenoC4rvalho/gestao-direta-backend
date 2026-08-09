@@ -23,6 +23,12 @@ public interface ContactVerificationCodeRepository
                     ContactVerificationStatus status,
                     LocalDateTime now);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<ContactVerificationCode> findWithLockByVerificationTypeAndChannelAndStatus(
+            ContactVerificationType type,
+            MessagingChannel channel,
+            ContactVerificationStatus status);
+
     List<ContactVerificationCode> findByUserContactIdAndVerificationTypeAndChannelAndStatus(
             Long contactId,
             ContactVerificationType type,
