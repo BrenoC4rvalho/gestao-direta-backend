@@ -322,7 +322,10 @@ public class TelegramFinancialExtractionProcessor {
     }
 
     private java.util.List<String> missingFields(FinancialTransactionExtractionResult result) {
-        java.util.List<String> fields = new java.util.ArrayList<>();
+        java.util.Set<String> fields = new java.util.LinkedHashSet<>();
+        if (result.missingFields() != null) {
+            fields.addAll(result.missingFields());
+        }
         if (result.type() == null) {
             fields.add("type");
         }
@@ -335,7 +338,7 @@ public class TelegramFinancialExtractionProcessor {
         if (result.transactionDate() == null) {
             fields.add("transactionDate");
         }
-        return fields;
+        return java.util.List.copyOf(fields);
     }
 
     private String confirmation(PendingFinancialTransaction pending) {

@@ -35,6 +35,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -52,6 +53,7 @@ class TelegramPendingFinancialTransactionTest {
         verify(fixture.outgoing, times(1)).send(any(), any());
     }
 
+    @Test
     void shouldCreatePendingWhenOnlyFinancialContextIsReportedMissing() {
         Fixture fixture = fixture();
         when(fixture.extractionService.isEnabled()).thenReturn(true);
@@ -79,6 +81,7 @@ class TelegramPendingFinancialTransactionTest {
         verify(fixture.pendingRepository).save(pending.capture());
         assertThat(pending.getValue().getAmount()).isEqualByComparingTo("1000.00");
         assertThat(pending.getValue().getType()).isEqualTo(TransactionType.INCOME);
+        assertThat(pending.getValue().getMissingFields()).isEqualTo("financialContext");
     }
 
     void shouldCreateOnlyPendingForConsistentFinancialMessage() {
