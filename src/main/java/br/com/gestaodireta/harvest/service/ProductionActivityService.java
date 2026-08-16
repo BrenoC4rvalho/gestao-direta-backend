@@ -55,11 +55,14 @@ public class ProductionActivityService {
 
     @Transactional(readOnly = true)
     public PageResponse<ProductionActivityResponse> findAll(
-            Long farmId, ProductionActivityStatus status, PaginationParams paginationParams) {
+            Long farmId,
+            String search,
+            ProductionActivityStatus status,
+            PaginationParams paginationParams) {
         farmService.findEntityById(farmId);
         Page<ProductionActivity> activities =
-                productionActivityRepository.findByFarmIdAndStatus(
-                        farmId, status, paginationParams.toPageable());
+                productionActivityRepository.findByFarmIdAndFilters(
+                        farmId, normalizeSearch(search), status, paginationParams.toPageable());
 
         return PageResponse.from(activities.map(productionActivityMapper::toResponse));
     }
@@ -69,8 +72,9 @@ public class ProductionActivityService {
         farmService.findEntityById(farmId);
 
         return productionActivityRepository
-                .findByFarmIdAndStatus(
+                .findByFarmIdAndFilters(
                         farmId,
+                        null,
                         ProductionActivityStatus.ACTIVE,
                         PaginationParamsForOptions.PAGEABLE)
                 .stream()
@@ -151,6 +155,14 @@ public class ProductionActivityService {
         }
 
         return sanitizedName;
+    }
+
+    private String normalizeSearch(String search) {
+        if (search == null || search.isBlank()) {
+            return null;
+        }
+
+        return "%" + search.trim().toLowerCase(Locale.ROOT) + "%";
     }
 
     private void validateUniqueName(Long farmId, String name, Long ignoredActivityId) {

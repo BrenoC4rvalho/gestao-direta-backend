@@ -47,9 +47,10 @@ public class ProductionActivityController {
     @PreAuthorize("@harvestAccess.canViewProductionActivities(#farmId)")
     public PageResponse<ProductionActivityResponse> findAll(
             @RequestParam Long farmId,
+            @RequestParam(required = false) String search,
             @RequestParam(required = false) ProductionActivityStatus status,
             @Valid @ModelAttribute PaginationParams paginationParams) {
-        return productionActivityService.findAll(farmId, status, paginationParams);
+        return productionActivityService.findAll(farmId, search, status, paginationParams);
     }
 
     @GetMapping("/active")

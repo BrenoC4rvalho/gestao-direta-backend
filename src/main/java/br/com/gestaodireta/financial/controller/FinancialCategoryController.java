@@ -3,6 +3,8 @@ package br.com.gestaodireta.financial.controller;
 import br.com.gestaodireta.financial.dto.FinancialCategoryCreateRequest;
 import br.com.gestaodireta.financial.dto.FinancialCategoryResponse;
 import br.com.gestaodireta.financial.dto.FinancialCategoryUpdateRequest;
+import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
+import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
 import br.com.gestaodireta.financial.service.FinancialCategoryService;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
@@ -46,8 +48,11 @@ public class FinancialCategoryController {
     public PageResponse<FinancialCategoryResponse> findAll(
             @RequestParam Long farmId,
             @RequestParam(defaultValue = "false") boolean includeInactive,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) FinancialCategoryStatus status,
             @Valid @ModelAttribute PaginationParams paginationParams) {
-        return financialCategoryService.findAll(farmId, includeInactive, paginationParams);
+        return financialCategoryService.findAll(
+                farmId, includeInactive, search, status, paginationParams);
     }
 
     @GetMapping("/used-in-transactions")

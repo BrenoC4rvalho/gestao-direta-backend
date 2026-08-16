@@ -64,15 +64,30 @@ public class FinancialCategoryService {
 
     @Transactional(readOnly = true)
     public PageResponse<FinancialCategoryResponse> findAll(
-            Long farmId, boolean includeInactive, PaginationParams paginationParams) {
+            Long farmId,
+            boolean includeInactive,
+            String search,
+            FinancialCategoryStatus status,
+            PaginationParams paginationParams) {
         farmService.findEntityById(farmId);
         Page<FinancialCategoryResponse> categories =
                 financialCategoryRepository
-                        .findByFarmId(farmId, includeInactive, paginationParams.toPageable())
+                        .findByFarmIdAndFilters(
+                                farmId,
+                                includeInactive,
+                                normalizeSearch(search),
+                                status,
+                                paginationParams.toPageable())
                         .map(financialCategoryMapper::toResponse);
 
         return PageResponse.from(categories);
     }
+    @Transactional(readOnly = true)
+    public PageResponse<FinancialCategoryResponse> findAll(
+            Long farmId, boolean includeInactive, PaginationParams paginationParams) {
+        return findAll(farmId, includeInactive, null, null, paginationParams);
+    }
+
 
     @Transactional(readOnly = true)
     public List<FinancialCategoryResponse> findUsedInTransactions(Long farmId) {
@@ -150,6 +165,15 @@ public class FinancialCategoryService {
 
         return sanitizedName;
     }
+
+    private String normalizeSearch(String search) {
+        if (search == null || search.isBlank()) {
+            return null;
+        }
+
+        return "%" + search.trim().toLowerCase(Locale.ROOT) + "%";
+    }
+
 
     private void validateUniqueName(
             String name, Long farmId, TransactionType type, Long ignoredCategoryId) {

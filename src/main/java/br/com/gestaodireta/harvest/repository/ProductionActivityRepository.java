@@ -17,6 +17,9 @@ public interface ProductionActivityRepository extends JpaRepository<ProductionAc
                     from ProductionActivity activity
                     join fetch activity.farm
                     where activity.farm.id = :farmId
+                      and (:search is null
+                           or lower(activity.name) like :search
+                           or lower(coalesce(activity.description, activity.name)) like :search)
                       and (:status is null or activity.status = :status)
                     """,
             countQuery =
@@ -24,10 +27,14 @@ public interface ProductionActivityRepository extends JpaRepository<ProductionAc
                     select count(activity)
                     from ProductionActivity activity
                     where activity.farm.id = :farmId
+                      and (:search is null
+                           or lower(activity.name) like :search
+                           or lower(coalesce(activity.description, activity.name)) like :search)
                       and (:status is null or activity.status = :status)
                     """)
-    Page<ProductionActivity> findByFarmIdAndStatus(
+    Page<ProductionActivity> findByFarmIdAndFilters(
             @Param("farmId") Long farmId,
+            @Param("search") String search,
             @Param("status") ProductionActivityStatus status,
             Pageable pageable);
 

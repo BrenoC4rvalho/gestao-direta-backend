@@ -1,6 +1,7 @@
 package br.com.gestaodireta.financial.repository;
 
 import br.com.gestaodireta.financial.entity.FinancialCategory;
+import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
 import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import java.util.Collection;
@@ -19,15 +20,26 @@ public interface FinancialCategoryRepository extends JpaRepository<FinancialCate
             select category
             from FinancialCategory category
             where category.farm.id = :farmId
+              and (:search is null or lower(category.name) like :search)
               and (
-                    :includeInactive = true
-                    or category.status = br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus.ACTIVE
+                    :status is not null and category.status = :status
+                    or :status is null and (
+                        :includeInactive = true
+                        or category.status = br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus.ACTIVE
+                    )
               )
             """)
-    Page<FinancialCategory> findByFarmId(
+    Page<FinancialCategory> findByFarmIdAndFilters(
             @Param("farmId") Long farmId,
             @Param("includeInactive") boolean includeInactive,
+            @Param("search") String search,
+            @Param("status") FinancialCategoryStatus status,
             Pageable pageable);
+
+    default Page<FinancialCategory> findByFarmId(
+            Long farmId, boolean includeInactive, Pageable pageable) {
+        return findByFarmIdAndFilters(farmId, includeInactive, null, null, pageable);
+    }
 
     @Query(
             """
