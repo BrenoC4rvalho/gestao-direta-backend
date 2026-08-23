@@ -1,6 +1,7 @@
 package br.com.gestaodireta.messaging.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
@@ -51,6 +52,21 @@ class TelegramPendingFinancialTransactionTest {
         verify(fixture.extractionService, never()).extract(any(), any(), any());
         verify(fixture.pendingRepository, never()).save(any());
         verify(fixture.outgoing, times(1)).send(any(), any());
+    }
+
+    @Test
+    void shouldNotAccessFarmBeforeEligibilityWhenConversationIsWaitingForSelection() {
+        Fixture fixture = fixture();
+        fixture.conversation.setFarm(null);
+        fixture.conversation.setStatus(MessagingConversationStatus.WAITING_FARM_SELECTION);
+
+        assertThatCode(
+                        () ->
+                                fixture.processor.process(
+                                        fixture.account, fixture.conversation, message("1")))
+                .doesNotThrowAnyException();
+
+        verify(fixture.extractionService, never()).extract(any(), any(), any());
     }
 
     @Test

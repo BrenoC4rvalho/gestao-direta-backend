@@ -79,7 +79,7 @@ public class TelegramFinancialExtractionProcessor {
                 (account.getUserContact() == null
                         ? null
                         : account.getUserContact().getUser().getId()),
-                conversation.getFarm().getId(),
+                farmId(conversation),
                 message.getContent());
         if (!eligible(account, conversation, message)
                 || pendingRepository.findBySourceMessageId(message.getId()).isPresent()) return;

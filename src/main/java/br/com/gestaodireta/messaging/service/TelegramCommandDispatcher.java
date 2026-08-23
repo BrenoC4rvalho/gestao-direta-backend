@@ -36,7 +36,7 @@ public class TelegramCommandDispatcher {
     }
 
     @Transactional
-    public void dispatch(
+    public boolean dispatch(
             MessagingAccount account, MessagingConversation conversation, String content) {
         String text = content.trim();
         String command =
@@ -45,7 +45,7 @@ public class TelegramCommandDispatcher {
                         : null;
         if ("/vincular".equals(command)) {
             pending(account, conversation, command, text);
-            return;
+            return true;
         }
         if (account.getStatus() == MessagingAccountStatus.BLOCKED
                 || account.getStatus() == MessagingAccountStatus.INACTIVE) {
@@ -53,38 +53,38 @@ public class TelegramCommandDispatcher {
             outgoing.send(
                     conversation,
                     "Sua conta de mensagens está indisponível. Acesse o Gestão Direta para verificar seu acesso.");
-            return;
+            return true;
         }
         if (account.getStatus() != MessagingAccountStatus.ACTIVE
                 || account.getUserContact() == null) {
             pending(account, conversation, command, text);
-            return;
+            return true;
         }
         if ("/start".equals(command)) {
             outgoing.send(
                     conversation,
                     "Bem-vindo ao Gestão Direta.\n\nUse /ajuda para consultar os comandos disponíveis.");
             resolve(conversation, true);
-            return;
+            return true;
         }
         if ("/ajuda".equals(command)) {
             outgoing.send(
                     conversation,
                     "Comandos disponíveis:\n\n/start — iniciar ou continuar\n/fazendas — listar suas fazendas\n/fazenda — mostrar a fazenda atual\n/trocar_fazenda — selecionar outra fazenda\n/sair — finalizar a conversa\n/ajuda — mostrar esta ajuda");
-            return;
+            return true;
         }
         if ("/fazendas".equals(command)) {
             listFarms(conversation);
-            return;
+            return true;
         }
         if ("/fazenda".equals(command)) {
             currentFarm(conversation);
-            return;
+            return true;
         }
         if ("/trocar_fazenda".equals(command)) {
             conversation.setFarm(null);
             resolve(conversation, true);
-            return;
+            return true;
         }
         if ("/sair".equals(command)) {
             conversation.setFarm(null);
@@ -93,33 +93,52 @@ public class TelegramCommandDispatcher {
             conversationRepository.save(conversation);
             outgoing.send(
                     conversation, "Conversa finalizada. Envie /start para começar novamente.");
-            return;
+            return true;
         }
         if (conversation.getCurrentStep() == MessagingConversationStep.WAITING_FARM_SELECTION) {
             if (farms.select(conversation, text)) {
                 conversationRepository.save(conversation);
+                logFarmSelection(account, conversation, text, true);
                 outgoing.send(
                         conversation,
                         "Fazenda selecionada: " + conversation.getFarm().getName() + ".");
             } else {
+                logFarmSelection(account, conversation, text, false);
                 outgoing.send(
                         conversation,
                         "Opção inválida. Envie o número de uma das fazendas disponíveis.\n\n"
                                 + options(conversation));
             }
-            return;
+            return true;
         }
         if (conversation.getFarm() == null) {
             resolve(conversation, true);
-            return;
+            return true;
         }
         if (!farms.accessibleFarms(account.getUserContact().getUser().getId()).stream()
                 .anyMatch(f -> f.getId().equals(conversation.getFarm().getId()))) {
             conversation.setFarm(null);
             resolve(conversation, true);
-            return;
+            return true;
         }
         // Non-command text is handled by TelegramFinancialExtractionProcessor.
+        return false;
+    }
+
+    private void logFarmSelection(
+            MessagingAccount account,
+            MessagingConversation conversation,
+            String input,
+            boolean selected) {
+        LOGGER.info(
+                "telegram farm selection received: messagingAccountId={} conversationId={} input={} availableFarmCount={} selected={} selectedFarmId={} selectedFarmName={}",
+                account.getId(),
+                conversation.getId(),
+                input,
+                farms.accessibleFarms(account.getUserContact().getUser().getId()).size(),
+                selected,
+                conversation.getFarm() == null ? null : conversation.getFarm().getId(),
+                conversation.getFarm() == null ? null : conversation.getFarm().getName());
     }
 
     private void pending(
