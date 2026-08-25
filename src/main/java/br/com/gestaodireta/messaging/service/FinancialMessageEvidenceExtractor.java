@@ -14,13 +14,14 @@ import org.springframework.stereotype.Component;
 @Component
 public class FinancialMessageEvidenceExtractor {
     private static final String NUMBER =
-            "(\\d{1,3}(?:\\.\\d{3})*(?:,\\d{1,2})?|\\d+(?:,\\d{1,2})?)";
+            "(?<!\\d)(\\d{1,3}(?:\\.\\d{3})+(?:,\\d{1,2})?|\\d+(?:,\\d{1,2})?)(?!\\d|[.,]\\d)";
     private static final Pattern CURRENCY_PREFIX =
             Pattern.compile("r\\$\\s*" + NUMBER, Pattern.CASE_INSENSITIVE);
     private static final Pattern CURRENCY_SUFFIX =
             Pattern.compile(NUMBER + "\\s*reais?", Pattern.CASE_INSENSITIVE);
     private static final Pattern DECIMAL_AMOUNT =
-            Pattern.compile("(\\d{1,3}(?:\\.\\d{3})*,\\d{1,2})(?=\\s|\\z)");
+            Pattern.compile(
+                    "(?<!\\d)(\\d{1,3}(?:\\.\\d{3})+,\\d{1,2}|\\d+,\\d{1,2})(?!\\d|[.,]\\d)");
     private static final Pattern CONTEXTUAL_AMOUNT =
             Pattern.compile(
                     "(?:por|paguei|pagou|recebi|recebeu|entrou|entrada(?:\\s+de)?|gastei|gastou|custou|foi|valor\\s+de)\\s*"

@@ -9,6 +9,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import java.util.stream.Stream;
 
 class FinancialExtractionValidationTest {
     private final FinancialMessageEvidenceExtractor evidence =
@@ -190,6 +194,162 @@ class FinancialExtractionValidationTest {
                                         new BigDecimal("0.95"),
                                         List.of())))
                 .isFalse();
+    }
+
+    @ParameterizedTest
+    @MethodSource("brazilianMoneyFormats")
+    void shouldNormalizeBrazilianMoneyFormats(String text, BigDecimal expectedAmount) {
+        assertThat(evidence.monetaryAmounts(text)).containsExactly(expectedAmount);
+    }
+
+    @ParameterizedTest
+    @MethodSource("expenseMoneyFormats")
+    void shouldAcceptExpenseMoneyFormats(String text, BigDecimal expectedAmount) {
+        assertThat(
+                        resultValidator.isValid(
+                                text,
+                                result(
+                                        TransactionType.EXPENSE,
+                                        expectedAmount,
+                                        "Diesel",
+                                        new BigDecimal("0.95"),
+                                        List.of())))
+                .isTrue();
+    }
+
+    @Test
+    void shouldAcceptRegressionCaseForFourThousandEightHundredReais() {
+        String text = "Recebi R$ 4800,00 pela venda de milho hoje.";
+
+        assertThat(evidence.monetaryAmounts(text)).containsExactly(new BigDecimal("4800.00"));
+        assertThat(
+                        resultValidator.validate(
+                                text,
+                                result(
+                                        TransactionType.INCOME,
+                                        new BigDecimal("4800.00"),
+                                        "Venda de milho",
+                                        new BigDecimal("0.95"),
+                                        List.of())))
+                .isEqualTo(
+                        new FinancialTransactionExtractionResultValidator.ValidationResult(
+                                true,
+                                FinancialTransactionExtractionResultValidator.RejectionReason.NONE));
+    }
+
+    @Test
+    void shouldRejectInventedOrPartialAmountsFromBrazilianMoneySource() {
+        assertThat(
+                        resultValidator.validate(
+                                "Paguei R$ 400 de combustível.",
+                                result(
+                                        TransactionType.EXPENSE,
+                                        new BigDecimal("500.00"),
+                                        "Combustível",
+                                        new BigDecimal("0.95"),
+                                        List.of()))
+                                .reason())
+                .isEqualTo(
+                        FinancialTransactionExtractionResultValidator.RejectionReason
+                                .AMOUNT_NOT_SUPPORTED_BY_SOURCE);
+        assertThat(
+                        resultValidator.validate(
+                                "Paguei R$ 4.800,00 de combustível.",
+                                result(
+                                        TransactionType.EXPENSE,
+                                        new BigDecimal("480.00"),
+                                        "Combustível",
+                                        new BigDecimal("0.95"),
+                                        List.of()))
+                                .reason())
+                .isEqualTo(
+                        FinancialTransactionExtractionResultValidator.RejectionReason
+                                .AMOUNT_NOT_SUPPORTED_BY_SOURCE);
+    }
+
+    @Test
+    void shouldPreferMonetaryAmountOverPhysicalQuantities() {
+        String text = "Comprei 10 sacos de fertilizante por R$ 2.500,00.";
+
+        assertThat(evidence.monetaryAmounts(text)).containsExactly(new BigDecimal("2500.00"));
+        assertThat(
+                        resultValidator.isValid(
+                                text,
+                                result(
+                                        TransactionType.EXPENSE,
+                                        new BigDecimal("2500.00"),
+                                        "Fertilizante",
+                                        new BigDecimal("0.95"),
+                                        List.of())))
+                .isTrue();
+        assertThat(
+                        resultValidator.isValid(
+                                text,
+                                result(
+                                        TransactionType.EXPENSE,
+                                        new BigDecimal("10.00"),
+                                        "Fertilizante",
+                                        new BigDecimal("0.95"),
+                                        List.of())))
+                .isFalse();
+    }
+
+    @Test
+    void shouldNotTreatPhysicalQuantityAsAmountWhenReaisIsPresent() {
+        String text = "Comprei 20 litros de óleo por 350 reais.";
+
+        assertThat(evidence.monetaryAmounts(text)).containsExactly(new BigDecimal("350.00"));
+        assertThat(
+                        resultValidator.isValid(
+                                text,
+                                result(
+                                        TransactionType.EXPENSE,
+                                        new BigDecimal("350.00"),
+                                        "Óleo",
+                                        new BigDecimal("0.95"),
+                                        List.of())))
+                .isTrue();
+        assertThat(
+                        resultValidator.isValid(
+                                text,
+                                result(
+                                        TransactionType.EXPENSE,
+                                        new BigDecimal("20.00"),
+                                        "Óleo",
+                                        new BigDecimal("0.95"),
+                                        List.of())))
+                .isFalse();
+    }
+
+    private static Stream<Arguments> expenseMoneyFormats() {
+        return Stream.of(
+                Arguments.of("Gastei R$400 com diesel hoje.", new BigDecimal("400.00")),
+                Arguments.of("Gastei R$ 400 com diesel hoje.", new BigDecimal("400.00")),
+                Arguments.of("Gastei R$400,00 com diesel hoje.", new BigDecimal("400.00")),
+                Arguments.of("Gastei R$ 400,00 com diesel hoje.", new BigDecimal("400.00")),
+                Arguments.of("Gastei 400 com diesel hoje.", new BigDecimal("400.00")),
+                Arguments.of("Gastei 400,00 com diesel hoje.", new BigDecimal("400.00")),
+                Arguments.of("Gastei 400,0 com diesel hoje.", new BigDecimal("400.00")));
+    }
+
+    private static Stream<Arguments> brazilianMoneyFormats() {
+        return Stream.of(
+                Arguments.of("Paguei R$400 com diesel.", new BigDecimal("400.00")),
+                Arguments.of("Paguei R$ 400 com diesel.", new BigDecimal("400.00")),
+                Arguments.of("Paguei R$400,00 com diesel.", new BigDecimal("400.00")),
+                Arguments.of("Paguei R$ 400,00 com diesel.", new BigDecimal("400.00")),
+                Arguments.of("Paguei 400 com diesel.", new BigDecimal("400.00")),
+                Arguments.of("Paguei 400,00 com diesel.", new BigDecimal("400.00")),
+                Arguments.of("Paguei 400,0 com diesel.", new BigDecimal("400.00")),
+                Arguments.of("Recebi R$4.800,00 pela venda.", new BigDecimal("4800.00")),
+                Arguments.of("Recebi R$ 4.800,00 pela venda.", new BigDecimal("4800.00")),
+                Arguments.of("Recebi 4.800,00 pela venda.", new BigDecimal("4800.00")),
+                Arguments.of("Recebi 4800,00 pela venda.", new BigDecimal("4800.00")),
+                Arguments.of("Recebi 4800 pela venda.", new BigDecimal("4800.00")),
+                Arguments.of("Recebi R$ 12.500,00 pela venda.", new BigDecimal("12500.00")),
+                Arguments.of("Recebi 12.500,00 pela venda.", new BigDecimal("12500.00")),
+                Arguments.of("Recebi 12500,00 pela venda.", new BigDecimal("12500.00")),
+                Arguments.of("Recebi 12500 pela venda.", new BigDecimal("12500.00")));
     }
 
     private FinancialTransactionExtractionResult result(

@@ -17,6 +17,7 @@ import br.com.gestaodireta.farm.entity.Farm;
 import br.com.gestaodireta.farm.enumeration.FarmUserRole;
 import br.com.gestaodireta.farm.repository.FarmUserRepository;
 import br.com.gestaodireta.financial.entity.PendingFinancialTransaction;
+import br.com.gestaodireta.financial.enumeration.PendingFinancialTransactionStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.PendingFinancialTransactionRepository;
@@ -70,7 +71,42 @@ class TelegramPendingFinancialTransactionTest {
     }
 
     @Test
-    void shouldCreatePendingWhenOnlyFinancialContextIsReportedMissing() {
+    void shouldCreatePendingForHarvesterMaintenanceWithoutMissingDescription() {
+        Fixture fixture = fixture();
+        when(fixture.extractionService.isEnabled()).thenReturn(true);
+        when(fixture.extractionService.model()).thenReturn("fake");
+        when(fixture.extractionService.provider()).thenReturn("fake");
+        when(fixture.extractionService.extract(any(), any(), any()))
+                .thenReturn(
+                        new FinancialTransactionExtractionResult(
+                                true,
+                                TransactionType.EXPENSE,
+                                new BigDecimal("780.00"),
+                                null,
+                                "Manutenção da colheitadeira",
+                                "Manutenção",
+                                new BigDecimal("0.95"),
+                                List.of("transactionDate")));
+
+        fixture.processor.process(
+                fixture.account,
+                fixture.conversation,
+                message("Paguei 780 de manutenção da colheitadeira."));
+
+        ArgumentCaptor<PendingFinancialTransaction> pending =
+                ArgumentCaptor.forClass(PendingFinancialTransaction.class);
+        verify(fixture.pendingRepository).save(pending.capture());
+        assertThat(pending.getValue().getAmount()).isEqualByComparingTo("780.00");
+        assertThat(pending.getValue().getType()).isEqualTo(TransactionType.EXPENSE);
+        assertThat(pending.getValue().getDescription()).isEqualTo("Manutenção da colheitadeira");
+        assertThat(pending.getValue().getTransactionDate()).isNull();
+        assertThat(pending.getValue().getStatus())
+                .isEqualTo(PendingFinancialTransactionStatus.PENDING_REVIEW);
+        assertThat(pending.getValue().getMissingFields()).doesNotContain("description");
+    }
+
+    @Test
+    void shouldCreatePendingForBrazilianFormattedCornSale() {
         Fixture fixture = fixture();
         when(fixture.extractionService.isEnabled()).thenReturn(true);
         when(fixture.extractionService.model()).thenReturn("fake");
@@ -80,24 +116,27 @@ class TelegramPendingFinancialTransactionTest {
                         new FinancialTransactionExtractionResult(
                                 true,
                                 TransactionType.INCOME,
-                                new BigDecimal("1000.00"),
-                                LocalDate.of(2026, 8, 9),
+                                new BigDecimal("4800.00"),
+                                LocalDate.of(2026, 8, 23),
                                 "Venda de milho",
-                                null,
+                                "Venda de produção",
                                 new BigDecimal("0.95"),
-                                List.of("financialContext")));
+                                List.of()));
 
         fixture.processor.process(
                 fixture.account,
                 fixture.conversation,
-                message("recebi 1000 reais pela venda de milho hoje"));
+                message("Recebi R$ 4800,00 pela venda de milho hoje."));
 
         ArgumentCaptor<PendingFinancialTransaction> pending =
                 ArgumentCaptor.forClass(PendingFinancialTransaction.class);
         verify(fixture.pendingRepository).save(pending.capture());
-        assertThat(pending.getValue().getAmount()).isEqualByComparingTo("1000.00");
+        assertThat(pending.getValue().getStatus())
+                .isEqualTo(PendingFinancialTransactionStatus.PENDING_REVIEW);
         assertThat(pending.getValue().getType()).isEqualTo(TransactionType.INCOME);
-        assertThat(pending.getValue().getMissingFields()).isEqualTo("financialContext");
+        assertThat(pending.getValue().getAmount()).isEqualByComparingTo("4800.00");
+        assertThat(pending.getValue().getDescription()).isEqualTo("Venda de milho");
+        assertThat(pending.getValue().getTransactionDate()).isEqualTo(LocalDate.of(2026, 8, 23));
     }
 
     void shouldCreateOnlyPendingForConsistentFinancialMessage() {

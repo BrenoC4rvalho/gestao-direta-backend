@@ -28,10 +28,16 @@ public class OllamaAiTextGenerationClient implements AiTextGenerationClient {
 
     private final String model;
 
+    private final String format;
+
+    private final double temperature;
+
     public OllamaAiTextGenerationClient(
             RestClient.Builder restClientBuilder, OllamaAiProperties ollamaAiProperties) {
         this.baseUrl = ollamaAiProperties.getBaseUrl();
         this.model = ollamaAiProperties.getModel();
+        this.format = ollamaAiProperties.getFormat();
+        this.temperature = ollamaAiProperties.getTemperature();
         this.restClient = restClientBuilder.baseUrl(baseUrl).build();
     }
 
@@ -51,7 +57,11 @@ public class OllamaAiTextGenerationClient implements AiTextGenerationClient {
                                             "prompt",
                                             request.prompt(),
                                             "stream",
-                                            false))
+                                            false,
+                                            "format",
+                                            format,
+                                            "options",
+                                            Map.of("temperature", temperature)))
                             .retrieve()
                             .body(OllamaGenerateResponse.class);
         } catch (RestClientResponseException exception) {

@@ -37,7 +37,9 @@ class OllamaAiTextGenerationClientTest {
                         {
                           "model": "llama3.1:8b",
                           "prompt": "parse this",
-                          "stream": false
+                          "stream": false,
+                          "format": "json",
+                          "options": {"temperature": 0}
                         }
                         """))
                 .andRespond(

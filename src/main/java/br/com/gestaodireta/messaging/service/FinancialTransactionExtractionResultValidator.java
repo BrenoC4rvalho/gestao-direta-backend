@@ -4,11 +4,17 @@ import br.com.gestaodireta.ai.config.FinancialExtractionProperties;
 import br.com.gestaodireta.ai.service.dto.FinancialTransactionExtractionResult;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 @Component
 public class FinancialTransactionExtractionResultValidator {
+    private static final Logger LOGGER =
+            LoggerFactory.getLogger(FinancialTransactionExtractionResultValidator.class);
+
     public enum RejectionReason {
         NONE,
         NOT_FINANCIAL,
@@ -82,10 +88,7 @@ public class FinancialTransactionExtractionResultValidator {
         if (result == null || !result.isFinancialTransaction()) {
             return rejected(RejectionReason.NOT_FINANCIAL);
         }
-        if (result.type() == null
-                || result.transactionDate() == null
-                || invalidDescription(result.description())
-                || hasMissingRequiredField(result)) {
+        if (invalidDescription(result.description()) || hasMissingRequiredField(result)) {
             return rejected(RejectionReason.MISSING_REQUIRED_FIELD);
         }
         if (result.amount() == null || result.amount().compareTo(BigDecimal.ZERO) <= 0) {
@@ -100,8 +103,15 @@ public class FinancialTransactionExtractionResultValidator {
                 < 0) {
             return rejected(RejectionReason.LOW_CONFIDENCE);
         }
-        if (evidence.monetaryAmounts(originalText).stream()
-                .noneMatch(amount -> amount.compareTo(result.amount()) == 0)) {
+        List<BigDecimal> sourceCandidates = evidence.monetaryAmounts(originalText);
+        boolean amountSupported =
+                sourceCandidates.stream()
+                        .anyMatch(amount -> amount.compareTo(result.amount()) == 0);
+        if (!amountSupported) {
+            LOGGER.info(
+                    "financial extraction amount source validation: extractedAmount={} sourceCandidates={} supported=false",
+                    result.amount(),
+                    sourceCandidates);
             return rejected(RejectionReason.AMOUNT_NOT_SUPPORTED_BY_SOURCE);
         }
         if (!hasCompatibleTypeSignal(evidence.words(originalText), result.type())) {
