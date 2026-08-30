@@ -190,7 +190,12 @@ public class TelegramFinancialExtractionProcessor {
                     exception,
                     AI_INVALID_RESPONSE_MESSAGE);
         } catch (AiModelNotAvailableException exception) {
-            rejectAi(message, conversation, "AI_UNAVAILABLE", exception, AI_UNAVAILABLE_MESSAGE);
+            rejectAi(
+                    message,
+                    conversation,
+                    exception.getReason().name(),
+                    exception,
+                    AI_UNAVAILABLE_MESSAGE);
         } catch (AiProviderException exception) {
             String reason =
                     exception.getReason() == AiProviderException.Reason.TIMEOUT
@@ -260,12 +265,25 @@ public class TelegramFinancialExtractionProcessor {
             String reason,
             RuntimeException exception,
             String response) {
-        LOGGER.warn(
-                "financial extraction rejected: stage={} reason={} messageId={} exception={}",
-                stage,
-                reason,
-                message.getId(),
-                exception.getClass().getSimpleName());
+        if (exception instanceof AiProviderException providerException) {
+            LOGGER.warn(
+                    "financial extraction rejected: stage={} reason={} provider={} model={} messageId={} httpStatus={} providerStatus={} exception={}",
+                    stage,
+                    reason,
+                    providerException.getProvider(),
+                    providerException.getModel(),
+                    message.getId(),
+                    providerException.getStatusCode(),
+                    providerException.getProviderStatus(),
+                    exception.getClass().getSimpleName());
+        } else {
+            LOGGER.error(
+                    "financial extraction rejected unexpectedly: stage={} reason={} messageId={}",
+                    stage,
+                    reason,
+                    message.getId(),
+                    exception);
+        }
         outgoing.send(conversation, response);
     }
 

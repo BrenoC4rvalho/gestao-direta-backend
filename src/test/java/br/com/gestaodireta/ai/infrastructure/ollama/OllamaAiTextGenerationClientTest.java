@@ -77,6 +77,23 @@ class OllamaAiTextGenerationClientTest {
         server.verify();
     }
 
+    @Test
+    void shouldProbeConfiguredOllamaModel() {
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        OllamaAiTextGenerationClient client =
+                new OllamaAiTextGenerationClient(restClientBuilder, properties());
+
+        server.expect(once(), requestTo("http://ollama.example/api/show"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().json("{\"model\":\"llama3.1:8b\"}"))
+                .andRespond(withSuccess("{\"details\":{}}", MediaType.APPLICATION_JSON));
+
+        client.probe();
+
+        server.verify();
+    }
+
     private OllamaAiProperties properties() {
         OllamaAiProperties properties = new OllamaAiProperties();
         properties.setBaseUrl("http://ollama.example");

@@ -20,6 +20,7 @@ public class AiProviderConfiguration {
             OllamaAiProperties ollamaProperties,
             GeminiAiProperties geminiProperties,
             FinancialExtractionProperties extractionProperties,
+            AiHealthProperties healthProperties,
             RestClient.Builder restClientBuilder) {
         String provider = normalize(providerProperties.getProvider());
 
@@ -28,13 +29,15 @@ public class AiProviderConfiguration {
                     new OllamaAiTextGenerationClient(
                             restClientBuilder,
                             ollamaProperties,
-                            extractionProperties.getTimeoutSeconds());
+                            extractionProperties.getTimeoutSeconds(),
+                            healthProperties.getTimeoutSeconds());
             case "gemini" -> {
                 validateGeminiApiKey(geminiProperties.getApiKey());
                 yield new GeminiAiTextGenerationClient(
                         restClientBuilder,
                         geminiProperties,
-                        extractionProperties.getTimeoutSeconds());
+                        extractionProperties.getTimeoutSeconds(),
+                        healthProperties.getTimeoutSeconds());
             }
             case "fake" -> new FakeAiTextGenerationClient();
             default -> throw new IllegalStateException("Unsupported AI provider: " + provider);

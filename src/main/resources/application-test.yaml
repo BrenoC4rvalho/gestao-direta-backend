@@ -52,6 +52,10 @@ app:
     gemini:
       api-key: test-gemini-key
       model: gemini-3.1-flash-lite
+    health:
+      enabled: true
+      timeout-seconds: 5
+      cache-seconds: 60
   cors:
     allowed-origins: http://localhost:5173
     allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS

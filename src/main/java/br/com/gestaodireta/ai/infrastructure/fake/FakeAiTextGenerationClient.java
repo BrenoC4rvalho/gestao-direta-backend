@@ -29,4 +29,7 @@ public class FakeAiTextGenerationClient implements AiTextGenerationClient {
     public String providerName() {
         return "fake";
     }
+
+    @Override
+    public void probe() {}
 }

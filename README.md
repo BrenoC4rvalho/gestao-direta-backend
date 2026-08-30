@@ -119,6 +119,9 @@ APP_AI_OLLAMA_FORMAT=json
 APP_AI_OLLAMA_TEMPERATURE=0
 APP_AI_GEMINI_API_KEY=
 APP_AI_GEMINI_MODEL=gemini-3.1-flash-lite
+AI_HEALTH_CHECK_ENABLED=true
+AI_HEALTH_CHECK_TIMEOUT_SECONDS=5
+AI_HEALTH_CHECK_CACHE_SECONDS=60
 
 TELEGRAM_ENABLED=false
 TELEGRAM_BOT_TOKEN=
@@ -156,6 +159,9 @@ MESSAGING_CONVERSATION_EXPIRATION_HOURS=24
 | `APP_AI_OLLAMA_TEMPERATURE` | Não | Temperatura enviada ao Ollama. | `0` |
 | `APP_AI_GEMINI_API_KEY` | Sim, se Gemini estiver habilitado | Chave da Gemini API, usada somente pelo backend. | — |
 | `APP_AI_GEMINI_MODEL` | Não | Modelo Gemini enviado à API. | `gemini-3.1-flash-lite` |
+| `AI_HEALTH_CHECK_ENABLED` | Não | Habilita a verificação de conectividade do provider de IA. | `true` |
+| `AI_HEALTH_CHECK_TIMEOUT_SECONDS` | Não | Timeout da verificação leve de saúde da IA. | `5` |
+| `AI_HEALTH_CHECK_CACHE_SECONDS` | Não | TTL do resultado de saúde para evitar chamadas repetidas ao provider. | `60` |
 | `TELEGRAM_ENABLED` | Não | Habilita a integração Telegram. | `false` |
 | `TELEGRAM_BOT_TOKEN` | Sim, se Telegram estiver habilitado | Token do bot. | Vazio |
 | `TELEGRAM_WEBHOOK_SECRET` | Sim, se Telegram estiver habilitado | Secret validado no webhook recebido. | Vazio |
@@ -249,6 +255,8 @@ Com a aplicação em execução:
 - OpenAPI JSON: `http://localhost:8080/api/v3/api-docs`
 - Health check: `http://localhost:8080/api/actuator/health`
 - Status público da aplicação: `http://localhost:8080/api/system/status`
+
+O health inclui o componente `ai`, que informa provider, modelo, conectividade e latência para usuários autorizados. Ele nunca expõe chaves, prompts, mensagens financeiras ou headers. A verificação real é cacheada pelo TTL configurado; quando a IA externa estiver indisponível, o componente `ai` ficará `DOWN` sem impedir o startup da API.
 
 ## Autenticação e CORS
 

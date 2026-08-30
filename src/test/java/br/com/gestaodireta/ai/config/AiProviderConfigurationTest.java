@@ -49,12 +49,14 @@ class AiProviderConfigurationTest {
         geminiProperties.setApiKey(geminiApiKey);
         geminiProperties.setModel("gemini-3.1-flash-lite");
         FinancialExtractionProperties extractionProperties = new FinancialExtractionProperties();
+        AiHealthProperties healthProperties = new AiHealthProperties();
 
         return configuration.aiTextGenerationClient(
                 providerProperties,
                 ollamaProperties,
                 geminiProperties,
                 extractionProperties,
+                healthProperties,
                 RestClient.builder());
     }
 }

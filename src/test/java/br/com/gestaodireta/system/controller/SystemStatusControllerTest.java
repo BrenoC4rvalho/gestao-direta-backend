@@ -50,6 +50,15 @@ class SystemStatusControllerTest extends PostgresIntegrationTest {
         mockMvc.perform(get("/api/actuator/health").contextPath(CONTEXT_PATH))
                 .andExpect(status().isOk());
 
+        mockMvc.perform(
+                        get("/api/actuator/health")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user("admin").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.components.ai.status").value("UP"))
+                .andExpect(jsonPath("$.components.ai.details.provider").value("fake"))
+                .andExpect(jsonPath("$.components.ai.details.model").value("fake"));
+
         mockMvc.perform(get("/api/actuator/info").contextPath(CONTEXT_PATH))
                 .andExpect(status().isOk());
     }

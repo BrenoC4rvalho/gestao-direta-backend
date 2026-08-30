@@ -59,11 +59,63 @@ class GeminiAiTextGenerationClientTest {
 
     @Test
     void shouldClassifyAuthenticationRateLimitAndServerErrors() {
+        assertHttpFailure(HttpStatus.BAD_REQUEST, AiProviderException.Reason.INVALID_REQUEST);
         assertHttpFailure(HttpStatus.UNAUTHORIZED, AiProviderException.Reason.UNAUTHORIZED);
         assertHttpFailure(HttpStatus.FORBIDDEN, AiProviderException.Reason.FORBIDDEN);
         assertHttpFailure(HttpStatus.TOO_MANY_REQUESTS, AiProviderException.Reason.RATE_LIMIT);
         assertHttpFailure(
                 HttpStatus.SERVICE_UNAVAILABLE, AiProviderException.Reason.SERVICE_UNAVAILABLE);
+    }
+
+    @Test
+    void shouldPreserveSanitizedGeminiErrorDetails() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GeminiAiTextGenerationClient client =
+                new GeminiAiTextGenerationClient(builder, properties());
+        server.expect(once(), requestTo(org.hamcrest.Matchers.containsString("generateContent")))
+                .andRespond(
+                        withStatus(HttpStatus.BAD_REQUEST)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .body(
+                                        """
+                                        {"error":{"code":400,"status":"INVALID_ARGUMENT","message":"Invalid JSON payload received. Unknown name x-goog-api-key: secret-value"}}
+                                        """));
+
+        assertThatThrownBy(() -> client.generate(new AiGenerationRequest("extract")))
+                .isInstanceOf(AiProviderException.class)
+                .satisfies(
+                        exception -> {
+                            AiProviderException providerException = (AiProviderException) exception;
+                            assertThat(providerException.getReason())
+                                    .isEqualTo(AiProviderException.Reason.INVALID_REQUEST);
+                            assertThat(providerException.getStatusCode()).isEqualTo(400);
+                            assertThat(providerException.getProviderStatus())
+                                    .isEqualTo("INVALID_ARGUMENT");
+                            assertThat(providerException.getMessage())
+                                    .contains("Invalid JSON payload received")
+                                    .doesNotContain("secret-value");
+                        });
+        server.verify();
+    }
+
+    @Test
+    void shouldProbeGeminiWithMinimalRequest() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GeminiAiTextGenerationClient client =
+                new GeminiAiTextGenerationClient(builder, properties());
+        server.expect(once(), requestTo(org.hamcrest.Matchers.containsString("generateContent")))
+                .andExpect(
+                        content()
+                                .string(
+                                        org.hamcrest.Matchers.containsString(
+                                                "Reply only with OK.")))
+                .andRespond(withSuccess(response("OK"), MediaType.APPLICATION_JSON));
+
+        client.probe();
+
+        server.verify();
     }
 
     @Test
