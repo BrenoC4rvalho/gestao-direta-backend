@@ -15,11 +15,13 @@ import br.com.gestaodireta.ai.service.AiModelNotAvailableException;
 import br.com.gestaodireta.ai.service.AiProviderException;
 import br.com.gestaodireta.ai.service.FinancialExtractionResponseSchema;
 import br.com.gestaodireta.ai.service.provider.AiGenerationRequest;
+import java.net.SocketTimeoutException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
 class GeminiAiTextGenerationClientTest {
@@ -145,10 +147,82 @@ class GeminiAiTextGenerationClientTest {
                                         org.hamcrest.Matchers.containsString(
                                                 "Reply only with OK.")))
                 .andExpect(jsonPath("$.generationConfig").doesNotExist())
-                .andRespond(withSuccess(response("OK"), MediaType.APPLICATION_JSON));
+                .andExpect(jsonPath("$.responseJsonSchema").doesNotExist())
+                .andRespond(withSuccess(response("Ready"), MediaType.APPLICATION_JSON));
 
         client.probe();
 
+        server.verify();
+    }
+
+    @Test
+    void shouldAcceptAnyNonBlankTextFromGeminiHealthProbe() {
+        assertSuccessfulProbe("OK");
+        assertSuccessfulProbe("OK\n");
+        assertSuccessfulProbe("ok");
+        assertSuccessfulProbe("Ready");
+    }
+
+    @Test
+    void shouldAcceptTextFromAnyCandidatePartInGeminiHealthProbe() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GeminiAiTextGenerationClient client =
+                new GeminiAiTextGenerationClient(builder, properties());
+        server.expect(once(), requestTo(org.hamcrest.Matchers.containsString("generateContent")))
+                .andRespond(
+                        withSuccess(
+                                """
+                                {"candidates":[
+                                  {"content":{"parts":[{}]},"finishReason":"STOP"},
+                                  {"content":{"parts":[{"text":"Ready"}]},"finishReason":"STOP"}
+                                ]}
+                                """,
+                                MediaType.APPLICATION_JSON));
+
+        client.probe();
+
+        server.verify();
+    }
+
+    @Test
+    void shouldRejectInvalidGeminiHealthProbeResponses() {
+        assertInvalidProbeResponse("{\"candidates\":[]}");
+        assertInvalidProbeResponse("{\"candidates\":[{\"content\":{},\"finishReason\":\"STOP\"}]}");
+        assertInvalidProbeResponse(
+                """
+                {"candidates":[{"content":{"parts":[{"text":"  "}]}}]}
+                """);
+        assertInvalidProbeResponse("{\"promptFeedback\":{\"blockReason\":\"SAFETY\"}}");
+        assertInvalidProbeResponse("{invalid");
+    }
+
+    @Test
+    void shouldClassifyGeminiHealthProbeHttpFailures() {
+        assertProbeHttpFailure(HttpStatus.UNAUTHORIZED, AiProviderException.Reason.UNAUTHORIZED);
+        assertProbeHttpFailure(HttpStatus.FORBIDDEN, AiProviderException.Reason.FORBIDDEN);
+        assertProbeHttpFailure(HttpStatus.TOO_MANY_REQUESTS, AiProviderException.Reason.RATE_LIMIT);
+        assertThatThrownBy(() -> probeWithStatus(HttpStatus.NOT_FOUND))
+                .isInstanceOf(AiModelNotAvailableException.class);
+    }
+
+    @Test
+    void shouldClassifyGeminiHealthProbeTimeout() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GeminiAiTextGenerationClient client =
+                new GeminiAiTextGenerationClient(builder, properties());
+        server.expect(once(), requestTo(org.hamcrest.Matchers.containsString("generateContent")))
+                .andRespond(
+                        request -> {
+                            throw new ResourceAccessException(
+                                    "Timed out", new SocketTimeoutException());
+                        });
+
+        assertThatThrownBy(client::probe)
+                .isInstanceOf(AiProviderException.class)
+                .extracting("reason")
+                .isEqualTo(AiProviderException.Reason.TIMEOUT);
         server.verify();
     }
 
@@ -211,11 +285,66 @@ class GeminiAiTextGenerationClientTest {
         server.verify();
     }
 
+    private void assertSuccessfulProbe(String text) {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GeminiAiTextGenerationClient client =
+                new GeminiAiTextGenerationClient(builder, properties());
+        server.expect(once(), requestTo(org.hamcrest.Matchers.containsString("generateContent")))
+                .andRespond(withSuccess(response(text), MediaType.APPLICATION_JSON));
+
+        client.probe();
+
+        server.verify();
+    }
+
+    private void assertInvalidProbeResponse(String responseBody) {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GeminiAiTextGenerationClient client =
+                new GeminiAiTextGenerationClient(builder, properties());
+        server.expect(once(), requestTo(org.hamcrest.Matchers.containsString("generateContent")))
+                .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(client::probe)
+                .isInstanceOf(AiProviderException.class)
+                .extracting("reason")
+                .isEqualTo(AiProviderException.Reason.INVALID_RESPONSE);
+        server.verify();
+    }
+
+    private void assertProbeHttpFailure(
+            HttpStatus status, AiProviderException.Reason expectedReason) {
+        assertThatThrownBy(() -> probeWithStatus(status))
+                .isInstanceOf(AiProviderException.class)
+                .extracting("reason")
+                .isEqualTo(expectedReason);
+    }
+
+    private void probeWithStatus(HttpStatus status) {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GeminiAiTextGenerationClient client =
+                new GeminiAiTextGenerationClient(builder, properties());
+        server.expect(once(), requestTo(org.hamcrest.Matchers.containsString("generateContent")))
+                .andRespond(withStatus(status));
+
+        try {
+            client.probe();
+        } finally {
+            server.verify();
+        }
+    }
+
     private String response(String text) {
         return """
                 {"candidates":[{"content":{"parts":[{"text":"%s"}]},"finishReason":"STOP"}]}
                 """
-                .formatted(text.replace("\"", "\\\""));
+                .formatted(
+                        text.replace("\\", "\\\\")
+                                .replace("\"", "\\\"")
+                                .replace("\n", "\\n")
+                                .replace("\r", "\\r"));
     }
 
     private GeminiAiProperties properties() {

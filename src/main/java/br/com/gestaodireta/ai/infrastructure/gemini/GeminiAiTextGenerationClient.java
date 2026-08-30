@@ -29,6 +29,8 @@ public class GeminiAiTextGenerationClient implements AiTextGenerationClient {
 
     private static final String GENERATE_CONTENT_ENDPOINT = "generateContent";
 
+    private static final int PROBE_TEXT_PREVIEW_LENGTH = 120;
+
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final RestClient restClient;
@@ -151,17 +153,7 @@ public class GeminiAiTextGenerationClient implements AiTextGenerationClient {
                             .body(requestBody("Reply only with OK.", null))
                             .retrieve()
                             .body(JsonNode.class);
-            String text = responseText(response);
-            if (!"OK".equalsIgnoreCase(text.trim())) {
-                throw new AiProviderException(
-                        AiProviderException.Reason.INVALID_RESPONSE,
-                        null,
-                        PROVIDER,
-                        model,
-                        null,
-                        "Gemini health probe returned an unexpected response",
-                        null);
-            }
+            probeResponseText(response);
         } catch (RestClientResponseException exception) {
             throw logAndTranslateHttpException(exception, startNanos);
         } catch (ResourceAccessException exception) {
@@ -176,6 +168,18 @@ public class GeminiAiTextGenerationClient implements AiTextGenerationClient {
                     model,
                     null,
                     "Gemini health probe timed out or could not be reached",
+                    exception);
+        } catch (AiProviderException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            logProbeEvaluation(0, null, 0, null, "unreadable_response");
+            throw new AiProviderException(
+                    AiProviderException.Reason.INVALID_RESPONSE,
+                    null,
+                    PROVIDER,
+                    model,
+                    null,
+                    "Gemini returned an invalid health probe response",
                     exception);
         }
     }
@@ -234,6 +238,94 @@ public class GeminiAiTextGenerationClient implements AiTextGenerationClient {
                     null);
         }
         return text;
+    }
+
+    private String probeResponseText(JsonNode response) {
+        int candidateCount = candidateCount(response);
+        if (response == null || response.path("promptFeedback").hasNonNull("blockReason")) {
+            throw invalidProbeResponse(candidateCount, null, 0, null, "blocked");
+        }
+
+        JsonNode candidates = response.path("candidates");
+        if (!candidates.isArray() || candidates.isEmpty()) {
+            throw invalidProbeResponse(candidateCount, null, 0, null, "no_candidates");
+        }
+
+        String lastFinishReason = null;
+        int lastPartCount = 0;
+        for (JsonNode candidate : candidates) {
+            lastFinishReason = candidate.path("finishReason").asText(null);
+            JsonNode parts = candidate.path("content").path("parts");
+            lastPartCount = parts.isArray() ? parts.size() : 0;
+            if (!parts.isArray()) {
+                continue;
+            }
+            for (JsonNode part : parts) {
+                String text = normalizeProbeText(part.path("text").asText(null));
+                if (text == null) {
+                    continue;
+                }
+                logProbeEvaluation(
+                        candidateCount, lastFinishReason, lastPartCount, text, "usable_text");
+                return text;
+            }
+        }
+
+        throw invalidProbeResponse(
+                candidateCount, lastFinishReason, lastPartCount, null, "no_usable_text");
+    }
+
+    private int candidateCount(JsonNode response) {
+        if (response == null || !response.path("candidates").isArray()) {
+            return 0;
+        }
+        return response.path("candidates").size();
+    }
+
+    private String normalizeProbeText(String text) {
+        if (text == null) {
+            return null;
+        }
+        String normalized = text.replaceAll("[\\r\\n\\t]+", " ").trim();
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    private AiProviderException invalidProbeResponse(
+            int candidateCount,
+            String finishReason,
+            int partCount,
+            String text,
+            String evaluation) {
+        logProbeEvaluation(candidateCount, finishReason, partCount, text, evaluation);
+        return new AiProviderException(
+                AiProviderException.Reason.INVALID_RESPONSE,
+                null,
+                PROVIDER,
+                model,
+                null,
+                "Gemini returned an invalid health probe response",
+                null);
+    }
+
+    private void logProbeEvaluation(
+            int candidateCount,
+            String finishReason,
+            int partCount,
+            String normalizedText,
+            String evaluation) {
+        String preview = normalizedText == null ? null : AiErrorSanitizer.message(normalizedText);
+        if (preview != null && preview.length() > PROBE_TEXT_PREVIEW_LENGTH) {
+            preview = preview.substring(0, PROBE_TEXT_PREVIEW_LENGTH) + "...";
+        }
+        LOGGER.debug(
+                "Gemini health probe evaluated. model={} candidates={} finishReason={} parts={} textLength={} textPreview={} result={}",
+                model,
+                candidateCount,
+                finishReason,
+                partCount,
+                normalizedText == null ? 0 : normalizedText.length(),
+                preview,
+                evaluation);
     }
 
     private RuntimeException logAndTranslateHttpException(
