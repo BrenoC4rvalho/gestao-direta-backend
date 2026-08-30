@@ -148,16 +148,7 @@ public class GeminiAiTextGenerationClient implements AiTextGenerationClient {
                     healthRestClient
                             .post()
                             .uri("/v1beta/models/{model}:generateContent", model)
-                            .body(
-                                    Map.of(
-                                            "contents",
-                                            List.of(
-                                                    Map.of(
-                                                            "parts",
-                                                            List.of(
-                                                                    Map.of(
-                                                                            "text",
-                                                                            "Reply only with OK."))))))
+                            .body(requestBody("Reply only with OK.", null))
                             .retrieve()
                             .body(JsonNode.class);
             String text = responseText(response);
@@ -190,25 +181,23 @@ public class GeminiAiTextGenerationClient implements AiTextGenerationClient {
     }
 
     private Map<String, Object> requestBody(AiGenerationRequest request) {
+        return requestBody(request.prompt(), request.responseSchema());
+    }
+
+    private Map<String, Object> requestBody(String prompt, Map<String, Object> responseSchema) {
         Map<String, Object> body =
-                Map.of(
-                        "contents",
-                        List.of(Map.of("parts", List.of(Map.of("text", request.prompt())))));
-        if (!request.hasResponseSchema()) {
+                Map.of("contents", List.of(Map.of("parts", List.of(Map.of("text", prompt)))));
+        if (responseSchema == null || responseSchema.isEmpty()) {
             return body;
         }
         return Map.of(
                 "contents", body.get("contents"),
                 "generationConfig",
                         Map.of(
-                                "responseFormat",
-                                Map.of(
-                                        "text",
-                                        Map.of(
-                                                "mimeType",
-                                                "application/json",
-                                                "schema",
-                                                request.responseSchema()))));
+                                "responseMimeType",
+                                "application/json",
+                                "responseJsonSchema",
+                                responseSchema));
     }
 
     private String responseText(JsonNode response) {

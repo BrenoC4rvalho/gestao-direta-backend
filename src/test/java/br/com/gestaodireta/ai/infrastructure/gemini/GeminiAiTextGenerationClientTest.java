@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.ExpectedCount.once;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
@@ -37,7 +38,14 @@ class GeminiAiTextGenerationClientTest {
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("x-goog-api-key", "test-key"))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("responseFormat")))
+                .andExpect(
+                        jsonPath("$.generationConfig.responseMimeType").value("application/json"))
+                .andExpect(jsonPath("$.generationConfig.responseJsonSchema.type").value("object"))
+                .andExpect(
+                        jsonPath(
+                                        "$.generationConfig.responseJsonSchema.properties.isFinancialTransaction.type")
+                                .value("boolean"))
+                .andExpect(jsonPath("$.generationConfig.responseFormat").doesNotExist())
                 .andExpect(
                         content()
                                 .string(
@@ -54,6 +62,31 @@ class GeminiAiTextGenerationClientTest {
                                 "extract", new FinancialExtractionResponseSchema().schema()));
 
         assertThat(result).isEqualTo("{\"type\":\"EXPENSE\",\"amount\":350}");
+        server.verify();
+    }
+
+    @Test
+    void shouldSendMinimalStructuredOutputSchemaUsingGenerateContentFields() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GeminiAiTextGenerationClient client =
+                new GeminiAiTextGenerationClient(builder, properties());
+        server.expect(once(), requestTo(org.hamcrest.Matchers.containsString("generateContent")))
+                .andExpect(
+                        jsonPath("$.generationConfig.responseMimeType").value("application/json"))
+                .andExpect(
+                        jsonPath("$.generationConfig.responseJsonSchema.required")
+                                .value(
+                                        org.hamcrest.Matchers.containsInAnyOrder(
+                                                "type", "amount", "description")))
+                .andExpect(
+                        jsonPath("$.generationConfig.responseJsonSchema.properties.type.enum")
+                                .value(org.hamcrest.Matchers.contains("INCOME", "EXPENSE")))
+                .andExpect(jsonPath("$.generationConfig.responseFormat").doesNotExist())
+                .andRespond(withSuccess(response("{}"), MediaType.APPLICATION_JSON));
+
+        client.generate(new AiGenerationRequest("extract", minimalSchema()));
+
         server.verify();
     }
 
@@ -111,6 +144,7 @@ class GeminiAiTextGenerationClientTest {
                                 .string(
                                         org.hamcrest.Matchers.containsString(
                                                 "Reply only with OK.")))
+                .andExpect(jsonPath("$.generationConfig").doesNotExist())
                 .andRespond(withSuccess(response("OK"), MediaType.APPLICATION_JSON));
 
         client.probe();
@@ -145,6 +179,21 @@ class GeminiAiTextGenerationClientTest {
                 .extracting("reason")
                 .isEqualTo(AiProviderException.Reason.INVALID_RESPONSE);
         emptyServer.verify();
+
+        RestClient.Builder invalidJsonBuilder = RestClient.builder();
+        MockRestServiceServer invalidJsonServer =
+                MockRestServiceServer.bindTo(invalidJsonBuilder).build();
+        GeminiAiTextGenerationClient invalidJsonClient =
+                new GeminiAiTextGenerationClient(invalidJsonBuilder, properties());
+        invalidJsonServer
+                .expect(once(), requestTo(org.hamcrest.Matchers.containsString("generateContent")))
+                .andRespond(withSuccess("{invalid", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> invalidJsonClient.generate(new AiGenerationRequest("extract")))
+                .isInstanceOf(AiProviderException.class)
+                .extracting("reason")
+                .isEqualTo(AiProviderException.Reason.INVALID_RESPONSE);
+        invalidJsonServer.verify();
     }
 
     private void assertHttpFailure(HttpStatus status, AiProviderException.Reason expectedReason) {
@@ -174,5 +223,22 @@ class GeminiAiTextGenerationClientTest {
         properties.setApiKey("test-key");
         properties.setModel("gemini-3.1-flash-lite");
         return properties;
+    }
+
+    private java.util.Map<String, Object> minimalSchema() {
+        return java.util.Map.of(
+                "type",
+                "object",
+                "properties",
+                java.util.Map.of(
+                        "type",
+                        java.util.Map.of(
+                                "type", "string", "enum", java.util.List.of("INCOME", "EXPENSE")),
+                        "amount",
+                        java.util.Map.of("type", "number"),
+                        "description",
+                        java.util.Map.of("type", "string")),
+                "required",
+                java.util.List.of("type", "amount", "description"));
     }
 }
