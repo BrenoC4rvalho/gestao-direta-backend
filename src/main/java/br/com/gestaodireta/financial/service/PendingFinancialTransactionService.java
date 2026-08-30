@@ -119,6 +119,7 @@ public class PendingFinancialTransactionService {
         ensurePending(pending);
         validateApproval(approval);
         applyApprovalDetails(pending, approval);
+        validateFinalTransactionDetails(pending);
         FinancialTransactionRequest request =
                 new FinancialTransactionRequest(
                         pending.getDescription(),
@@ -288,6 +289,22 @@ public class PendingFinancialTransactionService {
         }
         if (approval.notes() != null) {
             pending.setNotes(trimNullable(approval.notes()));
+        }
+    }
+
+    private void validateFinalTransactionDetails(PendingFinancialTransaction pending) {
+        if (pending.getType() == null) {
+            throw new BusinessException("Type is required to approve a pending transaction");
+        }
+        if (pending.getAmount() == null || pending.getAmount().signum() <= 0) {
+            throw new BusinessException("Amount is required to approve a pending transaction");
+        }
+        if (pending.getDescription() == null || pending.getDescription().isBlank()) {
+            throw new BusinessException("Description is required to approve a pending transaction");
+        }
+        if (pending.getTransactionDate() == null) {
+            throw new BusinessException(
+                    "Transaction date is required to approve a pending transaction");
         }
     }
 

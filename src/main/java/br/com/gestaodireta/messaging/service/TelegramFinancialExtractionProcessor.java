@@ -131,7 +131,7 @@ public class TelegramFinancialExtractionProcessor {
                         message.getId(),
                         validation.reason(),
                         missingRequiredFields(result),
-                        "[type, amount, description, transactionDate, confidence]",
+                        "[type, amount, description]",
                         presentRequiredFields(result));
                 outgoing.send(
                         conversation,
@@ -163,7 +163,17 @@ public class TelegramFinancialExtractionProcessor {
             pending.setConfidence(result.confidence());
             pending.setAiModel(extractionService.model());
             pending.setAiProcessedAt(LocalDateTime.now(clock));
-            pendingRepository.save(pending);
+            try {
+                pendingRepository.save(pending);
+            } catch (RuntimeException exception) {
+                rejectProcessing(
+                        message,
+                        conversation,
+                        "PENDING_CREATION",
+                        exception,
+                        AI_UNAVAILABLE_MESSAGE);
+                return;
+            }
             LOGGER.info(
                     "financial extraction pending movement: messageId={} status={} type={} amount={} farmId={}",
                     message.getId(),
@@ -171,7 +181,7 @@ public class TelegramFinancialExtractionProcessor {
                     pending.getType(),
                     pending.getAmount(),
                     pending.getFarm().getId());
-            outgoing.send(conversation, confirmation(pending));
+            sendPendingConfirmation(conversation, pending, message.getId());
         } catch (AiParsingException exception) {
             rejectAi(
                     message,
@@ -231,8 +241,28 @@ public class TelegramFinancialExtractionProcessor {
             String reason,
             RuntimeException exception,
             String response) {
+        rejectProcessing(message, conversation, "AI_EXTRACTION", reason, exception, response);
+    }
+
+    private void rejectProcessing(
+            MessagingMessage message,
+            MessagingConversation conversation,
+            String stage,
+            RuntimeException exception,
+            String response) {
+        rejectProcessing(message, conversation, stage, stage, exception, response);
+    }
+
+    private void rejectProcessing(
+            MessagingMessage message,
+            MessagingConversation conversation,
+            String stage,
+            String reason,
+            RuntimeException exception,
+            String response) {
         LOGGER.warn(
-                "financial extraction rejected: stage=AI reason={} messageId={} exception={}",
+                "financial extraction rejected: stage={} reason={} messageId={} exception={}",
+                stage,
                 reason,
                 message.getId(),
                 exception.getClass().getSimpleName());
@@ -261,9 +291,7 @@ public class TelegramFinancialExtractionProcessor {
 
     private String missingRequiredFields(FinancialTransactionExtractionResult result) {
         java.util.List<String> fields =
-                new java.util.ArrayList<>(
-                        java.util.List.of(
-                                "type", "amount", "description", "transactionDate", "confidence"));
+                new java.util.ArrayList<>(java.util.List.of("type", "amount", "description"));
         if (result.type() != null) {
             fields.remove("type");
         }
@@ -272,12 +300,6 @@ public class TelegramFinancialExtractionProcessor {
         }
         if (result.description() != null && !result.description().isBlank()) {
             fields.remove("description");
-        }
-        if (result.transactionDate() != null) {
-            fields.remove("transactionDate");
-        }
-        if (result.confidence() != null) {
-            fields.remove("confidence");
         }
         return fields.toString();
     }
@@ -344,7 +366,24 @@ public class TelegramFinancialExtractionProcessor {
         if (result.transactionDate() == null) {
             fields.add("transactionDate");
         }
+        if (result.categoryName() == null || result.categoryName().isBlank()) {
+            fields.add("category");
+        }
         return java.util.List.copyOf(fields);
+    }
+
+    private void sendPendingConfirmation(
+            MessagingConversation conversation,
+            PendingFinancialTransaction pending,
+            Long messageId) {
+        try {
+            outgoing.send(conversation, confirmation(pending));
+        } catch (RuntimeException exception) {
+            LOGGER.warn(
+                    "financial extraction notification failed: stage=TELEGRAM_SEND messageId={} exception={}",
+                    messageId,
+                    exception.getClass().getSimpleName());
+        }
     }
 
     private String confirmation(PendingFinancialTransaction pending) {
@@ -356,10 +395,16 @@ public class TelegramFinancialExtractionProcessor {
                 + "\nDescrição: "
                 + pending.getDescription()
                 + "\nData: "
-                + pending.getTransactionDate()
-                        .format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                + formattedTransactionDate(pending.getTransactionDate())
                 + "\nFazenda: "
                 + pending.getFarm().getName()
                 + "\n\nAcesse o Gestão Direta para revisar e aprovar.\n\nEssa movimentação ainda não foi incluída nos cálculos financeiros.";
+    }
+
+    private String formattedTransactionDate(java.time.LocalDate transactionDate) {
+        if (transactionDate == null) {
+            return "A revisar";
+        }
+        return transactionDate.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
     }
 }
