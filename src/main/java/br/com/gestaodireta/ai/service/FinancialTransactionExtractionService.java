@@ -26,16 +26,19 @@ public class FinancialTransactionExtractionService {
     private final FinancialExtractionProperties properties;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final FinancialExtractionResponseSchema responseSchema;
 
     public FinancialTransactionExtractionService(
             AiTextGenerationClient client,
             FinancialExtractionProperties properties,
             ObjectMapper objectMapper,
-            Clock clock) {
+            Clock clock,
+            FinancialExtractionResponseSchema responseSchema) {
         this.client = client;
         this.properties = properties;
         this.objectMapper = objectMapper;
         this.clock = clock;
+        this.responseSchema = responseSchema;
     }
 
     public boolean isEnabled() {
@@ -48,7 +51,7 @@ public class FinancialTransactionExtractionService {
 
     public String model() {
         return properties.getModel() == null || properties.getModel().isBlank()
-                ? client.providerName()
+                ? client.modelName()
                 : properties.getModel();
     }
 
@@ -59,14 +62,20 @@ public class FinancialTransactionExtractionService {
     public FinancialTransactionExtractionResult extract(
             String text, String farmName, List<FinancialCategory> categories) {
         String response =
-                client.generate(new AiGenerationRequest(prompt(text, farmName, categories)));
+                client.generate(
+                        new AiGenerationRequest(
+                                prompt(text, farmName, categories), responseSchema.schema()));
         if (properties.isDiagnosticOnly()) {
-            LOGGER.info("financial extraction diagnostic raw response: {}", response);
+            LOGGER.info(
+                    "financial extraction diagnostic response received. provider={}", provider());
         }
 
         FinancialTransactionExtractionResult result = parse(response);
         if (properties.isDiagnosticOnly()) {
-            LOGGER.info("financial extraction diagnostic parsed result: {}", result);
+            LOGGER.info(
+                    "financial extraction diagnostic result parsed. provider={} financial={}",
+                    provider(),
+                    result.isFinancialTransaction());
         }
 
         return result;

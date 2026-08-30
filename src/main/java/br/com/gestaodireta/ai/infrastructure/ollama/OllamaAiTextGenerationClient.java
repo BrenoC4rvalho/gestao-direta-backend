@@ -3,17 +3,15 @@ package br.com.gestaodireta.ai.infrastructure.ollama;
 import br.com.gestaodireta.ai.service.AiModelNotAvailableException;
 import br.com.gestaodireta.ai.service.provider.AiGenerationRequest;
 import br.com.gestaodireta.ai.service.provider.AiTextGenerationClient;
+import java.time.Duration;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Component;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
-@Component
-@ConditionalOnProperty(name = "app.ai.provider", havingValue = "ollama", matchIfMissing = true)
 public class OllamaAiTextGenerationClient implements AiTextGenerationClient {
 
     private static final Logger LOGGER =
@@ -39,6 +37,21 @@ public class OllamaAiTextGenerationClient implements AiTextGenerationClient {
         this.format = ollamaAiProperties.getFormat();
         this.temperature = ollamaAiProperties.getTemperature();
         this.restClient = restClientBuilder.baseUrl(baseUrl).build();
+    }
+
+    public OllamaAiTextGenerationClient(
+            RestClient.Builder restClientBuilder,
+            OllamaAiProperties ollamaAiProperties,
+            int timeoutSeconds) {
+        this.baseUrl = ollamaAiProperties.getBaseUrl();
+        this.model = ollamaAiProperties.getModel();
+        this.format = ollamaAiProperties.getFormat();
+        this.temperature = ollamaAiProperties.getTemperature();
+        this.restClient =
+                restClientBuilder
+                        .baseUrl(baseUrl)
+                        .requestFactory(requestFactory(timeoutSeconds))
+                        .build();
     }
 
     @Override
@@ -85,6 +98,11 @@ public class OllamaAiTextGenerationClient implements AiTextGenerationClient {
         return "ollama";
     }
 
+    @Override
+    public String modelName() {
+        return model;
+    }
+
     private boolean isModelNotFoundResponse(RestClientResponseException exception) {
         if (!HttpStatus.NOT_FOUND.equals(exception.getStatusCode())) {
             return false;
@@ -93,6 +111,14 @@ public class OllamaAiTextGenerationClient implements AiTextGenerationClient {
         String responseBody = exception.getResponseBodyAsString().toLowerCase();
 
         return responseBody.contains("model") && responseBody.contains("not found");
+    }
+
+    private SimpleClientHttpRequestFactory requestFactory(int timeoutSeconds) {
+        Duration timeout = Duration.ofSeconds(timeoutSeconds);
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(timeout);
+        factory.setReadTimeout(timeout);
+        return factory;
     }
 
     record OllamaGenerateResponse(String response) {}

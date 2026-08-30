@@ -2,6 +2,7 @@ package br.com.gestaodireta.messaging.service;
 
 import br.com.gestaodireta.ai.service.AiModelNotAvailableException;
 import br.com.gestaodireta.ai.service.AiParsingException;
+import br.com.gestaodireta.ai.service.AiProviderException;
 import br.com.gestaodireta.ai.service.FinancialTransactionExtractionService;
 import br.com.gestaodireta.ai.service.dto.FinancialTransactionExtractionResult;
 import br.com.gestaodireta.farm.enumeration.FarmUserRole;
@@ -73,14 +74,13 @@ public class TelegramFinancialExtractionProcessor {
             MessagingConversation conversation,
             MessagingMessage message) {
         LOGGER.info(
-                "financial extraction started: messageId={} chatId={} userId={} farmId={} text={}",
+                "financial extraction started: messageId={} chatId={} userId={} farmId={}",
                 message.getId(),
                 message.getExternalChatId(),
                 (account.getUserContact() == null
                         ? null
                         : account.getUserContact().getUser().getId()),
-                farmId(conversation),
-                message.getContent());
+                farmId(conversation));
         if (!eligible(account, conversation, message)
                 || pendingRepository.findBySourceMessageId(message.getId()).isPresent()) return;
         if (!eligibilityValidator.isEligible(message.getContent())) {
@@ -112,14 +112,10 @@ public class TelegramFinancialExtractionProcessor {
                     extractionService.extract(
                             message.getContent(), conversation.getFarm().getName(), categories);
             LOGGER.info(
-                    "financial extraction result: messageId={} financial={} type={} amount={} description={} date={} confidence={} missingFields={}",
+                    "financial extraction result: messageId={} financial={} fieldsPresent={} missingFields={}",
                     message.getId(),
                     result.isFinancialTransaction(),
-                    result.type(),
-                    result.amount(),
-                    result.description(),
-                    result.transactionDate(),
-                    result.confidence(),
+                    presentRequiredFields(result),
                     result.missingFields());
             if (extractionService.isDiagnosticOnly()) {
                 LOGGER.info(
@@ -185,6 +181,16 @@ public class TelegramFinancialExtractionProcessor {
                     AI_INVALID_RESPONSE_MESSAGE);
         } catch (AiModelNotAvailableException exception) {
             rejectAi(message, conversation, "AI_UNAVAILABLE", exception, AI_UNAVAILABLE_MESSAGE);
+        } catch (AiProviderException exception) {
+            String reason =
+                    exception.getReason() == AiProviderException.Reason.TIMEOUT
+                            ? "AI_TIMEOUT"
+                            : exception.getReason().name();
+            String response =
+                    exception.getReason() == AiProviderException.Reason.TIMEOUT
+                            ? AI_TIMEOUT_MESSAGE
+                            : AI_UNAVAILABLE_MESSAGE;
+            rejectAi(message, conversation, reason, exception, response);
         } catch (ResourceAccessException exception) {
             String reason =
                     exception.getCause() instanceof java.net.SocketTimeoutException

@@ -5,4 +5,8 @@ public interface AiTextGenerationClient {
     String generate(AiGenerationRequest request);
 
     String providerName();
+
+    default String modelName() {
+        return providerName();
+    }
 }

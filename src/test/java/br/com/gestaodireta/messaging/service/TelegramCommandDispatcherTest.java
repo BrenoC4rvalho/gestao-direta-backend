@@ -7,15 +7,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import br.com.gestaodireta.farm.entity.Farm;
 import br.com.gestaodireta.messaging.domain.MessagingAccount;
 import br.com.gestaodireta.messaging.domain.MessagingConversation;
-import br.com.gestaodireta.farm.entity.Farm;
 import br.com.gestaodireta.messaging.enumeration.MessagingAccountStatus;
 import br.com.gestaodireta.messaging.enumeration.MessagingConversationStatus;
 import br.com.gestaodireta.messaging.enumeration.MessagingConversationStep;
+import br.com.gestaodireta.messaging.repository.MessagingConversationRepository;
 import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.entity.UserContact;
-import br.com.gestaodireta.messaging.repository.MessagingConversationRepository;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -81,7 +81,6 @@ class TelegramCommandDispatcherTest {
         verify(conversationRepository).save(conversation);
         verify(outgoing).send(conversation, "Fazenda selecionada: Fazenda Boa Sorte.");
     }
-
 
     @Test
     void shouldKeepFarmUnsetForInvalidFarmSelection() {

@@ -57,9 +57,11 @@ public class TelegramIncomingMessageService {
         message.setRawPayload(incoming.rawPayload());
         message = messages.save(message);
         boolean handledByConversation =
-                dispatcher.dispatch(account, message.getMessagingConversation(), incoming.content());
+                dispatcher.dispatch(
+                        account, message.getMessagingConversation(), incoming.content());
         if (!handledByConversation) {
-            financialExtractionProcessor.process(account, message.getMessagingConversation(), message);
+            financialExtractionProcessor.process(
+                    account, message.getMessagingConversation(), message);
         }
         message.setStatus(MessagingMessageStatus.PROCESSED);
         message.setProcessedAt(LocalDateTime.now(clock));

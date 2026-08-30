@@ -82,12 +82,12 @@ public class FinancialCategoryService {
 
         return PageResponse.from(categories);
     }
+
     @Transactional(readOnly = true)
     public PageResponse<FinancialCategoryResponse> findAll(
             Long farmId, boolean includeInactive, PaginationParams paginationParams) {
         return findAll(farmId, includeInactive, null, null, paginationParams);
     }
-
 
     @Transactional(readOnly = true)
     public List<FinancialCategoryResponse> findUsedInTransactions(Long farmId) {
@@ -173,7 +173,6 @@ public class FinancialCategoryService {
 
         return "%" + search.trim().toLowerCase(Locale.ROOT) + "%";
     }
-
 
     private void validateUniqueName(
             String name, Long farmId, TransactionType type, Long ignoredCategoryId) {

@@ -47,7 +47,6 @@ class FinancialTransactionExtractionServiceTest {
                 () -> service.extract("Gastei com adubo", "Boa Vista", java.util.List.of()));
     }
 
-
     @Test
     void shouldUseCompactPromptAndParseDeterministicStructuredResponses() {
         assertStructuredResponse(
@@ -125,6 +124,7 @@ class FinancialTransactionExtractionServiceTest {
                 client,
                 properties,
                 new ObjectMapper(),
-                Clock.fixed(Instant.parse("2026-07-26T12:00:00Z"), ZoneId.of("America/Sao_Paulo")));
+                Clock.fixed(Instant.parse("2026-07-26T12:00:00Z"), ZoneId.of("America/Sao_Paulo")),
+                new FinancialExtractionResponseSchema());
     }
 }

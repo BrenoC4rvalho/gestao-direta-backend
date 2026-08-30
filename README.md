@@ -117,6 +117,8 @@ APP_AI_OLLAMA_BASE_URL=http://localhost:11434
 APP_AI_OLLAMA_MODEL=llama3.2:3b
 APP_AI_OLLAMA_FORMAT=json
 APP_AI_OLLAMA_TEMPERATURE=0
+APP_AI_GEMINI_API_KEY=
+APP_AI_GEMINI_MODEL=gemini-3.1-flash-lite
 
 TELEGRAM_ENABLED=false
 TELEGRAM_BOT_TOKEN=
@@ -147,11 +149,13 @@ MESSAGING_CONVERSATION_EXPIRATION_HOURS=24
 | `AI_FINANCIAL_EXTRACTION_TIMEOUT_SECONDS` | Não | Tempo limite da extração. | `20` |
 | `AI_FINANCIAL_EXTRACTION_MINIMUM_CONFIDENCE` | Não | Confiança mínima aceita. | `0.60` |
 | `AI_FINANCIAL_EXTRACTION_DIAGNOSTIC_ONLY` | Não | Registra diagnóstico sem criar pendência. | `false` |
-| `APP_AI_PROVIDER` | Não | Provider de IA: `ollama` ou `fake`. | `ollama` |
+| `APP_AI_PROVIDER` | Não | Provider de IA: `ollama` ou `gemini`. | `ollama` |
 | `APP_AI_OLLAMA_BASE_URL` | Não | URL base do Ollama. | `http://localhost:11434` |
 | `APP_AI_OLLAMA_MODEL` | Não | Modelo enviado ao Ollama. | `llama3.2:3b` |
 | `APP_AI_OLLAMA_FORMAT` | Não | Formato solicitado ao Ollama. | `json` |
 | `APP_AI_OLLAMA_TEMPERATURE` | Não | Temperatura enviada ao Ollama. | `0` |
+| `APP_AI_GEMINI_API_KEY` | Sim, se Gemini estiver habilitado | Chave da Gemini API, usada somente pelo backend. | — |
+| `APP_AI_GEMINI_MODEL` | Não | Modelo Gemini enviado à API. | `gemini-3.1-flash-lite` |
 | `TELEGRAM_ENABLED` | Não | Habilita a integração Telegram. | `false` |
 | `TELEGRAM_BOT_TOKEN` | Sim, se Telegram estiver habilitado | Token do bot. | Vazio |
 | `TELEGRAM_WEBHOOK_SECRET` | Sim, se Telegram estiver habilitado | Secret validado no webhook recebido. | Vazio |
@@ -180,9 +184,11 @@ Para mudanças estruturais, crie uma nova migration versionada nesse diretório.
 
 O plugin Maven do Flyway usa `DB_URL`, `DB_USERNAME` e `DB_PASSWORD` do ambiente.
 
-## Ollama / IA
+## Inteligência artificial
 
 Com o provider padrão `ollama`, a API chama o endpoint de geração do Ollama para interpretar mensagens financeiras em português. A resposta é estruturada em JSON e passa por validações de evidência e confiança antes de criar uma pendência.
+
+Para usar Gemini, configure `APP_AI_PROVIDER=gemini`, informe `APP_AI_GEMINI_API_KEY` somente no ambiente do backend e, opcionalmente, altere `APP_AI_GEMINI_MODEL` (o padrão é `gemini-3.1-flash-lite`). A integração usa Structured Outputs com JSON Schema; mesmo assim, a validação determinística de valor, tipo, descrição e confiança continua no Java. Não há fallback automático entre Gemini e Ollama.
 
 Com o serviço Docker iniciado, baixe o modelo padrão dentro do container:
 

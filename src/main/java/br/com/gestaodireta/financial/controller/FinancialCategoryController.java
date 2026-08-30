@@ -4,7 +4,6 @@ import br.com.gestaodireta.financial.dto.FinancialCategoryCreateRequest;
 import br.com.gestaodireta.financial.dto.FinancialCategoryResponse;
 import br.com.gestaodireta.financial.dto.FinancialCategoryUpdateRequest;
 import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
-import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
 import br.com.gestaodireta.financial.service.FinancialCategoryService;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;

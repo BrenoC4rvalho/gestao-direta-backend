@@ -8,11 +8,11 @@ import br.com.gestaodireta.financial.enumeration.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import java.util.stream.Stream;
 
 class FinancialExtractionValidationTest {
     private final FinancialMessageEvidenceExtractor evidence =
@@ -234,33 +234,36 @@ class FinancialExtractionValidationTest {
                 .isEqualTo(
                         new FinancialTransactionExtractionResultValidator.ValidationResult(
                                 true,
-                                FinancialTransactionExtractionResultValidator.RejectionReason.NONE));
+                                FinancialTransactionExtractionResultValidator.RejectionReason
+                                        .NONE));
     }
 
     @Test
     void shouldRejectInventedOrPartialAmountsFromBrazilianMoneySource() {
         assertThat(
-                        resultValidator.validate(
-                                "Paguei R$ 400 de combustível.",
-                                result(
-                                        TransactionType.EXPENSE,
-                                        new BigDecimal("500.00"),
-                                        "Combustível",
-                                        new BigDecimal("0.95"),
-                                        List.of()))
+                        resultValidator
+                                .validate(
+                                        "Paguei R$ 400 de combustível.",
+                                        result(
+                                                TransactionType.EXPENSE,
+                                                new BigDecimal("500.00"),
+                                                "Combustível",
+                                                new BigDecimal("0.95"),
+                                                List.of()))
                                 .reason())
                 .isEqualTo(
                         FinancialTransactionExtractionResultValidator.RejectionReason
                                 .AMOUNT_NOT_SUPPORTED_BY_SOURCE);
         assertThat(
-                        resultValidator.validate(
-                                "Paguei R$ 4.800,00 de combustível.",
-                                result(
-                                        TransactionType.EXPENSE,
-                                        new BigDecimal("480.00"),
-                                        "Combustível",
-                                        new BigDecimal("0.95"),
-                                        List.of()))
+                        resultValidator
+                                .validate(
+                                        "Paguei R$ 4.800,00 de combustível.",
+                                        result(
+                                                TransactionType.EXPENSE,
+                                                new BigDecimal("480.00"),
+                                                "Combustível",
+                                                new BigDecimal("0.95"),
+                                                List.of()))
                                 .reason())
                 .isEqualTo(
                         FinancialTransactionExtractionResultValidator.RejectionReason
