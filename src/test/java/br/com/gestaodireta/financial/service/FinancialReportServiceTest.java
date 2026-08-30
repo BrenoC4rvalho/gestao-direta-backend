@@ -22,6 +22,7 @@ import br.com.gestaodireta.user.enumeration.UserType;
 import br.com.gestaodireta.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -131,6 +132,85 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
 
         assertThat(report.summary().totalExpense()).isEqualByComparingTo("70.00");
         assertThat(report.evolution().getFirst().transactionCount()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldSummarizeOpenOverdueAndNextThirtyDayCommitments() {
+        Farm farm = saveFarm();
+        User user = saveUser();
+        LocalDate today = LocalDate.now(ZoneId.of("America/Sao_Paulo"));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PENDING,
+                new BigDecimal("100.00"),
+                today,
+                today.minusDays(1),
+                null);
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PENDING,
+                new BigDecimal("40.00"),
+                today,
+                today,
+                null);
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PENDING,
+                new BigDecimal("60.00"),
+                today,
+                today.plusDays(30),
+                null);
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PENDING,
+                new BigDecimal("30.00"),
+                today,
+                today.plusDays(31),
+                null);
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PENDING,
+                new BigDecimal("25.00"),
+                today,
+                null,
+                null);
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                new BigDecimal("90.00"),
+                today,
+                today.minusDays(2),
+                today);
+
+        FinancialReportResponse report =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                today.plusYears(1),
+                                today.plusYears(1),
+                                FinancialReportBasis.CASH,
+                                null,
+                                null));
+
+        assertThat(report.commitments().accountsReceivable()).isEqualByComparingTo("185.00");
+        assertThat(report.commitments().accountsPayable()).isEqualByComparingTo("70.00");
+        assertThat(report.commitments().overdueReceivableAmount()).isEqualByComparingTo("100.00");
+        assertThat(report.commitments().overdueReceivableCount()).isEqualTo(1);
+        assertThat(report.commitments().overduePayableAmount()).isZero();
+        assertThat(report.commitments().next30DaysReceivable()).isEqualByComparingTo("60.00");
+        assertThat(report.commitments().next30DaysPayable()).isEqualByComparingTo("40.00");
     }
 
     private Farm saveFarm() {

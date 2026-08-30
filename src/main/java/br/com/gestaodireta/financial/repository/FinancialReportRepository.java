@@ -3,6 +3,7 @@ package br.com.gestaodireta.financial.repository;
 import br.com.gestaodireta.financial.dto.FinancialCategorySummaryResponse;
 import br.com.gestaodireta.financial.dto.FinancialEvolutionPointResponse;
 import br.com.gestaodireta.financial.dto.FinancialHarvestSummaryResponse;
+import br.com.gestaodireta.financial.dto.FinancialReportCommitmentsResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportFilter;
 import br.com.gestaodireta.financial.dto.FinancialReportSummaryResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportTransactionResponse;
@@ -85,6 +86,40 @@ public class FinancialReportRepository {
                             decimal(resultSet.getBigDecimal("projected_income")),
                             decimal(resultSet.getBigDecimal("projected_expense")));
                 });
+    }
+
+    public FinancialReportCommitmentsResponse summarizeCommitments(
+            FinancialReportFilter filter, LocalDate today, LocalDate next30Days) {
+        String sql =
+                FILTERED_TRANSACTIONS
+                        + """
+                          select
+                            coalesce(sum(case when type = 'INCOME' and status in ('PENDING', 'OVERDUE') then amount else 0 end), 0) as accounts_receivable,
+                            coalesce(sum(case when type = 'EXPENSE' and status in ('PENDING', 'OVERDUE') then amount else 0 end), 0) as accounts_payable,
+                            coalesce(sum(case when type = 'INCOME' and (status = 'OVERDUE' or (status = 'PENDING' and due_date < :today)) then amount else 0 end), 0) as overdue_receivable_amount,
+                            count(case when type = 'INCOME' and (status = 'OVERDUE' or (status = 'PENDING' and due_date < :today)) then 1 end) as overdue_receivable_count,
+                            coalesce(sum(case when type = 'EXPENSE' and (status = 'OVERDUE' or (status = 'PENDING' and due_date < :today)) then amount else 0 end), 0) as overdue_payable_amount,
+                            count(case when type = 'EXPENSE' and (status = 'OVERDUE' or (status = 'PENDING' and due_date < :today)) then 1 end) as overdue_payable_count,
+                            coalesce(sum(case when type = 'INCOME' and status = 'PENDING' and due_date >= :today and due_date <= :next30Days then amount else 0 end), 0) as next30_days_receivable,
+                            coalesce(sum(case when type = 'EXPENSE' and status = 'PENDING' and due_date >= :today and due_date <= :next30Days then amount else 0 end), 0) as next30_days_payable
+                          from filtered_transactions
+                          """;
+        MapSqlParameterSource parameters = parameters(filter);
+        parameters.addValue("today", today);
+        parameters.addValue("next30Days", next30Days);
+        return jdbcTemplate.queryForObject(
+                sql,
+                parameters,
+                (resultSet, rowNum) ->
+                        new FinancialReportCommitmentsResponse(
+                                decimal(resultSet.getBigDecimal("accounts_receivable")),
+                                decimal(resultSet.getBigDecimal("accounts_payable")),
+                                decimal(resultSet.getBigDecimal("overdue_receivable_amount")),
+                                resultSet.getLong("overdue_receivable_count"),
+                                decimal(resultSet.getBigDecimal("overdue_payable_amount")),
+                                resultSet.getLong("overdue_payable_count"),
+                                decimal(resultSet.getBigDecimal("next30_days_receivable")),
+                                decimal(resultSet.getBigDecimal("next30_days_payable"))));
     }
 
     public List<FinancialEvolutionPointResponse> findEvolution(FinancialReportFilter filter) {

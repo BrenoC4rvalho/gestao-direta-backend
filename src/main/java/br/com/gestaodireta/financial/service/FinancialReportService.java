@@ -6,6 +6,7 @@ import br.com.gestaodireta.financial.dto.FinancialCategorySummaryResponse;
 import br.com.gestaodireta.financial.dto.FinancialEvolutionPointResponse;
 import br.com.gestaodireta.financial.dto.FinancialHarvestSummaryResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportCategoryIndicatorResponse;
+import br.com.gestaodireta.financial.dto.FinancialReportCommitmentsResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportFilter;
 import br.com.gestaodireta.financial.dto.FinancialReportHarvestIndicatorResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportIndicatorsResponse;
@@ -25,6 +26,7 @@ import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
 import br.com.gestaodireta.shared.exception.ValidationException;
 import br.com.gestaodireta.shared.response.PageResponse;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.Comparator;
@@ -42,15 +44,19 @@ public class FinancialReportService {
     private final FinancialCategoryRepository financialCategoryRepository;
     private final HarvestSeasonRepository harvestSeasonRepository;
 
+    private final Clock clock;
+
     public FinancialReportService(
             FinancialReportRepository financialReportRepository,
             FarmService farmService,
             FinancialCategoryRepository financialCategoryRepository,
-            HarvestSeasonRepository harvestSeasonRepository) {
+            HarvestSeasonRepository harvestSeasonRepository,
+            Clock clock) {
         this.financialReportRepository = financialReportRepository;
         this.farmService = farmService;
         this.financialCategoryRepository = financialCategoryRepository;
         this.harvestSeasonRepository = harvestSeasonRepository;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -58,6 +64,10 @@ public class FinancialReportService {
         FinancialReportFilter normalizedFilter = validateAndNormalize(filter);
         FinancialReportSummaryResponse summary =
                 financialReportRepository.summarize(normalizedFilter);
+        LocalDate today = LocalDate.now(clock);
+        FinancialReportCommitmentsResponse commitments =
+                financialReportRepository.summarizeCommitments(
+                        normalizedFilter, today, today.plusDays(30));
         List<FinancialEvolutionPointResponse> evolution =
                 fillMissingMonths(
                         normalizedFilter,
@@ -75,6 +85,7 @@ public class FinancialReportService {
                 normalizedFilter.endDate(),
                 normalizedFilter.basis(),
                 summary,
+                commitments,
                 evolution,
                 categories,
                 harvests,

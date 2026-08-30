@@ -10,6 +10,7 @@ public record FinancialReportResponse(
         LocalDate endDate,
         FinancialReportBasis basis,
         FinancialReportSummaryResponse summary,
+        FinancialReportCommitmentsResponse commitments,
         List<FinancialEvolutionPointResponse> evolution,
         List<FinancialCategorySummaryResponse> categories,
         List<FinancialHarvestSummaryResponse> harvests,
