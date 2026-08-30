@@ -4,6 +4,7 @@ import br.com.gestaodireta.financial.dto.FinancialReportFilter;
 import br.com.gestaodireta.financial.dto.FinancialReportResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportTransactionResponse;
 import br.com.gestaodireta.financial.enumeration.FinancialReportBasis;
+import br.com.gestaodireta.financial.enumeration.FinancialReportGranularity;
 import br.com.gestaodireta.financial.service.FinancialReportService;
 import br.com.gestaodireta.shared.response.PageResponse;
 import java.time.LocalDate;
@@ -32,10 +33,17 @@ public class FinancialReportController {
             @RequestParam LocalDate endDate,
             @RequestParam FinancialReportBasis basis,
             @RequestParam(required = false) List<Long> harvestSeasonIds,
-            @RequestParam(required = false) List<Long> categoryIds) {
+            @RequestParam(required = false) List<Long> categoryIds,
+            @RequestParam(defaultValue = "MONTHLY") FinancialReportGranularity granularity) {
         return financialReportService.getReport(
                 new FinancialReportFilter(
-                        farmId, startDate, endDate, basis, harvestSeasonIds, categoryIds));
+                        farmId,
+                        startDate,
+                        endDate,
+                        basis,
+                        harvestSeasonIds,
+                        categoryIds,
+                        granularity));
     }
 
     @GetMapping("/transactions")

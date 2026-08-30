@@ -11,6 +11,7 @@ import br.com.gestaodireta.financial.dto.FinancialReportTransactionResponse;
 import br.com.gestaodireta.financial.entity.FinancialTransaction;
 import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
 import br.com.gestaodireta.financial.enumeration.FinancialReportBasis;
+import br.com.gestaodireta.financial.enumeration.FinancialReportGranularity;
 import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
@@ -283,6 +284,133 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
         assertThat(available.commitments().next30DaysReceivable()).isEqualByComparingTo("40.00");
         assertThat(available.commitments().next30DaysPayable()).isEqualByComparingTo("20.00");
         assertThat(future.commitments().next30DaysAvailable()).isTrue();
+    }
+
+    @Test
+    void shouldClassifyCashEvolutionStatesWithoutDoubleCounting() {
+        Farm farm = saveFarm();
+        User user = saveUser();
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                new BigDecimal("40.00"),
+                LocalDate.of(2026, 7, 10),
+                LocalDate.of(2026, 7, 10),
+                LocalDate.of(2026, 8, 15));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PENDING,
+                new BigDecimal("20.00"),
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 9, 20),
+                null);
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                new BigDecimal("10.00"),
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 10),
+                LocalDate.of(2026, 9, 15));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                new BigDecimal("30.00"),
+                LocalDate.of(2026, 7, 10),
+                LocalDate.of(2026, 7, 10),
+                LocalDate.of(2026, 8, 20));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PENDING,
+                new BigDecimal("15.00"),
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 9, 10),
+                null);
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PENDING,
+                new BigDecimal("5.00"),
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 20),
+                null);
+
+        FinancialReportResponse report =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 7, 1),
+                                LocalDate.of(2026, 9, 30),
+                                FinancialReportBasis.CASH,
+                                null,
+                                null,
+                                FinancialReportGranularity.MONTHLY));
+
+        assertThat(report.evolution()).hasSize(3);
+        assertThat(report.evolution().get(0).overdueIncome()).isEqualByComparingTo("10.00");
+        assertThat(report.evolution().get(0).overdueExpense()).isEqualByComparingTo("5.00");
+        assertThat(report.evolution().get(0).overdueIncomeCount()).isEqualTo(1);
+        assertThat(report.evolution().get(1).realizedIncome()).isEqualByComparingTo("40.00");
+        assertThat(report.evolution().get(1).realizedExpense()).isEqualByComparingTo("30.00");
+        assertThat(report.evolution().get(1).realizedResult()).isEqualByComparingTo("10.00");
+        assertThat(report.evolution().get(2).projectedIncome()).isEqualByComparingTo("20.00");
+        assertThat(report.evolution().get(2).projectedExpense()).isEqualByComparingTo("15.00");
+        assertThat(report.evolution().get(2).overdueIncome()).isZero();
+        assertThat(report.evolution().get(2).realizedIncome()).isZero();
+    }
+
+    @Test
+    void shouldAggregateQuarterlyEvolutionAndFillMissingQuarters() {
+        Farm farm = saveFarm();
+        User user = saveUser();
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                new BigDecimal("100.00"),
+                LocalDate.of(2026, 4, 10),
+                LocalDate.of(2026, 4, 10),
+                LocalDate.of(2026, 4, 10));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                new BigDecimal("25.00"),
+                LocalDate.of(2026, 6, 10),
+                LocalDate.of(2026, 6, 10),
+                LocalDate.of(2026, 6, 10));
+
+        FinancialReportResponse report =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 1, 15),
+                                LocalDate.of(2026, 12, 10),
+                                FinancialReportBasis.CASH,
+                                null,
+                                null,
+                                FinancialReportGranularity.QUARTERLY));
+
+        assertThat(report.evolution()).hasSize(4);
+        assertThat(report.evolution().get(0).label()).isEqualTo("1º tri");
+        assertThat(report.evolution().get(0).periodStart()).isEqualTo(LocalDate.of(2026, 1, 15));
+        assertThat(report.evolution().get(0).transactionCount()).isZero();
+        assertThat(report.evolution().get(1).realizedIncome()).isEqualByComparingTo("100.00");
+        assertThat(report.evolution().get(1).realizedExpense()).isEqualByComparingTo("25.00");
+        assertThat(report.evolution().get(1).realizedResult()).isEqualByComparingTo("75.00");
+        assertThat(report.evolution().get(3).periodEnd()).isEqualTo(LocalDate.of(2026, 12, 10));
     }
 
     private FinancialReportResponse reportForEndDate(Farm farm, LocalDate endDate) {

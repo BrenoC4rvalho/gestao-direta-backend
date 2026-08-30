@@ -11,4 +11,14 @@ public record FinancialEvolutionPointResponse(
         BigDecimal income,
         BigDecimal expense,
         BigDecimal netBalance,
-        long transactionCount) {}
+        long transactionCount,
+        BigDecimal realizedIncome,
+        BigDecimal projectedIncome,
+        BigDecimal overdueIncome,
+        long overdueIncomeCount,
+        BigDecimal realizedExpense,
+        BigDecimal projectedExpense,
+        BigDecimal overdueExpense,
+        long overdueExpenseCount,
+        BigDecimal realizedResult,
+        boolean currentPeriod) {}

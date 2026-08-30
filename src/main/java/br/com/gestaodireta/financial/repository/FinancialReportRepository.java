@@ -8,6 +8,7 @@ import br.com.gestaodireta.financial.dto.FinancialReportFilter;
 import br.com.gestaodireta.financial.dto.FinancialReportSummaryResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportTransactionResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportUnallocatedResponse;
+import br.com.gestaodireta.financial.enumeration.FinancialReportGranularity;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.shared.response.PageResponse;
 import java.math.BigDecimal;
@@ -154,7 +155,92 @@ public class FinancialReportRepository {
                                         : null));
     }
 
-    public List<FinancialEvolutionPointResponse> findEvolution(FinancialReportFilter filter) {
+    public List<FinancialEvolutionPointResponse> findEvolution(
+            FinancialReportFilter filter, LocalDate referenceDate) {
+        String periodExpression =
+                FinancialReportGranularity.QUARTERLY.equals(filter.granularity())
+                        ? "date_trunc('quarter', bucket_date)::date"
+                        : "date_trunc('month', bucket_date)::date";
+        String sql =
+                FILTERED_TRANSACTIONS
+                        + """
+                          , classified_transactions as (
+                            select *,
+                                   case
+                                     when status = 'PAID'
+                                       and coalesce(paid_at, transaction_date) <= :referenceDate
+                                       then 'REALIZED'
+                                     when due_date is not null and due_date < :referenceDate
+                                       then 'OVERDUE'
+                                     else 'PROJECTED'
+                                   end as financial_state
+                            from filtered_transactions
+                          ), bucketed_transactions as (
+                            select *,
+                                   case financial_state
+                                     when 'REALIZED' then
+                                       case when :basis = 'ACCRUAL' then transaction_date
+                                            else coalesce(paid_at, transaction_date) end
+                                     when 'OVERDUE' then due_date
+                                     else case when :basis = 'ACCRUAL' then transaction_date
+                                               else due_date end
+                                   end as bucket_date
+                            from classified_transactions
+                          )
+                          select %s as period_start,
+                                 coalesce(sum(case when type = 'INCOME' then amount else 0 end), 0) as income,
+                                 coalesce(sum(case when type = 'EXPENSE' then amount else 0 end), 0) as expense,
+                                 count(*) as transaction_count,
+                                 coalesce(sum(case when type = 'INCOME' and financial_state = 'REALIZED' then amount else 0 end), 0) as realized_income,
+                                 coalesce(sum(case when type = 'INCOME' and financial_state = 'PROJECTED' then amount else 0 end), 0) as projected_income,
+                                 coalesce(sum(case when type = 'INCOME' and financial_state = 'OVERDUE' then amount else 0 end), 0) as overdue_income,
+                                 count(case when type = 'INCOME' and financial_state = 'OVERDUE' then 1 end) as overdue_income_count,
+                                 coalesce(sum(case when type = 'EXPENSE' and financial_state = 'REALIZED' then amount else 0 end), 0) as realized_expense,
+                                 coalesce(sum(case when type = 'EXPENSE' and financial_state = 'PROJECTED' then amount else 0 end), 0) as projected_expense,
+                                 coalesce(sum(case when type = 'EXPENSE' and financial_state = 'OVERDUE' then amount else 0 end), 0) as overdue_expense,
+                                 count(case when type = 'EXPENSE' and financial_state = 'OVERDUE' then 1 end) as overdue_expense_count
+                          from bucketed_transactions
+                          where bucket_date between :startDate and :endDate
+                          group by %s
+                          order by period_start
+                          """
+                                .formatted(periodExpression, periodExpression);
+        MapSqlParameterSource parameters = parameters(filter);
+        parameters.addValue("referenceDate", referenceDate);
+        return jdbcTemplate.query(
+                sql,
+                parameters,
+                (resultSet, rowNum) -> {
+                    LocalDate start = localDate(resultSet.getDate("period_start"));
+                    BigDecimal income = decimal(resultSet.getBigDecimal("income"));
+                    BigDecimal expense = decimal(resultSet.getBigDecimal("expense"));
+                    BigDecimal realizedIncome = decimal(resultSet.getBigDecimal("realized_income"));
+                    BigDecimal realizedExpense =
+                            decimal(resultSet.getBigDecimal("realized_expense"));
+                    return new FinancialEvolutionPointResponse(
+                            start.toString(),
+                            "",
+                            start,
+                            start,
+                            income,
+                            expense,
+                            income.subtract(expense),
+                            resultSet.getLong("transaction_count"),
+                            realizedIncome,
+                            decimal(resultSet.getBigDecimal("projected_income")),
+                            decimal(resultSet.getBigDecimal("overdue_income")),
+                            resultSet.getLong("overdue_income_count"),
+                            realizedExpense,
+                            decimal(resultSet.getBigDecimal("projected_expense")),
+                            decimal(resultSet.getBigDecimal("overdue_expense")),
+                            resultSet.getLong("overdue_expense_count"),
+                            realizedIncome.subtract(realizedExpense),
+                            false);
+                });
+    }
+
+    public List<FinancialEvolutionPointResponse> findPerformanceEvolution(
+            FinancialReportFilter filter) {
         String sql =
                 FILTERED_TRANSACTIONS
                         + """
@@ -175,14 +261,24 @@ public class FinancialReportRepository {
                     BigDecimal income = decimal(resultSet.getBigDecimal("income"));
                     BigDecimal expense = decimal(resultSet.getBigDecimal("expense"));
                     return new FinancialEvolutionPointResponse(
-                            start.toString().substring(0, 7),
-                            monthLabel(start),
+                            start.toString(),
+                            "",
                             start,
-                            start.plusMonths(1).minusDays(1),
+                            start,
                             income,
                             expense,
                             income.subtract(expense),
-                            resultSet.getLong("transaction_count"));
+                            resultSet.getLong("transaction_count"),
+                            BigDecimal.ZERO,
+                            BigDecimal.ZERO,
+                            BigDecimal.ZERO,
+                            0,
+                            BigDecimal.ZERO,
+                            BigDecimal.ZERO,
+                            BigDecimal.ZERO,
+                            0,
+                            BigDecimal.ZERO,
+                            false);
                 });
     }
 

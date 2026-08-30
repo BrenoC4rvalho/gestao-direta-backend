@@ -16,6 +16,7 @@ import br.com.gestaodireta.financial.dto.FinancialReportSummaryResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportTransactionResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportUnallocatedResponse;
 import br.com.gestaodireta.financial.entity.FinancialCategory;
+import br.com.gestaodireta.financial.enumeration.FinancialReportGranularity;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.FinancialReportRepository;
@@ -64,17 +65,34 @@ public class FinancialReportService {
         FinancialReportFilter normalizedFilter = validateAndNormalize(filter);
         FinancialReportSummaryResponse summary =
                 financialReportRepository.summarize(normalizedFilter);
-        LocalDate cutoffDate = normalizedFilter.endDate();
         LocalDate today = LocalDate.now(clock);
+        LocalDate cutoffDate = normalizedFilter.endDate();
+        LocalDate referenceDate = cutoffDate.isBefore(today) ? cutoffDate : today;
         LocalDate next30End = today.plusDays(30);
         boolean next30DaysAvailable = !cutoffDate.isBefore(next30End);
         FinancialReportCommitmentsResponse commitments =
                 financialReportRepository.summarizeCommitments(
                         normalizedFilter, cutoffDate, today, next30End, next30DaysAvailable);
+        FinancialReportFilter monthlyFilter =
+                withGranularity(normalizedFilter, FinancialReportGranularity.MONTHLY);
+        List<FinancialEvolutionPointResponse> monthlyEvolution =
+                fillMissingPeriods(
+                        monthlyFilter,
+                        financialReportRepository.findEvolution(monthlyFilter, referenceDate),
+                        today);
+        List<FinancialEvolutionPointResponse> performanceEvolution =
+                fillMissingPeriods(
+                        monthlyFilter,
+                        financialReportRepository.findPerformanceEvolution(monthlyFilter),
+                        today);
         List<FinancialEvolutionPointResponse> evolution =
-                fillMissingMonths(
-                        normalizedFilter,
-                        financialReportRepository.findEvolution(normalizedFilter));
+                FinancialReportGranularity.MONTHLY.equals(normalizedFilter.granularity())
+                        ? monthlyEvolution
+                        : fillMissingPeriods(
+                                normalizedFilter,
+                                financialReportRepository.findEvolution(
+                                        normalizedFilter, referenceDate),
+                                today);
         List<FinancialCategorySummaryResponse> categories =
                 financialReportRepository.findCategories(normalizedFilter);
         List<FinancialHarvestSummaryResponse> harvests =
@@ -92,7 +110,7 @@ public class FinancialReportService {
                 evolution,
                 categories,
                 harvests,
-                indicators(evolution, categories, harvests),
+                indicators(performanceEvolution, categories, harvests),
                 unallocated);
     }
 
@@ -130,7 +148,10 @@ public class FinancialReportService {
                 filter.endDate(),
                 filter.basis(),
                 harvestSeasonIds,
-                categoryIds);
+                categoryIds,
+                filter.granularity() == null
+                        ? FinancialReportGranularity.MONTHLY
+                        : filter.granularity());
     }
 
     private List<Long> normalizeIds(List<Long> ids) {
@@ -168,36 +189,128 @@ public class FinancialReportService {
         }
     }
 
-    private List<FinancialEvolutionPointResponse> fillMissingMonths(
-            FinancialReportFilter filter, List<FinancialEvolutionPointResponse> points) {
-        java.util.Map<YearMonth, FinancialEvolutionPointResponse> byMonth =
+    private FinancialReportFilter withGranularity(
+            FinancialReportFilter filter, FinancialReportGranularity granularity) {
+        return new FinancialReportFilter(
+                filter.farmId(),
+                filter.startDate(),
+                filter.endDate(),
+                filter.basis(),
+                filter.harvestSeasonIds(),
+                filter.categoryIds(),
+                granularity);
+    }
+
+    private List<FinancialEvolutionPointResponse> fillMissingPeriods(
+            FinancialReportFilter filter,
+            List<FinancialEvolutionPointResponse> points,
+            LocalDate today) {
+        java.util.Map<LocalDate, FinancialEvolutionPointResponse> byPeriodStart =
                 points.stream()
                         .collect(
                                 java.util.stream.Collectors.toMap(
-                                        point -> YearMonth.from(point.periodStart()),
+                                        FinancialEvolutionPointResponse::periodStart,
                                         point -> point));
-        YearMonth current = YearMonth.from(filter.startDate());
-        YearMonth end = YearMonth.from(filter.endDate());
         java.util.ArrayList<FinancialEvolutionPointResponse> result = new java.util.ArrayList<>();
-        while (!current.isAfter(end)) {
-            FinancialEvolutionPointResponse point = byMonth.get(current);
+        LocalDate current = periodStart(filter.startDate(), filter.granularity());
+        LocalDate last = periodStart(filter.endDate(), filter.granularity());
+        while (!current.isAfter(last)) {
+            FinancialEvolutionPointResponse point = byPeriodStart.get(current);
             if (point == null) {
-                LocalDate periodStart = current.atDay(1);
-                point =
-                        new FinancialEvolutionPointResponse(
-                                current.toString(),
-                                monthLabel(periodStart),
-                                periodStart,
-                                current.atEndOfMonth(),
-                                BigDecimal.ZERO,
-                                BigDecimal.ZERO,
-                                BigDecimal.ZERO,
-                                0);
+                point = emptyPeriod(current, filter.granularity());
             }
-            result.add(point);
-            current = current.plusMonths(1);
+            result.add(normalizePeriod(point, filter, today));
+            current =
+                    FinancialReportGranularity.QUARTERLY.equals(filter.granularity())
+                            ? current.plusMonths(3)
+                            : current.plusMonths(1);
         }
         return result;
+    }
+
+    private FinancialEvolutionPointResponse emptyPeriod(
+            LocalDate periodStart, FinancialReportGranularity granularity) {
+        return new FinancialEvolutionPointResponse(
+                periodStart.toString(),
+                "",
+                periodStart,
+                periodEnd(periodStart, granularity),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                0,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                0,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                0,
+                BigDecimal.ZERO,
+                false);
+    }
+
+    private FinancialEvolutionPointResponse normalizePeriod(
+            FinancialEvolutionPointResponse point, FinancialReportFilter filter, LocalDate today) {
+        LocalDate rawStart = point.periodStart();
+        LocalDate rawEnd = periodEnd(rawStart, filter.granularity());
+        LocalDate periodStart =
+                rawStart.isBefore(filter.startDate()) ? filter.startDate() : rawStart;
+        LocalDate periodEnd = rawEnd.isAfter(filter.endDate()) ? filter.endDate() : rawEnd;
+        boolean multipleYears = filter.startDate().getYear() != filter.endDate().getYear();
+        return new FinancialEvolutionPointResponse(
+                periodKey(rawStart, filter.granularity()),
+                periodLabel(rawStart, filter.granularity(), multipleYears),
+                periodStart,
+                periodEnd,
+                point.income(),
+                point.expense(),
+                point.netBalance(),
+                point.transactionCount(),
+                point.realizedIncome(),
+                point.projectedIncome(),
+                point.overdueIncome(),
+                point.overdueIncomeCount(),
+                point.realizedExpense(),
+                point.projectedExpense(),
+                point.overdueExpense(),
+                point.overdueExpenseCount(),
+                point.realizedResult(),
+                !today.isBefore(rawStart) && !today.isAfter(rawEnd));
+    }
+
+    private LocalDate periodStart(LocalDate date, FinancialReportGranularity granularity) {
+        if (FinancialReportGranularity.QUARTERLY.equals(granularity)) {
+            int firstQuarterMonth = ((date.getMonthValue() - 1) / 3) * 3 + 1;
+            return LocalDate.of(date.getYear(), firstQuarterMonth, 1);
+        }
+        return YearMonth.from(date).atDay(1);
+    }
+
+    private LocalDate periodEnd(LocalDate periodStart, FinancialReportGranularity granularity) {
+        return FinancialReportGranularity.QUARTERLY.equals(granularity)
+                ? periodStart.plusMonths(3).minusDays(1)
+                : YearMonth.from(periodStart).atEndOfMonth();
+    }
+
+    private String periodKey(LocalDate periodStart, FinancialReportGranularity granularity) {
+        if (FinancialReportGranularity.QUARTERLY.equals(granularity)) {
+            return periodStart.getYear() + "-Q" + ((periodStart.getMonthValue() - 1) / 3 + 1);
+        }
+        return YearMonth.from(periodStart).toString();
+    }
+
+    private String periodLabel(
+            LocalDate periodStart, FinancialReportGranularity granularity, boolean multipleYears) {
+        if (FinancialReportGranularity.QUARTERLY.equals(granularity)) {
+            String label = ((periodStart.getMonthValue() - 1) / 3 + 1) + "º tri";
+            return multipleYears ? label + "/" + periodStart.getYear() : label;
+        }
+        String label = monthLabel(periodStart);
+        return multipleYears
+                ? label + "/" + String.format("%02d", periodStart.getYear() % 100)
+                : label;
     }
 
     private FinancialReportIndicatorsResponse indicators(
