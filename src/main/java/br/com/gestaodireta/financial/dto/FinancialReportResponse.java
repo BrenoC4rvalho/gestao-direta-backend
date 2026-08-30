@@ -12,7 +12,7 @@ public record FinancialReportResponse(
         FinancialReportSummaryResponse summary,
         FinancialReportCommitmentsResponse commitments,
         List<FinancialEvolutionPointResponse> evolution,
-        List<FinancialCategorySummaryResponse> categories,
+        List<FinancialCategorySummaryGroupResponse> categories,
         List<FinancialHarvestSummaryResponse> harvests,
         FinancialReportIndicatorsResponse indicators,
         FinancialReportUnallocatedResponse unallocated) {}

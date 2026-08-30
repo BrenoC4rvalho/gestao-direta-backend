@@ -2,6 +2,7 @@ package br.com.gestaodireta.financial.service;
 
 import br.com.gestaodireta.farm.entity.Farm;
 import br.com.gestaodireta.farm.service.FarmService;
+import br.com.gestaodireta.financial.dto.FinancialCategorySummaryGroupResponse;
 import br.com.gestaodireta.financial.dto.FinancialCategorySummaryResponse;
 import br.com.gestaodireta.financial.dto.FinancialEvolutionPointResponse;
 import br.com.gestaodireta.financial.dto.FinancialHarvestSummaryResponse;
@@ -93,7 +94,7 @@ public class FinancialReportService {
                                 financialReportRepository.findEvolution(
                                         normalizedFilter, referenceDate),
                                 today);
-        List<FinancialCategorySummaryResponse> categories =
+        List<FinancialCategorySummaryGroupResponse> categories =
                 financialReportRepository.findCategories(normalizedFilter);
         List<FinancialHarvestSummaryResponse> harvests =
                 financialReportRepository.findHarvests(normalizedFilter);
@@ -315,7 +316,7 @@ public class FinancialReportService {
 
     private FinancialReportIndicatorsResponse indicators(
             List<FinancialEvolutionPointResponse> evolution,
-            List<FinancialCategorySummaryResponse> categories,
+            List<FinancialCategorySummaryGroupResponse> categories,
             List<FinancialHarvestSummaryResponse> harvests) {
         return new FinancialReportIndicatorsResponse(
                 evolution.size(),
@@ -337,6 +338,7 @@ public class FinancialReportService {
                         Comparator.reverseOrder()),
                 categories.stream()
                         .filter(category -> TransactionType.EXPENSE.equals(category.type()))
+                        .flatMap(category -> category.items().stream())
                         .max(Comparator.comparing(FinancialCategorySummaryResponse::amount))
                         .map(
                                 category ->

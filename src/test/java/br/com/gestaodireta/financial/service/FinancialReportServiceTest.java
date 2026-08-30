@@ -8,13 +8,22 @@ import br.com.gestaodireta.farm.repository.FarmRepository;
 import br.com.gestaodireta.financial.dto.FinancialReportFilter;
 import br.com.gestaodireta.financial.dto.FinancialReportResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportTransactionResponse;
+import br.com.gestaodireta.financial.entity.FinancialCategory;
 import br.com.gestaodireta.financial.entity.FinancialTransaction;
+import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
 import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
 import br.com.gestaodireta.financial.enumeration.FinancialReportBasis;
 import br.com.gestaodireta.financial.enumeration.FinancialReportGranularity;
 import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
+import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
+import br.com.gestaodireta.harvest.entity.HarvestSeason;
+import br.com.gestaodireta.harvest.entity.ProductionActivity;
+import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
+import br.com.gestaodireta.harvest.enumeration.ProductionActivityStatus;
+import br.com.gestaodireta.harvest.repository.HarvestSeasonRepository;
+import br.com.gestaodireta.harvest.repository.ProductionActivityRepository;
 import br.com.gestaodireta.shared.response.PageResponse;
 import br.com.gestaodireta.support.PostgresIntegrationTest;
 import br.com.gestaodireta.user.entity.User;
@@ -44,6 +53,12 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
 
     @Autowired private FinancialTransactionRepository financialTransactionRepository;
 
+    @Autowired private FinancialCategoryRepository financialCategoryRepository;
+
+    @Autowired private HarvestSeasonRepository harvestSeasonRepository;
+
+    @Autowired private ProductionActivityRepository productionActivityRepository;
+
     @Autowired private FarmRepository farmRepository;
 
     @Autowired private UserRepository userRepository;
@@ -53,6 +68,9 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
     @BeforeEach
     void setUp() {
         financialTransactionRepository.deleteAll();
+        harvestSeasonRepository.deleteAll();
+        productionActivityRepository.deleteAll();
+        financialCategoryRepository.deleteAll();
         farmRepository.deleteAll();
         userRepository.deleteAll();
     }
@@ -413,6 +431,70 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
         assertThat(report.evolution().get(3).periodEnd()).isEqualTo(LocalDate.of(2026, 12, 10));
     }
 
+    @Test
+    void shouldBuildCategoryRankingsByTypeWithinTheFilteredHarvestAndCategory() {
+        Farm farm = saveFarm();
+        User user = saveUser();
+        FinancialCategory supplies = saveCategory(farm, "Insumos", TransactionType.EXPENSE);
+        FinancialCategory seeds = saveCategory(farm, "Sementes", TransactionType.EXPENSE);
+        FinancialCategory sale = saveCategory(farm, "Venda de produção", TransactionType.INCOME);
+        HarvestSeason soybean = saveHarvest(farm, "Soja");
+        HarvestSeason corn = saveHarvest(farm, "Milho");
+
+        saveTransaction(
+                farm, user, supplies, soybean, TransactionType.EXPENSE, new BigDecimal("40150.00"));
+        saveTransaction(
+                farm, user, seeds, soybean, TransactionType.EXPENSE, new BigDecimal("34900.00"));
+        saveTransaction(
+                farm, user, sale, soybean, TransactionType.INCOME, new BigDecimal("211500.00"));
+        saveTransaction(
+                farm, user, supplies, corn, TransactionType.EXPENSE, new BigDecimal("999.00"));
+
+        FinancialReportResponse harvestReport =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 1, 1),
+                                LocalDate.of(2026, 1, 31),
+                                FinancialReportBasis.ACCRUAL,
+                                java.util.List.of(soybean.getId()),
+                                null));
+
+        assertThat(harvestReport.categories()).hasSize(2);
+        assertThat(harvestReport.categories().getFirst().type()).isEqualTo(TransactionType.EXPENSE);
+        assertThat(harvestReport.categories().getFirst().totalAmount())
+                .isEqualByComparingTo("75050.00");
+        assertThat(harvestReport.categories().getFirst().totalTransactionCount()).isEqualTo(2);
+        assertThat(harvestReport.categories().getFirst().items())
+                .extracting(item -> item.categoryName())
+                .containsExactly("Insumos", "Sementes");
+        assertThat(harvestReport.categories().getFirst().items())
+                .extracting(item -> item.percentage())
+                .containsExactly(new BigDecimal("53.50"), new BigDecimal("46.50"));
+        assertThat(harvestReport.categories().get(1).type()).isEqualTo(TransactionType.INCOME);
+        assertThat(harvestReport.categories().get(1).totalAmount())
+                .isEqualByComparingTo("211500.00");
+        assertThat(harvestReport.categories().get(1).items()).hasSize(1);
+
+        FinancialReportResponse categoryReport =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 1, 1),
+                                LocalDate.of(2026, 1, 31),
+                                FinancialReportBasis.ACCRUAL,
+                                java.util.List.of(soybean.getId()),
+                                java.util.List.of(supplies.getId())));
+
+        assertThat(categoryReport.categories().getFirst().totalAmount())
+                .isEqualByComparingTo("40150.00");
+        assertThat(categoryReport.categories().getFirst().items()).hasSize(1);
+        assertThat(categoryReport.categories().getFirst().items().getFirst().percentage())
+                .isEqualByComparingTo("100.00");
+        assertThat(categoryReport.categories().get(1).totalAmount()).isZero();
+        assertThat(categoryReport.categories().get(1).items()).isEmpty();
+    }
+
     private FinancialReportResponse reportForEndDate(Farm farm, LocalDate endDate) {
         return financialReportService.getReport(
                 new FinancialReportFilter(
@@ -436,6 +518,30 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
         return userRepository.save(user);
     }
 
+    private FinancialCategory saveCategory(Farm farm, String name, TransactionType type) {
+        FinancialCategory category = new FinancialCategory();
+        category.setFarm(farm);
+        category.setName(name);
+        category.setType(type);
+        category.setStatus(FinancialCategoryStatus.ACTIVE);
+        return financialCategoryRepository.save(category);
+    }
+
+    private HarvestSeason saveHarvest(Farm farm, String name) {
+        ProductionActivity activity = new ProductionActivity();
+        activity.setFarm(farm);
+        activity.setName(name + " activity");
+        activity.setStatus(ProductionActivityStatus.ACTIVE);
+        ProductionActivity savedActivity = productionActivityRepository.save(activity);
+        HarvestSeason harvest = new HarvestSeason();
+        harvest.setFarm(farm);
+        harvest.setProductionActivity(savedActivity);
+        harvest.setName(name);
+        harvest.setStartDate(LocalDate.of(2026, 1, 1));
+        harvest.setStatus(HarvestSeasonStatus.IN_PROGRESS);
+        return harvestSeasonRepository.save(harvest);
+    }
+
     private void saveTransaction(
             Farm farm,
             User user,
@@ -454,6 +560,29 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
         transaction.setDueDate(dueDate);
         transaction.setPaidAt(paidAt);
         transaction.setFarm(farm);
+        transaction.setCreatedByUser(user);
+        transaction.setRecordStatus(FinancialRecordStatus.ACTIVE);
+        financialTransactionRepository.save(transaction);
+    }
+
+    private void saveTransaction(
+            Farm farm,
+            User user,
+            FinancialCategory category,
+            HarvestSeason harvest,
+            TransactionType type,
+            BigDecimal amount) {
+        FinancialTransaction transaction = new FinancialTransaction();
+        transaction.setDescription("Category transaction");
+        transaction.setAmount(amount);
+        transaction.setType(type);
+        transaction.setStatus(PaymentStatus.PAID);
+        transaction.setTransactionDate(LocalDate.of(2026, 1, 10));
+        transaction.setDueDate(LocalDate.of(2026, 1, 10));
+        transaction.setPaidAt(LocalDate.of(2026, 1, 10));
+        transaction.setFarm(farm);
+        transaction.setCategory(category);
+        transaction.setHarvestSeason(harvest);
         transaction.setCreatedByUser(user);
         transaction.setRecordStatus(FinancialRecordStatus.ACTIVE);
         financialTransactionRepository.save(transaction);

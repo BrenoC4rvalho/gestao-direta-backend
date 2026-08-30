@@ -1,5 +1,6 @@
 package br.com.gestaodireta.financial.repository;
 
+import br.com.gestaodireta.financial.dto.FinancialCategorySummaryGroupResponse;
 import br.com.gestaodireta.financial.dto.FinancialCategorySummaryResponse;
 import br.com.gestaodireta.financial.dto.FinancialEvolutionPointResponse;
 import br.com.gestaodireta.financial.dto.FinancialHarvestSummaryResponse;
@@ -14,6 +15,8 @@ import br.com.gestaodireta.shared.response.PageResponse;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -282,39 +285,60 @@ public class FinancialReportRepository {
                 });
     }
 
-    public List<FinancialCategorySummaryResponse> findCategories(FinancialReportFilter filter) {
+    public List<FinancialCategorySummaryGroupResponse> findCategories(
+            FinancialReportFilter filter) {
         String sql =
                 FILTERED_TRANSACTIONS
                         + """
-                          select category_id, coalesce(category_name, 'Sem categoria') as category_name, type,
-                                 coalesce(sum(amount), 0) as amount, count(*) as transaction_count
-                          from filtered_transactions
-                          where reference_date between :startDate and :endDate
-                          group by category_id, category_name, type
-                          order by amount desc, category_name asc nulls last
+                          , category_amounts as (
+                            select category_id, coalesce(category_name, 'Sem categoria') as category_name, type,
+                                   coalesce(sum(amount), 0) as amount, count(*) as transaction_count
+                            from filtered_transactions
+                            where reference_date between :startDate and :endDate
+                            group by category_id, category_name, type
+                          )
+                          select category_id, category_name, type, amount, transaction_count,
+                                 coalesce(sum(amount) over (partition by type), 0) as total_amount,
+                                 coalesce(sum(transaction_count) over (partition by type), 0)
+                                   as total_transaction_count,
+                                 round(
+                                   coalesce(
+                                     amount * 100 / nullif(sum(amount) over (partition by type), 0),
+                                     0
+                                   ),
+                                   2
+                                 ) as percentage
+                          from category_amounts
+                          order by type asc, amount desc, category_name asc nulls last
                           """;
-        return jdbcTemplate
-                .query(
-                        sql,
-                        parameters(filter),
-                        (resultSet, rowNum) ->
-                                new CategoryAmount(
-                                        nullableLong(resultSet, "category_id"),
-                                        resultSet.getString("category_name"),
-                                        TransactionType.valueOf(resultSet.getString("type")),
-                                        decimal(resultSet.getBigDecimal("amount")),
-                                        resultSet.getLong("transaction_count")))
-                .stream()
-                .map(
-                        item ->
-                                new FinancialCategorySummaryResponse(
-                                        item.id(),
-                                        item.name(),
-                                        item.type(),
-                                        item.amount(),
-                                        percentage(
-                                                item.amount(), totalForType(filter, item.type())),
-                                        item.transactionCount()))
+        Map<TransactionType, List<CategoryAmount>> itemsByType =
+                new EnumMap<>(TransactionType.class);
+        for (TransactionType type : TransactionType.values()) {
+            itemsByType.put(type, new ArrayList<>());
+        }
+
+        jdbcTemplate.query(
+                sql,
+                parameters(filter),
+                (resultSet, rowNum) -> {
+                    TransactionType type = TransactionType.valueOf(resultSet.getString("type"));
+                    itemsByType
+                            .get(type)
+                            .add(
+                                    new CategoryAmount(
+                                            nullableLong(resultSet, "category_id"),
+                                            resultSet.getString("category_name"),
+                                            type,
+                                            decimal(resultSet.getBigDecimal("amount")),
+                                            decimal(resultSet.getBigDecimal("percentage")),
+                                            resultSet.getLong("transaction_count"),
+                                            decimal(resultSet.getBigDecimal("total_amount")),
+                                            resultSet.getLong("total_transaction_count")));
+                    return null;
+                });
+
+        return List.of(TransactionType.EXPENSE, TransactionType.INCOME).stream()
+                .map(type -> categoryGroup(type, itemsByType.get(type)))
                 .toList();
     }
 
@@ -423,18 +447,26 @@ public class FinancialReportRepository {
                 content, page, size, totalElements, totalPages, page == 0, page + 1 >= totalPages);
     }
 
-    private BigDecimal totalForType(FinancialReportFilter filter, TransactionType type) {
-        String sql =
-                FILTERED_TRANSACTIONS
-                        + """
-                          select coalesce(sum(amount), 0)
-                          from filtered_transactions
-                          where reference_date between :startDate and :endDate and type = :type
-                          """;
-        MapSqlParameterSource parameters = parameters(filter);
-        parameters.addValue("type", type.name());
-        BigDecimal total = jdbcTemplate.queryForObject(sql, parameters, BigDecimal.class);
-        return decimal(total);
+    private FinancialCategorySummaryGroupResponse categoryGroup(
+            TransactionType type, List<CategoryAmount> categoryAmounts) {
+        CategoryAmount first = categoryAmounts.isEmpty() ? null : categoryAmounts.getFirst();
+        List<FinancialCategorySummaryResponse> items =
+                categoryAmounts.stream()
+                        .map(
+                                item ->
+                                        new FinancialCategorySummaryResponse(
+                                                item.id(),
+                                                item.name(),
+                                                item.type(),
+                                                item.amount(),
+                                                item.percentage(),
+                                                item.transactionCount()))
+                        .toList();
+        return new FinancialCategorySummaryGroupResponse(
+                type,
+                first == null ? BigDecimal.ZERO : first.totalAmount(),
+                first == null ? 0 : first.totalTransactionCount(),
+                items);
     }
 
     private MapSqlParameterSource parameters(FinancialReportFilter filter) {
@@ -509,5 +541,12 @@ public class FinancialReportRepository {
     }
 
     private record CategoryAmount(
-            Long id, String name, TransactionType type, BigDecimal amount, long transactionCount) {}
+            Long id,
+            String name,
+            TransactionType type,
+            BigDecimal amount,
+            BigDecimal percentage,
+            long transactionCount,
+            BigDecimal totalAmount,
+            long totalTransactionCount) {}
 }
