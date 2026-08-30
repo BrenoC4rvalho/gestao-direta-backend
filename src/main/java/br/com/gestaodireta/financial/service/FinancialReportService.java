@@ -2,6 +2,9 @@ package br.com.gestaodireta.financial.service;
 
 import br.com.gestaodireta.farm.entity.Farm;
 import br.com.gestaodireta.farm.service.FarmService;
+import br.com.gestaodireta.financial.dto.FinancialCashFlowOpeningResponse;
+import br.com.gestaodireta.financial.dto.FinancialCashFlowPointResponse;
+import br.com.gestaodireta.financial.dto.FinancialCashFlowResponse;
 import br.com.gestaodireta.financial.dto.FinancialCategorySummaryGroupResponse;
 import br.com.gestaodireta.financial.dto.FinancialCategorySummaryResponse;
 import br.com.gestaodireta.financial.dto.FinancialEvolutionPointResponse;
@@ -94,6 +97,13 @@ public class FinancialReportService {
                                 financialReportRepository.findEvolution(
                                         normalizedFilter, referenceDate),
                                 today);
+        FinancialCashFlowResponse cashFlow =
+                cashFlow(
+                        normalizedFilter,
+                        financialReportRepository.findCashFlowOpening(
+                                normalizedFilter, referenceDate),
+                        financialReportRepository.findEvolution(normalizedFilter, referenceDate),
+                        today);
         List<FinancialCategorySummaryGroupResponse> categories =
                 financialReportRepository.findCategories(normalizedFilter);
         List<FinancialHarvestSummaryResponse> harvests =
@@ -109,6 +119,7 @@ public class FinancialReportService {
                 summary,
                 commitments,
                 evolution,
+                cashFlow,
                 categories,
                 harvests,
                 indicators(performanceEvolution, categories, harvests),
@@ -227,6 +238,64 @@ public class FinancialReportService {
                             : current.plusMonths(1);
         }
         return result;
+    }
+
+    private FinancialCashFlowResponse cashFlow(
+            FinancialReportFilter filter,
+            FinancialCashFlowOpeningResponse opening,
+            List<FinancialEvolutionPointResponse> points,
+            LocalDate today) {
+        java.util.Map<LocalDate, FinancialEvolutionPointResponse> byPeriodStart =
+                points.stream()
+                        .collect(
+                                java.util.stream.Collectors.toMap(
+                                        FinancialEvolutionPointResponse::periodStart,
+                                        point -> point));
+        java.util.ArrayList<FinancialCashFlowPointResponse> result = new java.util.ArrayList<>();
+        BigDecimal expectedBalance = opening.expectedBalance();
+        BigDecimal projectedBalance = opening.projectedBalance();
+        LocalDate current = periodStart(filter.startDate(), filter.granularity());
+        LocalDate last = periodStart(filter.endDate(), filter.granularity());
+        boolean multipleYears = filter.startDate().getYear() != filter.endDate().getYear();
+
+        while (!current.isAfter(last)) {
+            FinancialEvolutionPointResponse point = byPeriodStart.get(current);
+            if (point == null) {
+                point = emptyPeriod(current, filter.granularity());
+            }
+            BigDecimal expectedChange =
+                    point.realizedResult()
+                            .add(point.projectedIncome())
+                            .subtract(point.projectedExpense());
+            expectedBalance = expectedBalance.add(expectedChange);
+            projectedBalance =
+                    projectedBalance
+                            .add(expectedChange)
+                            .add(point.overdueIncome())
+                            .subtract(point.overdueExpense());
+            LocalDate rawEnd = periodEnd(current, filter.granularity());
+            result.add(
+                    new FinancialCashFlowPointResponse(
+                            periodKey(current, filter.granularity()),
+                            periodLabel(current, filter.granularity(), multipleYears),
+                            current.isBefore(filter.startDate()) ? filter.startDate() : current,
+                            rawEnd.isAfter(filter.endDate()) ? filter.endDate() : rawEnd,
+                            point.realizedIncome(),
+                            point.realizedExpense(),
+                            point.projectedIncome(),
+                            point.projectedExpense(),
+                            point.overdueIncome(),
+                            point.overdueExpense(),
+                            expectedBalance,
+                            projectedBalance,
+                            !today.isBefore(current) && !today.isAfter(rawEnd)));
+            current =
+                    FinancialReportGranularity.QUARTERLY.equals(filter.granularity())
+                            ? current.plusMonths(3)
+                            : current.plusMonths(1);
+        }
+        return new FinancialCashFlowResponse(
+                opening.expectedBalance(), opening.projectedBalance(), result);
     }
 
     private FinancialEvolutionPointResponse emptyPeriod(

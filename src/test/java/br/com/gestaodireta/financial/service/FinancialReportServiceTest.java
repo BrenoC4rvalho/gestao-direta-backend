@@ -388,6 +388,75 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldBuildCashFlowExpectedAndOverdueProjectedBalancesWithoutDoubleCounting() {
+        Farm farm = saveFarm();
+        User user = saveUser();
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                new BigDecimal("100.00"),
+                LocalDate.of(2026, 7, 10),
+                LocalDate.of(2026, 7, 10),
+                LocalDate.of(2026, 7, 10));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.OVERDUE,
+                new BigDecimal("30.00"),
+                LocalDate.of(2026, 7, 15),
+                LocalDate.of(2026, 7, 31),
+                null);
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PENDING,
+                new BigDecimal("50.00"),
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 9, 15),
+                null);
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PENDING,
+                new BigDecimal("20.00"),
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 9, 20),
+                null);
+
+        FinancialReportResponse report =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 7, 1),
+                                LocalDate.of(2026, 10, 31),
+                                FinancialReportBasis.CASH,
+                                null,
+                                null,
+                                FinancialReportGranularity.MONTHLY));
+
+        assertThat(report.cashFlow().points()).hasSize(4);
+        assertThat(report.cashFlow().points().get(0).expectedBalance())
+                .isEqualByComparingTo("100.00");
+        assertThat(report.cashFlow().points().get(0).projectedBalance())
+                .isEqualByComparingTo("70.00");
+        assertThat(report.cashFlow().points().get(0).overdueExpense())
+                .isEqualByComparingTo("30.00");
+        assertThat(report.cashFlow().points().get(2).expectedBalance())
+                .isEqualByComparingTo("130.00");
+        assertThat(report.cashFlow().points().get(2).projectedBalance())
+                .isEqualByComparingTo("100.00");
+        assertThat(report.cashFlow().points().get(3).expectedBalance())
+                .isEqualByComparingTo("130.00");
+        assertThat(report.cashFlow().points().get(3).projectedBalance())
+                .isEqualByComparingTo("100.00");
+    }
+
+    @Test
     void shouldAggregateQuarterlyEvolutionAndFillMissingQuarters() {
         Farm farm = saveFarm();
         User user = saveUser();

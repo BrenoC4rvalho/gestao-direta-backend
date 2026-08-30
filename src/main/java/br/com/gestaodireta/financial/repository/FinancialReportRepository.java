@@ -1,5 +1,6 @@
 package br.com.gestaodireta.financial.repository;
 
+import br.com.gestaodireta.financial.dto.FinancialCashFlowOpeningResponse;
 import br.com.gestaodireta.financial.dto.FinancialCategorySummaryGroupResponse;
 import br.com.gestaodireta.financial.dto.FinancialCategorySummaryResponse;
 import br.com.gestaodireta.financial.dto.FinancialEvolutionPointResponse;
@@ -240,6 +241,57 @@ public class FinancialReportRepository {
                             realizedIncome.subtract(realizedExpense),
                             false);
                 });
+    }
+
+    public FinancialCashFlowOpeningResponse findCashFlowOpening(
+            FinancialReportFilter filter, LocalDate referenceDate) {
+        String sql =
+                FILTERED_TRANSACTIONS
+                        + """
+                          , classified_transactions as (
+                            select *,
+                                   case
+                                     when status = 'PAID'
+                                       and coalesce(paid_at, transaction_date) <= :referenceDate
+                                       then 'REALIZED'
+                                     when due_date is not null and due_date < :referenceDate
+                                       then 'OVERDUE'
+                                     else 'PROJECTED'
+                                   end as financial_state
+                            from filtered_transactions
+                          ), bucketed_transactions as (
+                            select *,
+                                   case financial_state
+                                     when 'REALIZED' then
+                                       case when :basis = 'ACCRUAL' then transaction_date
+                                            else coalesce(paid_at, transaction_date) end
+                                     when 'OVERDUE' then due_date
+                                     else case when :basis = 'ACCRUAL' then transaction_date
+                                               else due_date end
+                                   end as bucket_date
+                            from classified_transactions
+                          )
+                          select
+                            coalesce(sum(case
+                              when financial_state <> 'OVERDUE' and type = 'INCOME' then amount
+                              when financial_state <> 'OVERDUE' and type = 'EXPENSE' then -amount
+                              else 0 end), 0) as expected_balance,
+                            coalesce(sum(case
+                              when type = 'INCOME' then amount
+                              when type = 'EXPENSE' then -amount
+                              else 0 end), 0) as projected_balance
+                          from bucketed_transactions
+                          where bucket_date < :startDate
+                          """;
+        MapSqlParameterSource parameters = parameters(filter);
+        parameters.addValue("referenceDate", referenceDate);
+        return jdbcTemplate.queryForObject(
+                sql,
+                parameters,
+                (resultSet, rowNum) ->
+                        new FinancialCashFlowOpeningResponse(
+                                decimal(resultSet.getBigDecimal("expected_balance")),
+                                decimal(resultSet.getBigDecimal("projected_balance"))));
     }
 
     public List<FinancialEvolutionPointResponse> findPerformanceEvolution(
