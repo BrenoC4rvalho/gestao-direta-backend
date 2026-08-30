@@ -89,22 +89,49 @@ public class FinancialReportRepository {
     }
 
     public FinancialReportCommitmentsResponse summarizeCommitments(
-            FinancialReportFilter filter, LocalDate today, LocalDate next30Days) {
+            FinancialReportFilter filter,
+            LocalDate cutoffDate,
+            LocalDate today,
+            LocalDate next30Days,
+            boolean next30DaysAvailable) {
         String sql =
                 FILTERED_TRANSACTIONS
                         + """
+                          , cutoff_commitments as (
+                            select *
+                            from filtered_transactions
+                            where coalesce(due_date, transaction_date) <= :cutoffDate
+                              and (
+                                status in ('PENDING', 'OVERDUE')
+                                or (
+                                  status = 'PAID'
+                                  and coalesce(paid_at, transaction_date) > :cutoffDate
+                                )
+                              )
+                          )
                           select
-                            coalesce(sum(case when type = 'INCOME' and status in ('PENDING', 'OVERDUE') then amount else 0 end), 0) as accounts_receivable,
-                            coalesce(sum(case when type = 'EXPENSE' and status in ('PENDING', 'OVERDUE') then amount else 0 end), 0) as accounts_payable,
-                            coalesce(sum(case when type = 'INCOME' and (status = 'OVERDUE' or (status = 'PENDING' and due_date < :today)) then amount else 0 end), 0) as overdue_receivable_amount,
-                            count(case when type = 'INCOME' and (status = 'OVERDUE' or (status = 'PENDING' and due_date < :today)) then 1 end) as overdue_receivable_count,
-                            coalesce(sum(case when type = 'EXPENSE' and (status = 'OVERDUE' or (status = 'PENDING' and due_date < :today)) then amount else 0 end), 0) as overdue_payable_amount,
-                            count(case when type = 'EXPENSE' and (status = 'OVERDUE' or (status = 'PENDING' and due_date < :today)) then 1 end) as overdue_payable_count,
-                            coalesce(sum(case when type = 'INCOME' and status = 'PENDING' and due_date >= :today and due_date <= :next30Days then amount else 0 end), 0) as next30_days_receivable,
-                            coalesce(sum(case when type = 'EXPENSE' and status = 'PENDING' and due_date >= :today and due_date <= :next30Days then amount else 0 end), 0) as next30_days_payable
-                          from filtered_transactions
+                            coalesce(sum(case when type = 'INCOME' then amount else 0 end), 0) as accounts_receivable,
+                            coalesce(sum(case when type = 'EXPENSE' then amount else 0 end), 0) as accounts_payable,
+                            coalesce(sum(case when type = 'INCOME' and due_date < :cutoffDate then amount else 0 end), 0) as overdue_receivable_amount,
+                            count(case when type = 'INCOME' and due_date < :cutoffDate then 1 end) as overdue_receivable_count,
+                            coalesce(sum(case when type = 'EXPENSE' and due_date < :cutoffDate then amount else 0 end), 0) as overdue_payable_amount,
+                            count(case when type = 'EXPENSE' and due_date < :cutoffDate then 1 end) as overdue_payable_count,
+                            (
+                              select coalesce(sum(case when type = 'INCOME' then amount else 0 end), 0)
+                              from filtered_transactions
+                              where status in ('PENDING', 'OVERDUE')
+                                and due_date between :today and :next30Days
+                            ) as next30_days_receivable,
+                            (
+                              select coalesce(sum(case when type = 'EXPENSE' then amount else 0 end), 0)
+                              from filtered_transactions
+                              where status in ('PENDING', 'OVERDUE')
+                                and due_date between :today and :next30Days
+                            ) as next30_days_payable
+                          from cutoff_commitments
                           """;
         MapSqlParameterSource parameters = parameters(filter);
+        parameters.addValue("cutoffDate", cutoffDate);
         parameters.addValue("today", today);
         parameters.addValue("next30Days", next30Days);
         return jdbcTemplate.queryForObject(
@@ -118,8 +145,13 @@ public class FinancialReportRepository {
                                 resultSet.getLong("overdue_receivable_count"),
                                 decimal(resultSet.getBigDecimal("overdue_payable_amount")),
                                 resultSet.getLong("overdue_payable_count"),
-                                decimal(resultSet.getBigDecimal("next30_days_receivable")),
-                                decimal(resultSet.getBigDecimal("next30_days_payable"))));
+                                next30DaysAvailable,
+                                next30DaysAvailable
+                                        ? decimal(resultSet.getBigDecimal("next30_days_receivable"))
+                                        : null,
+                                next30DaysAvailable
+                                        ? decimal(resultSet.getBigDecimal("next30_days_payable"))
+                                        : null));
     }
 
     public List<FinancialEvolutionPointResponse> findEvolution(FinancialReportFilter filter) {

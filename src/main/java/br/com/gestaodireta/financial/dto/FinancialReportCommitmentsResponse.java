@@ -9,5 +9,6 @@ public record FinancialReportCommitmentsResponse(
         Long overdueReceivableCount,
         BigDecimal overduePayableAmount,
         Long overduePayableCount,
+        boolean next30DaysAvailable,
         BigDecimal next30DaysReceivable,
         BigDecimal next30DaysPayable) {}

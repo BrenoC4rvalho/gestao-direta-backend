@@ -64,10 +64,13 @@ public class FinancialReportService {
         FinancialReportFilter normalizedFilter = validateAndNormalize(filter);
         FinancialReportSummaryResponse summary =
                 financialReportRepository.summarize(normalizedFilter);
+        LocalDate cutoffDate = normalizedFilter.endDate();
         LocalDate today = LocalDate.now(clock);
+        LocalDate next30End = today.plusDays(30);
+        boolean next30DaysAvailable = !cutoffDate.isBefore(next30End);
         FinancialReportCommitmentsResponse commitments =
                 financialReportRepository.summarizeCommitments(
-                        normalizedFilter, today, today.plusDays(30));
+                        normalizedFilter, cutoffDate, today, next30End, next30DaysAvailable);
         List<FinancialEvolutionPointResponse> evolution =
                 fillMissingMonths(
                         normalizedFilter,

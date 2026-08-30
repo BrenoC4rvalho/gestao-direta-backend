@@ -21,16 +21,23 @@ import br.com.gestaodireta.user.enumeration.UserStatus;
 import br.com.gestaodireta.user.enumeration.UserType;
 import br.com.gestaodireta.user.repository.UserRepository;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @SpringBootTest
 class FinancialReportServiceTest extends PostgresIntegrationTest {
+
+    private static final LocalDate TODAY = LocalDate.of(2026, 8, 30);
 
     @Autowired private FinancialReportService financialReportService;
 
@@ -135,18 +142,17 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void shouldSummarizeOpenOverdueAndNextThirtyDayCommitments() {
+    void shouldBuildCommitmentsAsOfTheReportEndDate() {
         Farm farm = saveFarm();
         User user = saveUser();
-        LocalDate today = LocalDate.now(ZoneId.of("America/Sao_Paulo"));
         saveTransaction(
                 farm,
                 user,
                 TransactionType.INCOME,
                 PaymentStatus.PENDING,
                 new BigDecimal("100.00"),
-                today,
-                today.minusDays(1),
+                LocalDate.of(2026, 7, 20),
+                LocalDate.of(2026, 7, 31),
                 null);
         saveTransaction(
                 farm,
@@ -154,8 +160,8 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
                 TransactionType.EXPENSE,
                 PaymentStatus.PENDING,
                 new BigDecimal("40.00"),
-                today,
-                today,
+                TODAY,
+                TODAY,
                 null);
         saveTransaction(
                 farm,
@@ -163,8 +169,8 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
                 TransactionType.INCOME,
                 PaymentStatus.PENDING,
                 new BigDecimal("60.00"),
-                today,
-                today.plusDays(30),
+                TODAY,
+                LocalDate.of(2026, 8, 31),
                 null);
         saveTransaction(
                 farm,
@@ -172,8 +178,8 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
                 TransactionType.EXPENSE,
                 PaymentStatus.PENDING,
                 new BigDecimal("30.00"),
-                today,
-                today.plusDays(31),
+                LocalDate.of(2026, 9, 1),
+                LocalDate.of(2026, 9, 1),
                 null);
         saveTransaction(
                 farm,
@@ -181,7 +187,7 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
                 TransactionType.INCOME,
                 PaymentStatus.PENDING,
                 new BigDecimal("25.00"),
-                today,
+                LocalDate.of(2026, 8, 20),
                 null,
                 null);
         saveTransaction(
@@ -189,28 +195,100 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
                 user,
                 TransactionType.INCOME,
                 PaymentStatus.PAID,
+                new BigDecimal("80.00"),
+                LocalDate.of(2026, 8, 15),
+                LocalDate.of(2026, 8, 15),
+                LocalDate.of(2026, 9, 5));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
                 new BigDecimal("90.00"),
-                today,
-                today.minusDays(2),
-                today);
+                LocalDate.of(2026, 8, 15),
+                LocalDate.of(2026, 8, 15),
+                LocalDate.of(2026, 8, 20));
 
         FinancialReportResponse report =
                 financialReportService.getReport(
                         new FinancialReportFilter(
                                 farm.getId(),
-                                today.plusYears(1),
-                                today.plusYears(1),
-                                FinancialReportBasis.CASH,
+                                LocalDate.of(2026, 8, 1),
+                                LocalDate.of(2026, 8, 31),
+                                FinancialReportBasis.ACCRUAL,
                                 null,
                                 null));
 
-        assertThat(report.commitments().accountsReceivable()).isEqualByComparingTo("185.00");
-        assertThat(report.commitments().accountsPayable()).isEqualByComparingTo("70.00");
-        assertThat(report.commitments().overdueReceivableAmount()).isEqualByComparingTo("100.00");
-        assertThat(report.commitments().overdueReceivableCount()).isEqualTo(1);
-        assertThat(report.commitments().overduePayableAmount()).isZero();
-        assertThat(report.commitments().next30DaysReceivable()).isEqualByComparingTo("60.00");
-        assertThat(report.commitments().next30DaysPayable()).isEqualByComparingTo("40.00");
+        assertThat(report.summary().totalIncome()).isEqualByComparingTo("165.00");
+        assertThat(report.commitments().accountsReceivable()).isEqualByComparingTo("265.00");
+        assertThat(report.commitments().accountsPayable()).isEqualByComparingTo("40.00");
+        assertThat(report.commitments().overdueReceivableAmount()).isEqualByComparingTo("180.00");
+        assertThat(report.commitments().overdueReceivableCount()).isEqualTo(2);
+        assertThat(report.commitments().overduePayableAmount()).isEqualByComparingTo("40.00");
+        assertThat(report.commitments().overduePayableCount()).isEqualTo(1);
+        assertThat(report.commitments().next30DaysAvailable()).isFalse();
+        assertThat(report.commitments().next30DaysReceivable()).isNull();
+        assertThat(report.commitments().next30DaysPayable()).isNull();
+    }
+
+    @Test
+    void shouldExposeTheFixedNextThirtyDayWindowOnlyWhenAvailable() {
+        Farm farm = saveFarm();
+        User user = saveUser();
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PENDING,
+                new BigDecimal("10.00"),
+                TODAY,
+                TODAY,
+                null);
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PENDING,
+                new BigDecimal("20.00"),
+                TODAY,
+                TODAY.plusDays(15),
+                null);
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PENDING,
+                new BigDecimal("30.00"),
+                TODAY,
+                TODAY.plusDays(30),
+                null);
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PENDING,
+                new BigDecimal("40.00"),
+                TODAY,
+                TODAY.plusDays(31),
+                null);
+
+        FinancialReportResponse unavailable = reportForEndDate(farm, TODAY.plusDays(29));
+        FinancialReportResponse available = reportForEndDate(farm, TODAY.plusDays(30));
+        FinancialReportResponse future = reportForEndDate(farm, TODAY.plusDays(31));
+
+        assertThat(unavailable.commitments().next30DaysAvailable()).isFalse();
+        assertThat(unavailable.commitments().next30DaysReceivable()).isNull();
+        assertThat(unavailable.commitments().next30DaysPayable()).isNull();
+        assertThat(available.commitments().next30DaysAvailable()).isTrue();
+        assertThat(available.commitments().next30DaysReceivable()).isEqualByComparingTo("40.00");
+        assertThat(available.commitments().next30DaysPayable()).isEqualByComparingTo("20.00");
+        assertThat(future.commitments().next30DaysAvailable()).isTrue();
+    }
+
+    private FinancialReportResponse reportForEndDate(Farm farm, LocalDate endDate) {
+        return financialReportService.getReport(
+                new FinancialReportFilter(
+                        farm.getId(), TODAY, endDate, FinancialReportBasis.ACCRUAL, null, null));
     }
 
     private Farm saveFarm() {
@@ -251,5 +329,16 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
         transaction.setCreatedByUser(user);
         transaction.setRecordStatus(FinancialRecordStatus.ACTIVE);
         financialTransactionRepository.save(transaction);
+    }
+
+    @TestConfiguration
+    static class FixedClockConfig {
+
+        @Bean
+        @Primary
+        Clock fixedClock() {
+            return Clock.fixed(
+                    Instant.parse("2026-08-30T03:00:00Z"), ZoneId.of("America/Sao_Paulo"));
+        }
     }
 }
