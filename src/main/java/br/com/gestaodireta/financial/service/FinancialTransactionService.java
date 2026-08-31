@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -138,6 +139,41 @@ public class FinancialTransactionService {
                         .map(financialTransactionMapper::toResponse);
 
         return PageResponse.from(transactions);
+    }
+
+    @Transactional(readOnly = true)
+    public List<FinancialTransactionResponse> findAllForExport(
+            FinancialTransactionFilterRequest filterRequest) {
+        FinancialTransactionFilterRequest normalizedFilter = normalizeFilter(filterRequest);
+        validateFilter(normalizedFilter);
+        validateCategoryFilter(normalizedFilter);
+        validateHarvestSeasonFilter(normalizedFilter);
+
+        return financialTransactionRepository
+                .findAllFiltered(
+                        normalizedFilter.farmId(),
+                        startDateOrDefault(normalizedFilter.transactionDateStart()),
+                        endDateOrDefault(normalizedFilter.transactionDateEnd()),
+                        startDateOrDefault(normalizedFilter.paidAtStart()),
+                        endDateOrDefault(normalizedFilter.paidAtEnd()),
+                        shouldFilterPaidAt(normalizedFilter),
+                        normalizedFilter.type(),
+                        hasCategoryIds(normalizedFilter),
+                        categoryIdsOrPlaceholder(normalizedFilter),
+                        normalizedFilter.harvestSeasonId(),
+                        hasPaymentStatuses(normalizedFilter),
+                        paymentStatusesOrPlaceholder(normalizedFilter),
+                        hasPaymentMethods(normalizedFilter),
+                        paymentMethodsOrPlaceholder(normalizedFilter),
+                        normalizedFilter.recordStatus(),
+                        normalizedFilter.description(),
+                        normalizedFilter.createdByUserId(),
+                        minAmountOrDefault(normalizedFilter.minAmount()),
+                        maxAmountOrDefault(normalizedFilter.maxAmount()),
+                        Sort.by(Sort.Direction.DESC, "transactionDate"))
+                .stream()
+                .map(financialTransactionMapper::toResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)

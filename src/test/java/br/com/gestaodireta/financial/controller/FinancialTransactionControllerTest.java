@@ -1,10 +1,12 @@
 package br.com.gestaodireta.financial.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -34,8 +36,10 @@ import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.enumeration.UserStatus;
 import br.com.gestaodireta.user.enumeration.UserType;
 import br.com.gestaodireta.user.repository.UserRepository;
+import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -346,6 +350,87 @@ class FinancialTransactionControllerTest extends PostgresIntegrationTest {
                                 .param("farmId", String.valueOf(farm.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(transaction.getId()));
+    }
+
+    @Test
+    void shouldExportAllFilteredTransactionsWithoutUsingPagination() throws Exception {
+        Farm farm = saveFarm(FarmStatus.ACTIVE);
+        User admin = saveUser("Admin", "export-admin@example.com", UserType.ADMIN);
+        for (int index = 0; index < 80; index++) {
+            saveTransaction(
+                    farm,
+                    null,
+                    admin,
+                    "Fertilizante " + index,
+                    new BigDecimal("100.00"),
+                    TransactionType.EXPENSE,
+                    PaymentStatus.PENDING,
+                    PaymentMethod.PIX,
+                    LocalDate.of(2026, 6, 20),
+                    null);
+        }
+        saveTransaction(
+                farm,
+                null,
+                admin,
+                "Semente excluída",
+                new BigDecimal("50.00"),
+                TransactionType.EXPENSE,
+                PaymentStatus.PENDING,
+                PaymentMethod.PIX,
+                LocalDate.of(2026, 6, 20),
+                null);
+
+        byte[] spreadsheet =
+                mockMvc.perform(
+                                get("/api/financial/transactions/export/xlsx")
+                                        .contextPath(CONTEXT_PATH)
+                                        .with(user(String.valueOf(admin.getId())).roles("ADMIN"))
+                                        .param("farmId", String.valueOf(farm.getId()))
+                                        .param("description", "fertilizante")
+                                        .param("page", "1")
+                                        .param("size", "10"))
+                        .andExpect(status().isOk())
+                        .andExpect(
+                                header().string(
+                                                "Content-Type",
+                                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                        .andExpect(
+                                header().string(
+                                                "Content-Disposition",
+                                                org.hamcrest.Matchers.containsString(".xlsx")))
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsByteArray();
+
+        try (var workbook = WorkbookFactory.create(new ByteArrayInputStream(spreadsheet))) {
+            var sheet = workbook.getSheet("Movimentações");
+            assertThat(sheet.getLastRowNum()).isEqualTo(80);
+            assertThat(sheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo("Data");
+            assertThat(sheet.getRow(1).getCell(7).getNumericCellValue()).isEqualTo(100.00d);
+            assertThat(sheet.getRow(1).getCell(0).getLocalDateTimeCellValue().toLocalDate())
+                    .isEqualTo(LocalDate.of(2026, 6, 20));
+        }
+
+        byte[] pdf =
+                mockMvc.perform(
+                                get("/api/financial/transactions/export/pdf")
+                                        .contextPath(CONTEXT_PATH)
+                                        .with(user(String.valueOf(admin.getId())).roles("ADMIN"))
+                                        .param("farmId", String.valueOf(farm.getId()))
+                                        .param("description", "fertilizante"))
+                        .andExpect(status().isOk())
+                        .andExpect(header().string("Content-Type", "application/pdf"))
+                        .andExpect(
+                                header().string(
+                                                "Content-Disposition",
+                                                org.hamcrest.Matchers.containsString(".pdf")))
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsByteArray();
+
+        assertThat(new String(pdf, 0, 4, java.nio.charset.StandardCharsets.US_ASCII))
+                .isEqualTo("%PDF");
     }
 
     private void expectCanCreate(String username, String role, Farm farm) throws Exception {

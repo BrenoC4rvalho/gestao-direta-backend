@@ -21,11 +21,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface FinancialTransactionRepository extends JpaRepository<FinancialTransaction, Long> {
 
-    Page<FinancialTransaction> findByFarmIdAndRecordStatus(
-            Long farmId, FinancialRecordStatus recordStatus, Pageable pageable);
-
-    @EntityGraph(attributePaths = {"harvestSeason"})
-    @Query(
+    String FILTERED_TRANSACTIONS_QUERY =
             """
             select transaction
             from FinancialTransaction transaction
@@ -47,7 +43,20 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
                 or transaction.createdByUser.id = :createdByUserId)
               and transaction.amount >= :minAmount
               and transaction.amount <= :maxAmount
-            """)
+            """;
+
+    Page<FinancialTransaction> findByFarmIdAndRecordStatus(
+            Long farmId, FinancialRecordStatus recordStatus, Pageable pageable);
+
+    @EntityGraph(
+            attributePaths = {
+                "farm",
+                "category",
+                "harvestSeason",
+                "createdByUser",
+                "updatedByUser"
+            })
+    @Query(FILTERED_TRANSACTIONS_QUERY)
     Page<FinancialTransaction> findAllFiltered(
             @Param("farmId") Long farmId,
             @Param("transactionDateStart") LocalDate transactionDateStart,
@@ -69,6 +78,37 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
             @Param("minAmount") BigDecimal minAmount,
             @Param("maxAmount") BigDecimal maxAmount,
             Pageable pageable);
+
+    @EntityGraph(
+            attributePaths = {
+                "farm",
+                "category",
+                "harvestSeason",
+                "createdByUser",
+                "updatedByUser"
+            })
+    @Query(FILTERED_TRANSACTIONS_QUERY)
+    List<FinancialTransaction> findAllFiltered(
+            @Param("farmId") Long farmId,
+            @Param("transactionDateStart") LocalDate transactionDateStart,
+            @Param("transactionDateEnd") LocalDate transactionDateEnd,
+            @Param("paidAtStart") LocalDate paidAtStart,
+            @Param("paidAtEnd") LocalDate paidAtEnd,
+            @Param("filterPaidAt") boolean filterPaidAt,
+            @Param("type") TransactionType type,
+            @Param("filterCategoryIds") boolean filterCategoryIds,
+            @Param("categoryIds") Collection<Long> categoryIds,
+            @Param("harvestSeasonId") Long harvestSeasonId,
+            @Param("filterPaymentStatuses") boolean filterPaymentStatuses,
+            @Param("paymentStatuses") Collection<PaymentStatus> paymentStatuses,
+            @Param("filterPaymentMethods") boolean filterPaymentMethods,
+            @Param("paymentMethods") Collection<PaymentMethod> paymentMethods,
+            @Param("recordStatus") FinancialRecordStatus recordStatus,
+            @Param("description") String description,
+            @Param("createdByUserId") Long createdByUserId,
+            @Param("minAmount") BigDecimal minAmount,
+            @Param("maxAmount") BigDecimal maxAmount,
+            org.springframework.data.domain.Sort sort);
 
     @Query(
             """
