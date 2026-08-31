@@ -14,6 +14,7 @@ Não há cadastro público: usuários são administrados por usuários com perfi
 - Administração de usuários, contatos e contas de mensageria vinculadas.
 - Cadastro de fazendas e controle de acesso por vínculo e papel na fazenda.
 - Categorias, movimentações, pagamentos, agenda, alertas, resumo, fluxo de caixa e relatórios financeiros.
+- Exportação das movimentações filtradas em XLSX e PDF, sem depender da página atual da listagem.
 - Safras e atividades produtivas vinculadas às fazendas.
 - Recebimento e consulta de mensagens do Telegram.
 - Extração de dados financeiros por IA, com criação de pendência para revisão, aprovação ou rejeição.
@@ -33,7 +34,9 @@ Consulte a interface Swagger para a relação completa e atualizada de endpoints
 | PostgreSQL | Banco de dados |
 | Flyway 11.7.2 | Versionamento do schema |
 | SpringDoc OpenAPI 2.8.16 | OpenAPI e Swagger UI |
-| Ollama | Extração financeira por IA |
+| Gemini e Ollama | Providers configuráveis para extração financeira por IA |
+| Apache POI 5.5.1 | Geração de exportações XLSX |
+| OpenPDF 3.0.3 | Geração de exportações PDF |
 | Docker Compose | Serviços locais de PostgreSQL e Ollama |
 | JUnit, Mockito, Spring Security Test e Testcontainers | Testes |
 | Spotless 2.43.0 com google-java-format AOSP | Formatação Java |
@@ -78,8 +81,10 @@ scripts/
 ## Pré-requisitos
 
 - Java 21.
-- Docker e Docker Compose para usar o PostgreSQL e o Ollama definidos no Compose, e para os testes de integração com Testcontainers.
-- Ollama, somente se a IA for executada fora do Docker.
+- Docker e Docker Compose para usar o PostgreSQL definido no Compose e para os testes de integração com Testcontainers.
+- Ollama, somente quando `APP_AI_PROVIDER=ollama` e o provider não estiver sendo executado no Compose.
+
+Gemini é acessado por API e não exige Ollama instalado localmente.
 
 O Maven Wrapper está versionado no repositório; não é necessário instalar Maven globalmente.
 
@@ -192,9 +197,31 @@ O plugin Maven do Flyway usa `DB_URL`, `DB_USERNAME` e `DB_PASSWORD` do ambiente
 
 ## Inteligência artificial
 
-Com o provider padrão `ollama`, a API chama o endpoint de geração do Ollama para interpretar mensagens financeiras em português. A resposta é estruturada em JSON e passa por validações de evidência e confiança antes de criar uma pendência.
+O provider é escolhido por `APP_AI_PROVIDER`. A API aceita `gemini` e `ollama`; não há fallback automático entre eles. Independentemente do provider, a resposta estruturada passa por validações determinísticas de valor, tipo, descrição e confiança antes de poder criar uma pendência financeira para revisão.
 
-Para usar Gemini, configure `APP_AI_PROVIDER=gemini`, informe `APP_AI_GEMINI_API_KEY` somente no ambiente do backend e, opcionalmente, altere `APP_AI_GEMINI_MODEL` (o padrão é `gemini-3.1-flash-lite`). A integração usa Structured Outputs com JSON Schema; mesmo assim, a validação determinística de valor, tipo, descrição e confiança continua no Java. Não há fallback automático entre Gemini e Ollama.
+### Gemini
+
+Gemini é acessado por API. Configure a chave somente no ambiente do backend:
+
+```env
+APP_AI_PROVIDER=gemini
+APP_AI_GEMINI_API_KEY=<sua-chave-da-api>
+APP_AI_GEMINI_MODEL=gemini-3.1-flash-lite
+```
+
+A integração usa Structured Outputs com JSON Schema; a validação de domínio continua sendo executada no Java.
+
+### Ollama
+
+O provider padrão usa a API local do Ollama. Configure-o assim quando ele estiver disponível localmente ou no Compose:
+
+```env
+APP_AI_PROVIDER=ollama
+APP_AI_OLLAMA_BASE_URL=http://localhost:11434
+APP_AI_OLLAMA_MODEL=llama3.2:3b
+APP_AI_OLLAMA_FORMAT=json
+APP_AI_OLLAMA_TEMPERATURE=0
+```
 
 Com o serviço Docker iniciado, baixe o modelo padrão dentro do container:
 
@@ -221,6 +248,8 @@ POST /api/webhooks/messaging/telegram
 ```
 
 Ele valida o header `X-Telegram-Bot-Api-Secret-Token` contra `TELEGRAM_WEBHOOK_SECRET`. O registro do webhook no Telegram deve apontar para uma URL pública que alcance esse endpoint; o backend não configura esse registro automaticamente.
+
+No desenvolvimento local, exponha a API por uma URL pública temporária, por exemplo com ngrok, e registre no Telegram uma URL no formato `https://<seu-dominio-publico>/api/webhooks/messaging/telegram`. Não versione nem documente URLs temporárias pessoais.
 
 Usuários podem vincular uma conta de mensageria e, em uma conversa com contexto de fazenda, enviar informações financeiras. A integração também oferece fluxos de recuperação de senha por Telegram quando houver contato elegível.
 
@@ -258,6 +287,14 @@ Com a aplicação em execução:
 
 O health inclui o componente `ai`, que informa provider, modelo, conectividade e latência para usuários autorizados. Ele nunca expõe chaves, prompts, mensagens financeiras ou headers. A verificação real é cacheada pelo TTL configurado; quando a IA externa estiver indisponível, o componente `ai` ficará `DOWN` sem impedir o startup da API.
 
+No startup, a aplicação também registra o resultado da verificação do provider configurado. Uma falha é registrada como aviso e não interrompe a inicialização.
+
+## Relatórios e exportações
+
+O relatório financeiro oferece visão consolidada por período e filtros de fazenda, safra e categoria, com base de caixa ou competência, evolução financeira mensal/trimestral, resumo por categoria e fluxo de caixa acumulado. O fluxo acumulado diferencia o cenário previsto do cenário que também considera valores vencidos ainda abertos.
+
+Na página de movimentações, as exportações XLSX e PDF são geradas pelo backend com os mesmos filtros da listagem. A consulta de exportação busca todo o conjunto filtrado, portanto não é limitada pela paginação visível na interface.
+
 ## Autenticação e CORS
 
 Após o login, o JWT é enviado no cookie `gd_session`, configurado como HTTP-only. A opção “lembrar de mim” altera a expiração do token. Uma alteração de credenciais invalida sessões anteriores por meio de `credentialsVersion`.
@@ -276,6 +313,12 @@ Para gerar o artefato e executar a suíte de testes:
 
 ```bash
 ./mvnw verify
+```
+
+Para gerar o pacote da aplicação:
+
+```bash
+./mvnw package
 ```
 
 Para validar ou aplicar a formatação Java:
