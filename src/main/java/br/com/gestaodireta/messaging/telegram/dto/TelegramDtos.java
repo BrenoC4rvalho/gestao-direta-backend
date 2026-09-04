@@ -22,7 +22,19 @@ public final class TelegramDtos {
             Long date,
             Chat chat,
             User from,
-            String text) {}
+            String text,
+            Voice voice) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Voice(
+            @JsonProperty("file_id") String fileId,
+            @JsonProperty("file_unique_id") String fileUniqueId,
+            Integer duration,
+            @JsonProperty("mime_type") String mimeType,
+            @JsonProperty("file_size") Long fileSize) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record File(@JsonProperty("file_path") String filePath) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Chat(

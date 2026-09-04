@@ -62,6 +62,14 @@ server:
 
 app:
   ai:
+    audio-transcription:
+      enabled: ${APP_AI_AUDIO_TRANSCRIPTION_ENABLED:true}
+      model: ${APP_AI_AUDIO_TRANSCRIPTION_MODEL:gemini-3.5-transcribe}
+      language: ${APP_AI_AUDIO_TRANSCRIPTION_LANGUAGE:pt-BR}
+      mode: ${APP_AI_AUDIO_TRANSCRIPTION_MODE:smart}
+      max-duration-seconds: ${APP_AI_AUDIO_TRANSCRIPTION_MAX_DURATION_SECONDS:60}
+      max-size-mb: ${APP_AI_AUDIO_TRANSCRIPTION_MAX_SIZE_MB:10}
+      timeout-seconds: ${APP_AI_AUDIO_TRANSCRIPTION_TIMEOUT_SECONDS:30}
     financial-extraction:
       enabled: ${AI_FINANCIAL_EXTRACTION_ENABLED:false}
       model: ${AI_FINANCIAL_EXTRACTION_MODEL:}

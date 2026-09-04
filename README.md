@@ -164,6 +164,13 @@ MESSAGING_CONVERSATION_EXPIRATION_HOURS=24
 | `APP_AI_OLLAMA_TEMPERATURE` | Não | Temperatura enviada ao Ollama. | `0` |
 | `APP_AI_GEMINI_API_KEY` | Sim, se Gemini estiver habilitado | Chave da Gemini API, usada somente pelo backend. | — |
 | `APP_AI_GEMINI_MODEL` | Não | Modelo Gemini enviado à API. | `gemini-3.1-flash-lite` |
+| `APP_AI_AUDIO_TRANSCRIPTION_ENABLED` | Não | Habilita transcrição de mensagens de voz do Telegram. | `false` |
+| `APP_AI_AUDIO_TRANSCRIPTION_MODEL` | Não | Modelo Gemini usado na transcrição. | `gemini-3.5-transcribe` |
+| `APP_AI_AUDIO_TRANSCRIPTION_LANGUAGE` | Não | Hint BCP-47; vazio ativa detecção automática. | `pt-BR` |
+| `APP_AI_AUDIO_TRANSCRIPTION_MODE` | Não | Modo de transcrição Gemini. | `smart` |
+| `APP_AI_AUDIO_TRANSCRIPTION_MAX_DURATION_SECONDS` | Não | Duração máxima aceita para uma voz. | `60` |
+| `APP_AI_AUDIO_TRANSCRIPTION_MAX_SIZE_MB` | Não | Tamanho máximo aceito para uma voz. | `10` |
+| `APP_AI_AUDIO_TRANSCRIPTION_TIMEOUT_SECONDS` | Não | Timeout de upload e transcrição. | `30` |
 | `AI_HEALTH_CHECK_ENABLED` | Não | Habilita a verificação de conectividade do provider de IA. | `true` |
 | `AI_HEALTH_CHECK_TIMEOUT_SECONDS` | Não | Timeout da verificação leve de saúde da IA. | `5` |
 | `AI_HEALTH_CHECK_CACHE_SECONDS` | Não | TTL do resultado de saúde para evitar chamadas repetidas ao provider. | `60` |
@@ -265,6 +272,12 @@ Mensagem Telegram
 ```
 
 Mensagens sem contexto financeiro suficiente não criam movimentações. Campos ausentes não devem ser inventados pela IA. Mesmo uma extração válida é registrada primeiro como pendência (`PENDING_REVIEW`) para revisão.
+
+### Mensagens de voz
+
+Quando `APP_AI_AUDIO_TRANSCRIPTION_ENABLED=true`, mensagens de voz do Telegram são baixadas uma única vez, transcritas pelo Gemini e encaminhadas ao mesmo fluxo de texto acima. A transcrição usa `gemini-3.5-transcribe`, Files API e Interactions API em modo `smart`; `audio/ogg` e `audio/opus` são enviados diretamente, sem conversão ou FFmpeg.
+
+O áudio não é salvo no banco ou em disco. O arquivo temporário criado na Files API é removido após a transcrição em modo best-effort; apenas o texto transcrito é mantido no histórico da mensagem para permitir as validações financeiras existentes. A chave `APP_AI_GEMINI_API_KEY` é obrigatória quando a transcrição estiver habilitada, mesmo que a extração financeira use Ollama.
 
 ## Executando a aplicação
 

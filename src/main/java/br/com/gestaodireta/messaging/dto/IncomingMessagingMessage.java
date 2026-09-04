@@ -13,5 +13,6 @@ public record IncomingMessagingMessage(
         String displayName,
         MessagingMessageType messageType,
         String content,
+        IncomingAudioAttachment audio,
         Instant receivedAt,
         String rawPayload) {}

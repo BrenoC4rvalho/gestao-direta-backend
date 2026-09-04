@@ -1,5 +1,6 @@
 package br.com.gestaodireta.messaging.telegram.webhook;
 
+import br.com.gestaodireta.messaging.dto.IncomingAudioAttachment;
 import br.com.gestaodireta.messaging.dto.IncomingMessagingMessage;
 import br.com.gestaodireta.messaging.enumeration.*;
 import br.com.gestaodireta.messaging.telegram.dto.TelegramDtos.*;
@@ -15,10 +16,19 @@ public class TelegramUpdateParser {
                 || update.message() == null
                 || update.message().chat() == null
                 || update.message().from() == null
-                || !"private".equals(update.message().chat().type())
-                || update.message().text() == null
-                || update.message().text().isBlank()) return Optional.empty();
+                || !"private".equals(update.message().chat().type())) return Optional.empty();
         Message m = update.message();
+        if (m.text() != null && !m.text().isBlank()) {
+            return incomingText(update, m, rawPayload);
+        }
+        if (m.voice() != null && m.voice().fileId() != null && !m.voice().fileId().isBlank()) {
+            return incomingVoice(update, m, rawPayload);
+        }
+        return Optional.empty();
+    }
+
+    private Optional<IncomingMessagingMessage> incomingText(
+            Update update, Message m, String rawPayload) {
         String displayName = displayName(m.from(), m.chat());
         return Optional.of(
                 new IncomingMessagingMessage(
@@ -31,6 +41,31 @@ public class TelegramUpdateParser {
                         displayName,
                         MessagingMessageType.TEXT,
                         m.text(),
+                        null,
+                        Instant.ofEpochSecond(m.date()),
+                        rawPayload));
+    }
+
+    private Optional<IncomingMessagingMessage> incomingVoice(
+            Update update, Message m, String rawPayload) {
+        String displayName = displayName(m.from(), m.chat());
+        Voice voice = m.voice();
+        return Optional.of(
+                new IncomingMessagingMessage(
+                        MessagingChannel.TELEGRAM,
+                        String.valueOf(update.updateId()),
+                        m.messageId() == null ? null : String.valueOf(m.messageId()),
+                        String.valueOf(m.from().id()),
+                        String.valueOf(m.chat().id()),
+                        m.from().username(),
+                        displayName,
+                        MessagingMessageType.VOICE,
+                        "",
+                        new IncomingAudioAttachment(
+                                voice.fileId(),
+                                voice.duration(),
+                                voice.mimeType(),
+                                voice.fileSize()),
                         Instant.ofEpochSecond(m.date()),
                         rawPayload));
     }

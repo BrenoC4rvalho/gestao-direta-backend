@@ -3,9 +3,13 @@ package br.com.gestaodireta.ai.config;
 import br.com.gestaodireta.ai.infrastructure.fake.FakeAiTextGenerationClient;
 import br.com.gestaodireta.ai.infrastructure.gemini.GeminiAiProperties;
 import br.com.gestaodireta.ai.infrastructure.gemini.GeminiAiTextGenerationClient;
+import br.com.gestaodireta.ai.infrastructure.gemini.GeminiAudioTranscriptionClient;
 import br.com.gestaodireta.ai.infrastructure.ollama.OllamaAiProperties;
 import br.com.gestaodireta.ai.infrastructure.ollama.OllamaAiTextGenerationClient;
 import br.com.gestaodireta.ai.service.provider.AiTextGenerationClient;
+import br.com.gestaodireta.ai.transcription.AudioTranscriptionClient;
+import br.com.gestaodireta.ai.transcription.AudioTranscriptionProperties;
+import br.com.gestaodireta.ai.transcription.DisabledAudioTranscriptionClient;
 import java.util.Locale;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +17,19 @@ import org.springframework.web.client.RestClient;
 
 @Configuration
 public class AiProviderConfiguration {
+
+    @Bean
+    public AudioTranscriptionClient audioTranscriptionClient(
+            AudioTranscriptionProperties transcriptionProperties,
+            GeminiAiProperties geminiProperties,
+            RestClient.Builder restClientBuilder) {
+        if (!transcriptionProperties.isEnabled()) {
+            return new DisabledAudioTranscriptionClient();
+        }
+        validateGeminiApiKey(geminiProperties.getApiKey());
+        return new GeminiAudioTranscriptionClient(
+                restClientBuilder, geminiProperties, transcriptionProperties, true);
+    }
 
     @Bean
     public AiTextGenerationClient aiTextGenerationClient(

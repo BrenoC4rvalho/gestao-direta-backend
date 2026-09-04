@@ -40,6 +40,42 @@ public class RestClientTelegramBotClient implements TelegramBotClient {
         return new TelegramSendMessageResult(String.valueOf(response.result().messageId()));
     }
 
+    @Override
+    public String getFilePath(String fileId) {
+        ensureEnabled();
+        ApiResponse<File> response =
+                call(
+                        "getFile",
+                        Map.of("file_id", fileId),
+                        new org.springframework.core.ParameterizedTypeReference<>() {});
+        if (!response.ok() || response.result() == null || isBlank(response.result().filePath())) {
+            throw new BusinessException("Telegram file lookup failed");
+        }
+        return response.result().filePath();
+    }
+
+    @Override
+    public byte[] downloadFile(String filePath) {
+        ensureEnabled();
+        if (isBlank(filePath)) {
+            throw new BusinessException("Telegram file path is missing");
+        }
+        try {
+            byte[] content =
+                    restClient
+                            .get()
+                            .uri("/file/bot" + properties.getBotToken() + "/" + filePath)
+                            .retrieve()
+                            .body(byte[].class);
+            if (content == null) {
+                throw new BusinessException("Telegram file download returned an empty response");
+            }
+            return content;
+        } catch (RestClientException exception) {
+            throw new BusinessException("Telegram file download failed");
+        }
+    }
+
     private <T> ApiResponse<T> call(
             String method,
             Object body,
@@ -60,5 +96,9 @@ public class RestClientTelegramBotClient implements TelegramBotClient {
     private void ensureEnabled() {
         if (!properties.isEnabled())
             throw new BusinessException("Telegram integration is disabled");
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }

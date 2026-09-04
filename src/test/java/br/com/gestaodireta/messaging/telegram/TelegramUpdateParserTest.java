@@ -2,10 +2,12 @@ package br.com.gestaodireta.messaging.telegram;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import br.com.gestaodireta.messaging.enumeration.MessagingMessageType;
 import br.com.gestaodireta.messaging.telegram.dto.TelegramDtos.Chat;
 import br.com.gestaodireta.messaging.telegram.dto.TelegramDtos.Message;
 import br.com.gestaodireta.messaging.telegram.dto.TelegramDtos.Update;
 import br.com.gestaodireta.messaging.telegram.dto.TelegramDtos.User;
+import br.com.gestaodireta.messaging.telegram.dto.TelegramDtos.Voice;
 import br.com.gestaodireta.messaging.telegram.webhook.TelegramUpdateParser;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +24,8 @@ class TelegramUpdateParserTest {
                                 1_700_000_000L,
                                 new Chat(10L, "private", null, null, null, null),
                                 new User(11L, false, "Maria", "Silva", "maria", "pt-br"),
-                                "Olá"));
+                                "Olá",
+                                null));
         var result = parser.parse(update, "{}");
         assertThat(result).isPresent();
         assertThat(result.orElseThrow().providerUpdateId()).isEqualTo("99");
@@ -40,7 +43,29 @@ class TelegramUpdateParserTest {
                                 1_700_000_000L,
                                 new Chat(10L, "private", null, null, null, null),
                                 new User(11L, false, "Maria", null, null, null),
+                                null,
                                 null));
         assertThat(parser.parse(update, "{}")).isEmpty();
+    }
+
+    @Test
+    void shouldParsePrivateVoiceUpdate() {
+        Update update =
+                new Update(
+                        100L,
+                        new Message(
+                                8L,
+                                1_700_000_001L,
+                                new Chat(10L, "private", null, null, null, null),
+                                new User(11L, false, "Maria", null, "maria", "pt-BR"),
+                                null,
+                                new Voice("voice-file", "unique", 5, "audio/ogg", 1024L)));
+
+        var result = parser.parse(update, "{}");
+
+        assertThat(result).isPresent();
+        assertThat(result.orElseThrow().messageType()).isEqualTo(MessagingMessageType.VOICE);
+        assertThat(result.orElseThrow().audio().fileId()).isEqualTo("voice-file");
+        assertThat(result.orElseThrow().audio().durationSeconds()).isEqualTo(5);
     }
 }

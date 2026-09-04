@@ -15,6 +15,7 @@ public class TelegramIncomingMessageService {
     private final MessagingConversationService conversations;
     private final TelegramCommandDispatcher dispatcher;
     private final TelegramFinancialExtractionProcessor financialExtractionProcessor;
+    private final TelegramVoiceMessageProcessor voiceProcessor;
     private final Clock clock;
 
     public TelegramIncomingMessageService(
@@ -23,12 +24,14 @@ public class TelegramIncomingMessageService {
             MessagingConversationService conversations,
             TelegramCommandDispatcher dispatcher,
             TelegramFinancialExtractionProcessor financialExtractionProcessor,
+            TelegramVoiceMessageProcessor voiceProcessor,
             Clock clock) {
         this.accounts = accounts;
         this.messages = messages;
         this.conversations = conversations;
         this.dispatcher = dispatcher;
         this.financialExtractionProcessor = financialExtractionProcessor;
+        this.voiceProcessor = voiceProcessor;
         this.clock = clock;
     }
 
@@ -51,7 +54,7 @@ public class TelegramIncomingMessageService {
         message.setExternalChatId(incoming.externalChatId());
         message.setDirection(MessagingDirection.INBOUND);
         message.setMessageType(incoming.messageType());
-        message.setContent(incoming.content());
+        message.setContent(incoming.content() == null ? "" : incoming.content());
         message.setStatus(MessagingMessageStatus.RECEIVED);
         message.setReceivedAt(time);
         message.setRawPayload(incoming.rawPayload());
@@ -60,8 +63,13 @@ public class TelegramIncomingMessageService {
                 dispatcher.dispatch(
                         account, message.getMessagingConversation(), incoming.content());
         if (!handledByConversation) {
-            financialExtractionProcessor.process(
-                    account, message.getMessagingConversation(), message);
+            if (incoming.messageType() == MessagingMessageType.VOICE) {
+                voiceProcessor.process(
+                        account, message.getMessagingConversation(), message, incoming.audio());
+            } else {
+                financialExtractionProcessor.process(
+                        account, message.getMessagingConversation(), message);
+            }
         }
         message.setStatus(MessagingMessageStatus.PROCESSED);
         message.setProcessedAt(LocalDateTime.now(clock));

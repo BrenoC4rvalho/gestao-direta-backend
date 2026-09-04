@@ -326,7 +326,8 @@ public class TelegramFinancialExtractionProcessor {
             MessagingAccount account,
             MessagingConversation conversation,
             MessagingMessage message) {
-        if (message.getMessageType() != MessagingMessageType.TEXT
+        if ((message.getMessageType() != MessagingMessageType.TEXT
+                        && message.getMessageType() != MessagingMessageType.VOICE)
                 || message.getContent() == null
                 || message.getContent().isBlank()
                 || message.getContent().trim().startsWith("/")) return false;
