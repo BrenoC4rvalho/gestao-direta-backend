@@ -3,6 +3,7 @@ package br.com.gestaodireta.messaging.service;
 import br.com.gestaodireta.ai.transcription.AudioTranscriptionClient;
 import br.com.gestaodireta.ai.transcription.AudioTranscriptionException;
 import br.com.gestaodireta.ai.transcription.AudioTranscriptionProperties;
+import br.com.gestaodireta.ai.transcription.AudioTranscriptionRequest;
 import br.com.gestaodireta.messaging.domain.MessagingAccount;
 import br.com.gestaodireta.messaging.domain.MessagingConversation;
 import br.com.gestaodireta.messaging.domain.MessagingMessage;
@@ -41,18 +42,21 @@ public class TelegramVoiceMessageProcessor {
     private final AudioTranscriptionClient transcriber;
     private final TelegramFinancialExtractionProcessor financialExtractionProcessor;
     private final OutgoingMessagingService outgoing;
+    private final TelegramAudioDebugFileSaver audioDebugFileSaver;
 
     public TelegramVoiceMessageProcessor(
             AudioTranscriptionProperties properties,
             TelegramBotClient telegram,
             AudioTranscriptionClient transcriber,
             TelegramFinancialExtractionProcessor financialExtractionProcessor,
-            OutgoingMessagingService outgoing) {
+            OutgoingMessagingService outgoing,
+            TelegramAudioDebugFileSaver audioDebugFileSaver) {
         this.properties = properties;
         this.telegram = telegram;
         this.transcriber = transcriber;
         this.financialExtractionProcessor = financialExtractionProcessor;
         this.outgoing = outgoing;
+        this.audioDebugFileSaver = audioDebugFileSaver;
     }
 
     public void process(
@@ -62,9 +66,10 @@ public class TelegramVoiceMessageProcessor {
             IncomingAudioAttachment voice) {
         String mimeType = normalizeMimeType(voice.mimeType());
         LOGGER.info(
-                "telegram voice received: updateId={} messageId={} durationSeconds={} mimeType={} fileSize={}",
+                "telegram voice received: updateId={} sourceMessageId={} internalMessageId={} durationSeconds={} mimeType={} fileSize={}",
                 message.getProviderUpdateId(),
                 message.getProviderMessageId(),
+                message.getId(),
                 voice.durationSeconds(),
                 mimeType,
                 voice.fileSize());
@@ -92,13 +97,26 @@ public class TelegramVoiceMessageProcessor {
             audio = telegram.downloadFile(telegram.getFilePath(voice.fileId()));
         } catch (RuntimeException exception) {
             LOGGER.warn(
-                    "telegram voice rejected: stage=DOWNLOAD reason=TELEGRAM_FILE_DOWNLOAD_ERROR messageId={}",
+                    "telegram voice rejected: stage=DOWNLOAD reason=TELEGRAM_FILE_DOWNLOAD_ERROR updateId={} sourceMessageId={} internalMessageId={}",
+                    message.getProviderUpdateId(),
+                    message.getProviderMessageId(),
+                    message.getId());
+            outgoing.send(conversation, DOWNLOAD_ERROR_MESSAGE);
+            return;
+        }
+        if (audio == null || audio.length == 0) {
+            LOGGER.warn(
+                    "telegram voice rejected: stage=DOWNLOAD reason=EMPTY_AUDIO updateId={} sourceMessageId={} internalMessageId={}",
+                    message.getProviderUpdateId(),
+                    message.getProviderMessageId(),
                     message.getId());
             outgoing.send(conversation, DOWNLOAD_ERROR_MESSAGE);
             return;
         }
         LOGGER.info(
-                "telegram voice downloaded: messageId={} bytes={} elapsedMs={}",
+                "telegram voice downloaded: updateId={} sourceMessageId={} internalMessageId={} bytes={} elapsedMs={}",
+                message.getProviderUpdateId(),
+                message.getProviderMessageId(),
                 message.getId(),
                 audio.length,
                 elapsedMillis(downloadStart));
@@ -106,8 +124,16 @@ public class TelegramVoiceMessageProcessor {
             outgoing.send(conversation, TOO_LARGE_MESSAGE);
             return;
         }
+        audioDebugFileSaver.save(
+                message.getProviderUpdateId(), message.getProviderMessageId(), audio, mimeType);
         try {
-            String transcript = transcriber.transcribe(audio, mimeType);
+            String transcript =
+                    transcriber.transcribe(
+                            new AudioTranscriptionRequest(
+                                    audio,
+                                    mimeType,
+                                    message.getProviderUpdateId(),
+                                    message.getProviderMessageId()));
             if (transcript == null || transcript.isBlank()) {
                 outgoing.send(conversation, EMPTY_TRANSCRIPT_MESSAGE);
                 return;
@@ -120,8 +146,10 @@ public class TelegramVoiceMessageProcessor {
                             ? EMPTY_TRANSCRIPT_MESSAGE
                             : TRANSCRIPTION_ERROR_MESSAGE;
             LOGGER.warn(
-                    "telegram voice rejected: stage=TRANSCRIPTION reason={} messageId={}",
+                    "telegram voice rejected: stage=TRANSCRIPTION reason={} updateId={} sourceMessageId={} internalMessageId={}",
                     exception.getReason(),
+                    message.getProviderUpdateId(),
+                    message.getProviderMessageId(),
                     message.getId());
             outgoing.send(conversation, response);
         }

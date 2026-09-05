@@ -4,6 +4,7 @@ import br.com.gestaodireta.ai.infrastructure.fake.FakeAiTextGenerationClient;
 import br.com.gestaodireta.ai.infrastructure.gemini.GeminiAiProperties;
 import br.com.gestaodireta.ai.infrastructure.gemini.GeminiAiTextGenerationClient;
 import br.com.gestaodireta.ai.infrastructure.gemini.GeminiAudioTranscriptionClient;
+import br.com.gestaodireta.ai.infrastructure.gemini.GeminiMultimodalAudioTranscriptionClient;
 import br.com.gestaodireta.ai.infrastructure.ollama.OllamaAiProperties;
 import br.com.gestaodireta.ai.infrastructure.ollama.OllamaAiTextGenerationClient;
 import br.com.gestaodireta.ai.service.provider.AiTextGenerationClient;
@@ -27,8 +28,19 @@ public class AiProviderConfiguration {
             return new DisabledAudioTranscriptionClient();
         }
         validateGeminiApiKey(geminiProperties.getApiKey());
-        return new GeminiAudioTranscriptionClient(
-                restClientBuilder, geminiProperties, transcriptionProperties, true);
+        return switch (normalize(transcriptionProperties.getStrategy())) {
+            case "gemini-transcribe" ->
+                    new GeminiAudioTranscriptionClient(
+                            restClientBuilder, geminiProperties, transcriptionProperties, true);
+            case "gemini-multimodal" ->
+                    new GeminiMultimodalAudioTranscriptionClient(
+                            restClientBuilder, geminiProperties, transcriptionProperties, true);
+            default ->
+                    throw new IllegalStateException(
+                            "Unsupported audio transcription strategy: "
+                                    + transcriptionProperties.getStrategy()
+                                    + ". Supported strategies: gemini-transcribe, gemini-multimodal");
+        };
     }
 
     @Bean

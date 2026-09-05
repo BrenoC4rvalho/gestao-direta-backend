@@ -61,15 +61,22 @@ server:
   forward-headers-strategy: framework
 
 app:
+  telegram:
+    audio-debug:
+      save-enabled: ${APP_TELEGRAM_AUDIO_DEBUG_SAVE_ENABLED:false}
+      directory: ${APP_TELEGRAM_AUDIO_DEBUG_DIRECTORY:telegram-audio-debug}
   ai:
     audio-transcription:
       enabled: ${APP_AI_AUDIO_TRANSCRIPTION_ENABLED:true}
+      strategy: ${APP_AI_AUDIO_TRANSCRIPTION_STRATEGY:gemini-transcribe}
       model: ${APP_AI_AUDIO_TRANSCRIPTION_MODEL:gemini-3.5-transcribe}
-      language: ${APP_AI_AUDIO_TRANSCRIPTION_LANGUAGE:pt-BR}
-      mode: ${APP_AI_AUDIO_TRANSCRIPTION_MODE:smart}
+      language: ${APP_AI_AUDIO_TRANSCRIPTION_LANGUAGE:}
+      mode: ${APP_AI_AUDIO_TRANSCRIPTION_MODE:}
       max-duration-seconds: ${APP_AI_AUDIO_TRANSCRIPTION_MAX_DURATION_SECONDS:60}
       max-size-mb: ${APP_AI_AUDIO_TRANSCRIPTION_MAX_SIZE_MB:10}
       timeout-seconds: ${APP_AI_AUDIO_TRANSCRIPTION_TIMEOUT_SECONDS:30}
+      debug-response: ${APP_AI_AUDIO_TRANSCRIPTION_DEBUG_RESPONSE:false}
+      debug-response-directory: ${APP_AI_AUDIO_TRANSCRIPTION_DEBUG_RESPONSE_DIRECTORY:telegram-audio-debug}
     financial-extraction:
       enabled: ${AI_FINANCIAL_EXTRACTION_ENABLED:false}
       model: ${AI_FINANCIAL_EXTRACTION_MODEL:}

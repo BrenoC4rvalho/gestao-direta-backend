@@ -8,15 +8,26 @@ import org.springframework.stereotype.Component;
 public class AudioTranscriptionProperties {
 
     private boolean enabled;
+    private String strategy = "gemini-transcribe";
     private String model = "gemini-3.5-transcribe";
-    private String language = "pt-BR";
-    private String mode = "smart";
+    private String language;
+    private String mode;
     private int maxDurationSeconds = 60;
     private int maxSizeMb = 10;
     private int timeoutSeconds = 30;
+    private boolean debugResponse;
+    private String debugResponseDirectory = "telegram-audio-debug";
 
     public boolean isEnabled() {
         return enabled;
+    }
+
+    public String getStrategy() {
+        return strategy;
+    }
+
+    public void setStrategy(String value) {
+        strategy = value;
     }
 
     public void setEnabled(boolean value) {
@@ -69,5 +80,21 @@ public class AudioTranscriptionProperties {
 
     public void setTimeoutSeconds(int value) {
         timeoutSeconds = value;
+    }
+
+    public boolean isDebugResponse() {
+        return debugResponse;
+    }
+
+    public void setDebugResponse(boolean value) {
+        debugResponse = value;
+    }
+
+    public String getDebugResponseDirectory() {
+        return debugResponseDirectory;
+    }
+
+    public void setDebugResponseDirectory(String value) {
+        debugResponseDirectory = value;
     }
 }
