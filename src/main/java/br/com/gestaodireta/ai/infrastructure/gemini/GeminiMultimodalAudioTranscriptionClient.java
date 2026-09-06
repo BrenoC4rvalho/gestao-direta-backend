@@ -26,7 +26,6 @@ public class GeminiMultimodalAudioTranscriptionClient implements AudioTranscript
             LoggerFactory.getLogger(GeminiMultimodalAudioTranscriptionClient.class);
     private static final String BASE_URL = "https://generativelanguage.googleapis.com";
     private static final String FILES_UPLOAD_ENDPOINT = "/upload/v1beta/files";
-    private static final String STRATEGY = "gemini-multimodal";
     private static final String PROMPT =
             "Transcreva o conteúdo falado neste áudio.\n"
                     + "Retorne apenas a transcrição, sem comentários adicionais.\n"
@@ -68,8 +67,7 @@ public class GeminiMultimodalAudioTranscriptionClient implements AudioTranscript
             UploadedFile uploaded = upload(request, startNanos);
             fileName = uploaded.name();
             LOGGER.info(
-                    "audio transcription request: strategy={} model={} endpoint=generateContent mimeType={} bytes={} timeoutSeconds={}",
-                    STRATEGY,
+                    "gemini audio transcription request: model={} mimeType={} bytes={} timeoutSeconds={}",
                     properties.getModel(),
                     uploaded.mimeType(),
                     request.audioBytes().length,
@@ -83,14 +81,12 @@ public class GeminiMultimodalAudioTranscriptionClient implements AudioTranscript
                             .retrieve()
                             .toEntity(String.class);
             String responseBody = response.getBody();
-            debugResponseSaver.save(request, STRATEGY, responseBody);
+            debugResponseSaver.save(request, responseBody);
             ResponseDetails details = inspectResponse(parseResponse(responseBody));
             LOGGER.info(
-                    "audio transcription response: strategy={} model={} httpStatus={} outputTextPresent={} outputTextLength={} inputTokens={} outputTokens={} elapsedMs={}",
-                    STRATEGY,
+                    "gemini audio transcription completed: model={} httpStatus={} characters={} inputTokens={} outputTokens={} elapsedMs={}",
                     properties.getModel(),
                     response.getStatusCode().value(),
-                    details.text() != null && !details.text().isBlank(),
                     details.text() == null ? null : details.text().length(),
                     details.inputTokens(),
                     details.outputTokens(),
@@ -112,8 +108,7 @@ public class GeminiMultimodalAudioTranscriptionClient implements AudioTranscript
                             ? AudioTranscriptionException.Reason.TIMEOUT
                             : AudioTranscriptionException.Reason.PROVIDER_ERROR;
             LOGGER.warn(
-                    "audio transcription failed: strategy={} model={} reason={} elapsedMs={}",
-                    STRATEGY,
+                    "gemini audio transcription failed: model={} reason={} elapsedMs={}",
                     properties.getModel(),
                     reason,
                     elapsedMillis(startNanos));
@@ -121,8 +116,7 @@ public class GeminiMultimodalAudioTranscriptionClient implements AudioTranscript
                     reason, "Gemini transcription could not be reached", exception);
         } catch (RuntimeException exception) {
             LOGGER.warn(
-                    "audio transcription failed: strategy={} model={} reason=INVALID_RESPONSE elapsedMs={}",
-                    STRATEGY,
+                    "gemini audio transcription failed: model={} reason=INVALID_RESPONSE elapsedMs={}",
                     properties.getModel(),
                     elapsedMillis(startNanos));
             throw new AudioTranscriptionException(
@@ -152,8 +146,7 @@ public class GeminiMultimodalAudioTranscriptionClient implements AudioTranscript
         String uri = textValue(file, "uri");
         String returnedMimeType = textValue(file, "mimeType");
         LOGGER.info(
-                "gemini audio upload completed: strategy={} httpStatus={} fileNamePresent={} fileUriPresent={} fileUriLength={} mimeTypeSent={} mimeTypeReturned={} fileSize={} fileState={} elapsedMs={}",
-                STRATEGY,
+                "gemini audio upload completed: httpStatus={} fileNamePresent={} fileUriPresent={} fileUriLength={} mimeTypeSent={} mimeTypeReturned={} fileSize={} fileState={} elapsedMs={}",
                 finalized.getStatusCode().value(),
                 name != null && !name.isBlank(),
                 uri != null && !uri.isBlank(),
@@ -269,12 +262,12 @@ public class GeminiMultimodalAudioTranscriptionClient implements AudioTranscript
             long startNanos,
             String stage) {
         String responseBody = exception.getResponseBodyAsString();
-        debugResponseSaver.save(request, STRATEGY, responseBody);
+        debugResponseSaver.save(request, responseBody);
         JsonNode error = parseError(responseBody);
         LOGGER.warn(
-                "gemini transcription http error: strategy={} stage={} httpStatus={} apiErrorCode={} apiErrorStatus={} apiErrorMessage={} elapsedMs={}",
-                STRATEGY,
+                "gemini audio transcription failed: stage={} model={} httpStatus={} apiErrorCode={} apiErrorStatus={} apiErrorMessage={} elapsedMs={}",
                 stage,
+                properties.getModel(),
                 exception.getStatusCode().value(),
                 longValue(error, "code"),
                 textValue(error, "status"),
@@ -302,10 +295,7 @@ public class GeminiMultimodalAudioTranscriptionClient implements AudioTranscript
         try {
             restClient.delete().uri("/v1beta/" + fileName).retrieve().toBodilessEntity();
         } catch (RuntimeException exception) {
-            LOGGER.warn(
-                    "Gemini uploaded audio cleanup failed: strategy={} fileName={}",
-                    STRATEGY,
-                    fileName);
+            LOGGER.warn("Gemini uploaded audio cleanup failed: fileName={}", fileName);
         }
     }
 

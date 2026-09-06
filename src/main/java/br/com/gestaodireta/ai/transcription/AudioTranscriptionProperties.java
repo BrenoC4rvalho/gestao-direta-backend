@@ -8,10 +8,7 @@ import org.springframework.stereotype.Component;
 public class AudioTranscriptionProperties {
 
     private boolean enabled;
-    private String strategy = "gemini-transcribe";
-    private String model = "gemini-3.5-transcribe";
-    private String language;
-    private String mode;
+    private String model = "gemini-3.1-flash-lite";
     private int maxDurationSeconds = 60;
     private int maxSizeMb = 10;
     private int timeoutSeconds = 30;
@@ -20,14 +17,6 @@ public class AudioTranscriptionProperties {
 
     public boolean isEnabled() {
         return enabled;
-    }
-
-    public String getStrategy() {
-        return strategy;
-    }
-
-    public void setStrategy(String value) {
-        strategy = value;
     }
 
     public void setEnabled(boolean value) {
@@ -40,22 +29,6 @@ public class AudioTranscriptionProperties {
 
     public void setModel(String value) {
         model = value;
-    }
-
-    public String getLanguage() {
-        return language;
-    }
-
-    public void setLanguage(String value) {
-        language = value;
-    }
-
-    public String getMode() {
-        return mode;
-    }
-
-    public void setMode(String value) {
-        mode = value;
     }
 
     public int getMaxDurationSeconds() {

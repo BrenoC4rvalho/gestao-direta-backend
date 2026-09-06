@@ -165,9 +165,7 @@ MESSAGING_CONVERSATION_EXPIRATION_HOURS=24
 | `APP_AI_GEMINI_API_KEY` | Sim, se Gemini estiver habilitado | Chave da Gemini API, usada somente pelo backend. | — |
 | `APP_AI_GEMINI_MODEL` | Não | Modelo Gemini enviado à API. | `gemini-3.1-flash-lite` |
 | `APP_AI_AUDIO_TRANSCRIPTION_ENABLED` | Não | Habilita transcrição de mensagens de voz do Telegram. | `false` |
-| `APP_AI_AUDIO_TRANSCRIPTION_MODEL` | Não | Modelo Gemini usado na transcrição. | `gemini-3.5-transcribe` |
-| `APP_AI_AUDIO_TRANSCRIPTION_LANGUAGE` | Não | Hint BCP-47; vazio omite `language_codes` e ativa detecção automática. | Vazio |
-| `APP_AI_AUDIO_TRANSCRIPTION_MODE` | Não | Modo de transcrição Gemini; vazio envia o payload mínimo oficial. | Vazio |
+| `APP_AI_AUDIO_TRANSCRIPTION_MODEL` | Não | Modelo Gemini multimodal usado na transcrição. | `gemini-3.1-flash-lite` |
 | `APP_AI_AUDIO_TRANSCRIPTION_MAX_DURATION_SECONDS` | Não | Duração máxima aceita para uma voz. | `60` |
 | `APP_AI_AUDIO_TRANSCRIPTION_MAX_SIZE_MB` | Não | Tamanho máximo aceito para uma voz. | `10` |
 | `APP_AI_AUDIO_TRANSCRIPTION_TIMEOUT_SECONDS` | Não | Timeout de upload e transcrição. | `30` |
@@ -279,13 +277,13 @@ Mensagens sem contexto financeiro suficiente não criam movimentações. Campos 
 
 ### Mensagens de voz
 
-Quando `APP_AI_AUDIO_TRANSCRIPTION_ENABLED=true`, mensagens de voz do Telegram são baixadas uma única vez, transcritas pelo Gemini e encaminhadas ao mesmo fluxo de texto acima. A transcrição usa `gemini-3.5-transcribe`, Files API e Interactions API; por padrão é enviado o payload mínimo com detecção automática de idioma. Defina `APP_AI_AUDIO_TRANSCRIPTION_MODE=smart` para ativar transcrição inteligente. `audio/ogg` e `audio/opus` são enviados diretamente, sem conversão ou FFmpeg.
+Quando `APP_AI_AUDIO_TRANSCRIPTION_ENABLED=true`, mensagens de voz do Telegram são baixadas uma única vez, enviadas como áudio multimodal ao Gemini e encaminhadas ao mesmo fluxo de texto acima. A transcrição usa Files API e `generateContent` com `gemini-3.1-flash-lite` por padrão. `audio/ogg` e `audio/opus` são enviados diretamente, sem conversão ou FFmpeg.
 
 O áudio não é salvo no banco. Para diagnóstico local temporário, defina `APP_TELEGRAM_AUDIO_DEBUG_SAVE_ENABLED=true`: os mesmos bytes recebidos do Telegram são copiados, antes da transcrição, para `telegram-audio-debug/telegram-{updateId}-{sourceMessageId}.ogg`. O salvamento é best-effort e uma falha local não interrompe a transcrição; por padrão ele está desabilitado. O arquivo temporário criado na Files API é removido após a transcrição em modo best-effort; apenas o texto transcrito é mantido no histórico da mensagem para permitir as validações financeiras existentes. A chave `APP_AI_GEMINI_API_KEY` é obrigatória quando a transcrição estiver habilitada, mesmo que a extração financeira use Ollama.
 
-Para registrar o corpo JSON retornado pela Interactions API, ative `APP_AI_AUDIO_TRANSCRIPTION_DEBUG_RESPONSE=true`. A resposta é salva como `telegram-audio-debug/gemini-response-{updateId}-{sourceMessageId}.json`; não inclui headers, credenciais ou áudio. O primeiro teste deve manter `APP_AI_AUDIO_TRANSCRIPTION_MODE=` e `APP_AI_AUDIO_TRANSCRIPTION_LANGUAGE=` vazios, enviando somente modelo e áudio.
+Para registrar o corpo JSON retornado pelo Gemini multimodal, ative `APP_AI_AUDIO_TRANSCRIPTION_DEBUG_RESPONSE=true`. A resposta é salva como `telegram-audio-debug/gemini-response-{updateId}-{sourceMessageId}.json`; não inclui headers, credenciais ou áudio.
 
-Para reproduzir o mesmo áudio manualmente, defina as variáveis abaixo sem colocar a chave no comando. O primeiro POST cria uma sessão resumable; o segundo envia exatamente os bytes OGG; o último usa o payload mínimo da Interactions API.
+Para reproduzir o mesmo áudio manualmente, defina as variáveis abaixo sem colocar a chave no comando. O primeiro POST cria uma sessão resumable; o segundo envia exatamente os bytes OGG; o último usa `generateContent` multimodal.
 
 ```bash
 AUDIO_FILE=telegram-audio-debug/telegram-<updateId>-<sourceMessageId>.ogg
@@ -316,14 +314,14 @@ curl -sS "$UPLOAD_URL" \
 FILE_URI=$(jq -r '.file.uri' gemini-upload.json)
 FILE_MIME_TYPE=$(jq -r '.file.mimeType // "audio/ogg"' gemini-upload.json)
 
-curl -sS -X POST https://generativelanguage.googleapis.com/v1beta/interactions \
+curl -sS -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent" \
   -H "x-goog-api-key: $APP_AI_GEMINI_API_KEY" \
   -H "Content-Type: application/json" \
-  -d "{\"model\":\"gemini-3.5-transcribe\",\"input\":[{\"type\":\"audio\",\"uri\":\"$FILE_URI\",\"mime_type\":\"$FILE_MIME_TYPE\"}]}" \
-  > gemini-interaction.json
+  -d "{\"contents\":[{\"parts\":[{\"text\":\"Transcreva o conteúdo falado neste áudio. Retorne apenas a transcrição, sem comentários adicionais.\"},{\"file_data\":{\"mime_type\":\"$FILE_MIME_TYPE\",\"file_uri\":\"$FILE_URI\"}}]}]}" \
+  > gemini-response.json
 ```
 
-Depois, compare `gemini-interaction.json` com a resposta gravada pela aplicação. Repita adicionando `generation_config.transcription_config.mode=smart` e, em uma execução separada, `language_codes=["pt-BR"]`.
+Depois, compare `gemini-response.json` com a resposta gravada pela aplicação.
 
 ## Executando a aplicação
 

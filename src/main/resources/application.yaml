@@ -68,10 +68,7 @@ app:
   ai:
     audio-transcription:
       enabled: ${APP_AI_AUDIO_TRANSCRIPTION_ENABLED:true}
-      strategy: ${APP_AI_AUDIO_TRANSCRIPTION_STRATEGY:gemini-transcribe}
-      model: ${APP_AI_AUDIO_TRANSCRIPTION_MODEL:gemini-3.5-transcribe}
-      language: ${APP_AI_AUDIO_TRANSCRIPTION_LANGUAGE:}
-      mode: ${APP_AI_AUDIO_TRANSCRIPTION_MODE:}
+      model: ${APP_AI_AUDIO_TRANSCRIPTION_MODEL:gemini-3.1-flash-lite}
       max-duration-seconds: ${APP_AI_AUDIO_TRANSCRIPTION_MAX_DURATION_SECONDS:60}
       max-size-mb: ${APP_AI_AUDIO_TRANSCRIPTION_MAX_SIZE_MB:10}
       timeout-seconds: ${APP_AI_AUDIO_TRANSCRIPTION_TIMEOUT_SECONDS:30}

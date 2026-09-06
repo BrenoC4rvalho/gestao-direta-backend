@@ -3,7 +3,6 @@ package br.com.gestaodireta.ai.config;
 import br.com.gestaodireta.ai.infrastructure.fake.FakeAiTextGenerationClient;
 import br.com.gestaodireta.ai.infrastructure.gemini.GeminiAiProperties;
 import br.com.gestaodireta.ai.infrastructure.gemini.GeminiAiTextGenerationClient;
-import br.com.gestaodireta.ai.infrastructure.gemini.GeminiAudioTranscriptionClient;
 import br.com.gestaodireta.ai.infrastructure.gemini.GeminiMultimodalAudioTranscriptionClient;
 import br.com.gestaodireta.ai.infrastructure.ollama.OllamaAiProperties;
 import br.com.gestaodireta.ai.infrastructure.ollama.OllamaAiTextGenerationClient;
@@ -28,19 +27,8 @@ public class AiProviderConfiguration {
             return new DisabledAudioTranscriptionClient();
         }
         validateGeminiApiKey(geminiProperties.getApiKey());
-        return switch (normalize(transcriptionProperties.getStrategy())) {
-            case "gemini-transcribe" ->
-                    new GeminiAudioTranscriptionClient(
-                            restClientBuilder, geminiProperties, transcriptionProperties, true);
-            case "gemini-multimodal" ->
-                    new GeminiMultimodalAudioTranscriptionClient(
-                            restClientBuilder, geminiProperties, transcriptionProperties, true);
-            default ->
-                    throw new IllegalStateException(
-                            "Unsupported audio transcription strategy: "
-                                    + transcriptionProperties.getStrategy()
-                                    + ". Supported strategies: gemini-transcribe, gemini-multimodal");
-        };
+        return new GeminiMultimodalAudioTranscriptionClient(
+                restClientBuilder, geminiProperties, transcriptionProperties, true);
     }
 
     @Bean
@@ -80,7 +68,7 @@ public class AiProviderConfiguration {
     private void validateGeminiApiKey(String apiKey) {
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException(
-                    "APP_AI_GEMINI_API_KEY must be configured when APP_AI_PROVIDER=gemini");
+                    "APP_AI_GEMINI_API_KEY must be configured when Gemini is enabled");
         }
     }
 }

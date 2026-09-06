@@ -20,11 +20,11 @@ class GeminiTranscriptionDebugResponseSaver {
         this.properties = properties;
     }
 
-    void save(AudioTranscriptionRequest request, String strategy, String responseBody) {
+    void save(AudioTranscriptionRequest request, String responseBody) {
         if (!properties.isDebugResponse() || responseBody == null || responseBody.isBlank()) {
             return;
         }
-        Path path = targetPath(request, strategy);
+        Path path = targetPath(request);
         try {
             Files.createDirectories(path.getParent());
             Files.writeString(path, responseBody, StandardOpenOption.CREATE_NEW);
@@ -43,13 +43,12 @@ class GeminiTranscriptionDebugResponseSaver {
         }
     }
 
-    private Path targetPath(AudioTranscriptionRequest request, String strategy) {
+    private Path targetPath(AudioTranscriptionRequest request) {
         String fileName =
-                "gemini-response-%s-%s-%s.json"
+                "gemini-response-%s-%s.json"
                         .formatted(
                                 safeIdentifier(request.updateId()),
-                                safeIdentifier(request.sourceMessageId()),
-                                safeIdentifier(strategy));
+                                safeIdentifier(request.sourceMessageId()));
         return Path.of(properties.getDebugResponseDirectory()).resolve(fileName);
     }
 

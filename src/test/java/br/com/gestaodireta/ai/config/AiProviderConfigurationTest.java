@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import br.com.gestaodireta.ai.infrastructure.gemini.GeminiAiProperties;
 import br.com.gestaodireta.ai.infrastructure.gemini.GeminiAiTextGenerationClient;
-import br.com.gestaodireta.ai.infrastructure.gemini.GeminiAudioTranscriptionClient;
 import br.com.gestaodireta.ai.infrastructure.gemini.GeminiMultimodalAudioTranscriptionClient;
 import br.com.gestaodireta.ai.infrastructure.ollama.OllamaAiProperties;
 import br.com.gestaodireta.ai.infrastructure.ollama.OllamaAiTextGenerationClient;
@@ -44,22 +43,20 @@ class AiProviderConfigurationTest {
     }
 
     @Test
-    void shouldSelectGeminiTranscribeAudioStrategyByDefault() {
-        assertThat(audioClientFor("gemini-transcribe"))
-                .isInstanceOf(GeminiAudioTranscriptionClient.class);
+    void shouldSelectGeminiMultimodalAudioTranscriptionClient() {
+        assertThat(audioClient()).isInstanceOf(GeminiMultimodalAudioTranscriptionClient.class);
     }
 
     @Test
-    void shouldSelectGeminiMultimodalAudioStrategy() {
-        assertThat(audioClientFor("gemini-multimodal"))
-                .isInstanceOf(GeminiMultimodalAudioTranscriptionClient.class);
-    }
+    void shouldUseDisabledClientWhenAudioTranscriptionIsDisabled() {
+        AudioTranscriptionProperties properties = new AudioTranscriptionProperties();
 
-    @Test
-    void shouldRejectUnsupportedAudioStrategy() {
-        assertThatThrownBy(() -> audioClientFor("unknown"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Unsupported audio transcription strategy: unknown");
+        assertThat(
+                        configuration.audioTranscriptionClient(
+                                properties, new GeminiAiProperties(), RestClient.builder()))
+                .isInstanceOf(
+                        br.com.gestaodireta.ai.transcription.DisabledAudioTranscriptionClient
+                                .class);
     }
 
     private AiTextGenerationClient clientFor(String provider, String geminiApiKey) {
@@ -83,10 +80,9 @@ class AiProviderConfigurationTest {
                 RestClient.builder());
     }
 
-    private AudioTranscriptionClient audioClientFor(String strategy) {
+    private AudioTranscriptionClient audioClient() {
         AudioTranscriptionProperties transcriptionProperties = new AudioTranscriptionProperties();
         transcriptionProperties.setEnabled(true);
-        transcriptionProperties.setStrategy(strategy);
         GeminiAiProperties geminiProperties = new GeminiAiProperties();
         geminiProperties.setApiKey("test-key");
         return configuration.audioTranscriptionClient(
