@@ -131,3 +131,7 @@ messaging:
 
   conversation:
     expiration-hours: ${MESSAGING_CONVERSATION_EXPIRATION_HOURS:24}
+
+logging:
+  level:
+    br.com.gestaodireta.messaging.service.TelegramVoiceMessageProcessor: DEBUG

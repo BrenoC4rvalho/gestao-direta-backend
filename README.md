@@ -287,6 +287,8 @@ Quando `APP_AI_AUDIO_TRANSCRIPTION_ENABLED=true`, mensagens de voz do Telegram s
 
 O áudio não é salvo no banco. Para diagnóstico local temporário, defina `APP_TELEGRAM_AUDIO_DEBUG_SAVE_ENABLED=true`: os mesmos bytes recebidos do Telegram são copiados, antes da transcrição, para `telegram-audio-debug/telegram-{updateId}-{sourceMessageId}.ogg`. O salvamento é best-effort e uma falha local não interrompe a transcrição; por padrão ele está desabilitado. O arquivo temporário criado na Files API é removido após a transcrição em modo best-effort; apenas o texto transcrito é mantido no histórico da mensagem para permitir as validações financeiras existentes. A chave `APP_AI_GEMINI_API_KEY` é obrigatória para a transcrição apenas quando `APP_TRANSCRIPTION_PROVIDER=gemini`.
 
+Para visualizar o texto transcrito no log local, sem habilitar DEBUG para toda a aplicação, configure `logging.level.br.com.gestaodireta.messaging.service.TelegramVoiceMessageProcessor=DEBUG`. Cada transcrição concluída registra o provider selecionado e o texto retornado; por conter conteúdo informado pelo usuário, esse dado é emitido somente em DEBUG.
+
 Para registrar o corpo JSON retornado pelo Gemini multimodal, ative `APP_AI_AUDIO_TRANSCRIPTION_DEBUG_RESPONSE=true`. A resposta é salva como `telegram-audio-debug/gemini-response-{updateId}-{sourceMessageId}.json`; não inclui headers, credenciais ou áudio.
 
 Para reproduzir o mesmo áudio manualmente, defina as variáveis abaixo sem colocar a chave no comando. O primeiro POST cria uma sessão resumable; o segundo envia exatamente os bytes OGG; o último usa `generateContent` multimodal.

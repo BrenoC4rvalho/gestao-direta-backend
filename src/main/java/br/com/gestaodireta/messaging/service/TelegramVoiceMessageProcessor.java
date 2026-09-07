@@ -140,6 +140,10 @@ public class TelegramVoiceMessageProcessor {
                 outgoing.send(conversation, EMPTY_TRANSCRIPT_MESSAGE);
                 return;
             }
+            LOGGER.debug(
+                    "audio transcription completed: provider={} text=\"{}\"",
+                    transcriber.providerName(),
+                    normalizeTranscriptForLog(transcript));
             message.setContent(transcript.trim());
             financialExtractionProcessor.process(account, conversation, message);
         } catch (AudioTranscriptionException exception) {
@@ -178,5 +182,9 @@ public class TelegramVoiceMessageProcessor {
 
     private long elapsedMillis(long startNanos) {
         return Duration.ofNanos(System.nanoTime() - startNanos).toMillis();
+    }
+
+    private String normalizeTranscriptForLog(String transcript) {
+        return transcript.replace('\r', ' ').replace('\n', ' ');
     }
 }
