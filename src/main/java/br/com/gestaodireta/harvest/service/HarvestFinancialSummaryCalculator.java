@@ -20,9 +20,10 @@ public class HarvestFinancialSummaryCalculator {
             BigDecimal plannedCost, BigDecimal plannedRevenue) {
         BigDecimal resolvedCost = zeroIfNull(plannedCost);
         BigDecimal resolvedRevenue = zeroIfNull(plannedRevenue);
+        BigDecimal profit = resolvedRevenue.subtract(resolvedCost);
 
         return new HarvestPlanningSummaryResponse(
-                resolvedCost, resolvedRevenue, resolvedRevenue.subtract(resolvedCost));
+                resolvedCost, resolvedRevenue, profit, margin(profit, resolvedRevenue));
     }
 
     public HarvestRealizedSummaryResponse realized(HarvestSeasonFinancialTotalsProjection totals) {
@@ -33,9 +34,10 @@ public class HarvestFinancialSummaryCalculator {
             BigDecimal realizedCost, BigDecimal realizedRevenue) {
         BigDecimal resolvedCost = zeroIfNull(realizedCost);
         BigDecimal resolvedRevenue = zeroIfNull(realizedRevenue);
+        BigDecimal profit = resolvedRevenue.subtract(resolvedCost);
 
         return new HarvestRealizedSummaryResponse(
-                resolvedCost, resolvedRevenue, resolvedRevenue.subtract(resolvedCost));
+                resolvedCost, resolvedRevenue, profit, margin(profit, resolvedRevenue));
     }
 
     public HarvestProjectionSummaryResponse projection(
@@ -48,9 +50,10 @@ public class HarvestFinancialSummaryCalculator {
             HarvestRealizedSummaryResponse realized, BigDecimal openCost, BigDecimal openRevenue) {
         BigDecimal projectedCost = realized.realizedCost().add(zeroIfNull(openCost));
         BigDecimal projectedRevenue = realized.realizedRevenue().add(zeroIfNull(openRevenue));
+        BigDecimal profit = projectedRevenue.subtract(projectedCost);
 
         return new HarvestProjectionSummaryResponse(
-                projectedCost, projectedRevenue, projectedRevenue.subtract(projectedCost));
+                projectedCost, projectedRevenue, profit, margin(profit, projectedRevenue));
     }
 
     public HarvestComparisonSummaryResponse comparison(
@@ -71,6 +74,8 @@ public class HarvestFinancialSummaryCalculator {
     public HarvestOpenAmountsSummaryResponse openAmounts(
             HarvestSeasonFinancialTotalsProjection totals) {
         return new HarvestOpenAmountsSummaryResponse(
+                zeroIfNull(totals.getOpenCost()),
+                zeroIfNull(totals.getOpenRevenue()),
                 new FinancialAmountSummaryResponse(
                         zeroIfNull(totals.getPendingPayableAmount()),
                         zeroIfNull(totals.getPendingReceivableAmount())),
@@ -85,6 +90,14 @@ public class HarvestFinancialSummaryCalculator {
         }
 
         return value.multiply(BigDecimal.valueOf(100)).divide(base, 2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal margin(BigDecimal profit, BigDecimal revenue) {
+        if (BigDecimal.ZERO.compareTo(revenue) == 0) {
+            return BigDecimal.ZERO;
+        }
+
+        return profit.multiply(BigDecimal.valueOf(100)).divide(revenue, 2, RoundingMode.HALF_UP);
     }
 
     private ProfitPerformanceStatus profitPerformanceStatus(

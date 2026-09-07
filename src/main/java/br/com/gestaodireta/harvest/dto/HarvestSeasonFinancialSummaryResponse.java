@@ -6,4 +6,5 @@ public record HarvestSeasonFinancialSummaryResponse(
         HarvestPlanningSummaryResponse planning,
         HarvestRealizedSummaryResponse realized,
         HarvestProjectionSummaryResponse projection,
-        HarvestComparisonSummaryResponse comparison) {}
+        HarvestComparisonSummaryResponse comparison,
+        HarvestOpenAmountsSummaryResponse openAmounts) {}

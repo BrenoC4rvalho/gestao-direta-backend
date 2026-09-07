@@ -1,4 +1,9 @@
 package br.com.gestaodireta.harvest.dto;
 
+import java.math.BigDecimal;
+
 public record HarvestOpenAmountsSummaryResponse(
-        FinancialAmountSummaryResponse pending, FinancialAmountSummaryResponse overdue) {}
+        BigDecimal payableAmount,
+        BigDecimal receivableAmount,
+        FinancialAmountSummaryResponse pending,
+        FinancialAmountSummaryResponse overdue) {}

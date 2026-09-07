@@ -219,7 +219,8 @@ public class HarvestSeasonService {
                 planning,
                 realized,
                 projection,
-                harvestFinancialSummaryCalculator.comparison(planning, projection));
+                harvestFinancialSummaryCalculator.comparison(planning, projection),
+                harvestFinancialSummaryCalculator.openAmounts(totals));
     }
 
     @Transactional(readOnly = true)

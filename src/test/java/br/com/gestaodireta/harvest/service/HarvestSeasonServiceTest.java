@@ -429,12 +429,19 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         assertThat(response.expectedCost()).isEqualByComparingTo("96500.00");
         assertThat(response.expectedRevenue()).isEqualByComparingTo("210000.00");
         assertThat(response.expectedProfit()).isEqualByComparingTo("113500.00");
+        assertThat(response.planning().plannedMargin()).isEqualByComparingTo("54.05");
         assertThat(response.realizedRevenue()).isEqualByComparingTo("150000.00");
         assertThat(response.realizedCost()).isEqualByComparingTo("72500.00");
         assertThat(response.realizedProfit()).isEqualByComparingTo("77500.00");
+        assertThat(response.realized().realizedMargin()).isEqualByComparingTo("51.67");
         assertThat(response.pendingExpenses()).isEqualByComparingTo("18000.00");
         assertThat(response.overdueExpenses()).isEqualByComparingTo("6000.00");
         assertThat(response.pendingRevenue()).isEqualByComparingTo("25000.00");
+        assertThat(response.openAmounts().payableAmount()).isEqualByComparingTo("24000.00");
+        assertThat(response.openAmounts().receivableAmount()).isEqualByComparingTo("25000.00");
+        assertThat(response.projection().projectedCost()).isEqualByComparingTo("96500.00");
+        assertThat(response.projection().projectedRevenue()).isEqualByComparingTo("175000.00");
+        assertThat(response.projection().projectedProfit()).isEqualByComparingTo("78500.00");
         assertThat(response.transactionCount()).isEqualTo(7L);
         assertThat(response.incomeCount()).isEqualTo(3L);
         assertThat(response.expenseCount()).isEqualTo(4L);
@@ -758,11 +765,15 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         assertThat(response.planning().plannedCost()).isEqualByComparingTo("150000.00");
         assertThat(response.planning().plannedRevenue()).isEqualByComparingTo("270000.00");
         assertThat(response.planning().plannedProfit()).isEqualByComparingTo("120000.00");
+        assertThat(response.planning().plannedMargin()).isEqualByComparingTo("44.44");
         assertThat(response.realized().realizedCost()).isEqualByComparingTo("50000.00");
         assertThat(response.realized().realizedRevenue()).isEqualByComparingTo("50000.00");
         assertThat(response.projection().projectedCost()).isEqualByComparingTo("75000.00");
         assertThat(response.projection().projectedRevenue()).isEqualByComparingTo("150000.00");
         assertThat(response.projection().projectedProfit()).isEqualByComparingTo("75000.00");
+        assertThat(response.projection().projectedMargin()).isEqualByComparingTo("50.00");
+        assertThat(response.openAmounts().payableAmount()).isEqualByComparingTo("25000.00");
+        assertThat(response.openAmounts().receivableAmount()).isEqualByComparingTo("100000.00");
         assertThat(response.comparison().profitPerformancePercentage())
                 .isEqualByComparingTo("-37.50");
         assertThat(response.comparison().costVarianceAmount()).isEqualByComparingTo("-75000.00");
