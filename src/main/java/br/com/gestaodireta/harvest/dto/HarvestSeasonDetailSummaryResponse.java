@@ -1,6 +1,7 @@
 package br.com.gestaodireta.harvest.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
@@ -81,8 +82,53 @@ public record HarvestSeasonDetailSummaryResponse(
         return perHectare(realizedProfit());
     }
 
+    @JsonProperty
+    public BigDecimal plannedCostPerHectare() {
+        return perHectare(planning.plannedCost());
+    }
+
+    @JsonProperty
+    public BigDecimal plannedRevenuePerHectare() {
+        return perHectare(planning.plannedRevenue());
+    }
+
+    @JsonProperty
+    public BigDecimal plannedResultPerHectare() {
+        return perHectare(planning.plannedProfit());
+    }
+
+    @JsonProperty
+    public BigDecimal projectedCostPerHectare() {
+        return perHectare(projection.projectedCost());
+    }
+
+    @JsonProperty
+    public BigDecimal projectedRevenuePerHectare() {
+        return perHectare(projection.projectedRevenue());
+    }
+
+    @JsonProperty
+    public BigDecimal projectedProfitPerHectare() {
+        return perHectare(projection.projectedProfit());
+    }
+
+    @JsonProperty
+    public BigDecimal realizedCostPerHectare() {
+        return perHectare(realized.realizedCost());
+    }
+
+    @JsonProperty
+    public BigDecimal realizedRevenuePerHectare() {
+        return perHectare(realized.realizedRevenue());
+    }
+
+    @JsonProperty
+    public BigDecimal realizedProfitPerHectare() {
+        return perHectare(realized.realizedProfit());
+    }
+
     private BigDecimal perHectare(BigDecimal amount) {
-        if (areaHectares == null || BigDecimal.ZERO.compareTo(areaHectares) == 0) {
+        if (areaHectares == null || areaHectares.compareTo(BigDecimal.ZERO) <= 0) {
             return null;
         }
 

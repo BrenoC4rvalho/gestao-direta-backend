@@ -449,6 +449,15 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         assertThat(response.costPerHectare()).isEqualByComparingTo("604.17");
         assertThat(response.revenuePerHectare()).isEqualByComparingTo("1250.00");
         assertThat(response.profitPerHectare()).isEqualByComparingTo("645.83");
+        assertThat(response.plannedCostPerHectare()).isEqualByComparingTo("804.17");
+        assertThat(response.plannedRevenuePerHectare()).isEqualByComparingTo("1750.00");
+        assertThat(response.plannedResultPerHectare()).isEqualByComparingTo("945.83");
+        assertThat(response.projectedCostPerHectare()).isEqualByComparingTo("804.17");
+        assertThat(response.projectedRevenuePerHectare()).isEqualByComparingTo("1458.33");
+        assertThat(response.projectedProfitPerHectare()).isEqualByComparingTo("654.17");
+        assertThat(response.realizedCostPerHectare()).isEqualByComparingTo("604.17");
+        assertThat(response.realizedRevenuePerHectare()).isEqualByComparingTo("1250.00");
+        assertThat(response.realizedProfitPerHectare()).isEqualByComparingTo("645.83");
     }
 
     @Test
@@ -591,6 +600,8 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
                 saveSeason(farm, activity, "100.00", "50.00", null, "Safra Sem Area");
         HarvestSeason seasonWithZeroArea =
                 saveSeason(farm, activity, "100.00", "50.00", "0.00", "Safra Zero");
+        HarvestSeason seasonWithNegativeArea =
+                saveSeason(farm, activity, "100.00", "50.00", "-10.00", "Safra Area Negativa");
         saveTransaction(
                 farm,
                 user,
@@ -605,11 +616,20 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
                 TransactionType.INCOME,
                 PaymentStatus.PAID,
                 "100.00");
+        saveTransaction(
+                farm,
+                user,
+                seasonWithNegativeArea,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                "100.00");
 
         HarvestSeasonDetailSummaryResponse withoutArea =
                 harvestSeasonService.getSummary(seasonWithoutArea.getId());
         HarvestSeasonDetailSummaryResponse withZeroArea =
                 harvestSeasonService.getSummary(seasonWithZeroArea.getId());
+        HarvestSeasonDetailSummaryResponse withNegativeArea =
+                harvestSeasonService.getSummary(seasonWithNegativeArea.getId());
 
         assertThat(withoutArea.costPerHectare()).isNull();
         assertThat(withoutArea.revenuePerHectare()).isNull();
@@ -617,6 +637,15 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         assertThat(withZeroArea.costPerHectare()).isNull();
         assertThat(withZeroArea.revenuePerHectare()).isNull();
         assertThat(withZeroArea.profitPerHectare()).isNull();
+        assertThat(withNegativeArea.plannedCostPerHectare()).isNull();
+        assertThat(withNegativeArea.plannedRevenuePerHectare()).isNull();
+        assertThat(withNegativeArea.plannedResultPerHectare()).isNull();
+        assertThat(withNegativeArea.projectedCostPerHectare()).isNull();
+        assertThat(withNegativeArea.projectedRevenuePerHectare()).isNull();
+        assertThat(withNegativeArea.projectedProfitPerHectare()).isNull();
+        assertThat(withNegativeArea.realizedCostPerHectare()).isNull();
+        assertThat(withNegativeArea.realizedRevenuePerHectare()).isNull();
+        assertThat(withNegativeArea.realizedProfitPerHectare()).isNull();
     }
 
     @Test
