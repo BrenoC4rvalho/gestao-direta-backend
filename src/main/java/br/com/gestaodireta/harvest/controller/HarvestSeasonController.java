@@ -4,6 +4,7 @@ import br.com.gestaodireta.harvest.dto.DashboardHarvestSeasonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonBudgetItemRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonBudgetItemResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonBudgetResponse;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonComparisonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonDetailSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonFinancialSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonRequest;
@@ -131,6 +132,15 @@ public class HarvestSeasonController {
     @PreAuthorize("@harvestAccess.canViewSeasons(#farmId)")
     public List<DashboardHarvestSeasonResponse> findDashboardSeasons(@RequestParam Long farmId) {
         return harvestSeasonService.findDashboardSeasons(farmId);
+    }
+
+    @GetMapping("/compare")
+    @PreAuthorize("@harvestAccess.canViewSeasons(#farmId)")
+    public HarvestSeasonComparisonResponse compare(
+            @RequestParam Long farmId,
+            @RequestParam Long harvestSeasonIdA,
+            @RequestParam Long harvestSeasonIdB) {
+        return harvestSeasonService.compare(farmId, harvestSeasonIdA, harvestSeasonIdB);
     }
 
     @GetMapping("/{id}")

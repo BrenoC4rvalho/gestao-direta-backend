@@ -14,8 +14,12 @@ import br.com.gestaodireta.harvest.dto.FinancialAmountCountResponse;
 import br.com.gestaodireta.harvest.dto.HarvestPlanningSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestProjectionSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestRealizedSummaryResponse;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonComparisonDifferenceResponse;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonComparisonHarvestResponse;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonComparisonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonDetailSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonFinancialSummaryResponse;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonPerHectareComparisonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonStatusUpdateRequest;
@@ -23,6 +27,8 @@ import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryListResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonUpdateRequest;
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
 import br.com.gestaodireta.harvest.entity.ProductionActivity;
+import br.com.gestaodireta.harvest.enumeration.ComparisonSemantic;
+import br.com.gestaodireta.harvest.enumeration.HarvestSeasonComparisonMetric;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
 import br.com.gestaodireta.harvest.enumeration.ProductionActivityStatus;
 import br.com.gestaodireta.harvest.mapper.HarvestSeasonMapper;
@@ -34,12 +40,15 @@ import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -245,10 +254,50 @@ public class HarvestSeasonService {
 
     @Transactional(readOnly = true)
     public HarvestSeasonDetailSummaryResponse getSummary(Long id) {
-        HarvestSeason harvestSeason = findEntityById(id);
+        return buildDetailSummary(findEntityById(id));
+    }
+
+    @Transactional(readOnly = true)
+    public HarvestSeasonComparisonResponse compare(
+            Long farmId, Long harvestSeasonIdA, Long harvestSeasonIdB) {
+        if (harvestSeasonIdA.equals(harvestSeasonIdB)) {
+            throw new BusinessException("Harvest seasons must be different for comparison.");
+        }
+
+        Farm farm = farmService.findEntityById(farmId);
+        HarvestSeason harvestSeasonA = findEntityById(harvestSeasonIdA);
+        HarvestSeason harvestSeasonB = findEntityById(harvestSeasonIdB);
+        ensureHarvestSeasonBelongsToFarm(harvestSeasonA, farm);
+        ensureHarvestSeasonBelongsToFarm(harvestSeasonB, farm);
+
+        HarvestSeasonComparisonHarvestResponse harvestA = toComparisonHarvest(harvestSeasonA);
+        HarvestSeasonComparisonHarvestResponse harvestB = toComparisonHarvest(harvestSeasonB);
+        List<HarvestSeasonComparisonDifferenceResponse> differences =
+                comparisonDifferences(harvestA, harvestB);
+
+        return new HarvestSeasonComparisonResponse(
+                harvestA,
+                harvestB,
+                differences,
+                differences.stream()
+                        .filter(this::isHighlightCandidate)
+                        .filter(difference -> difference.percentageDifference() != null)
+                        .sorted(
+                                Comparator.comparing(
+                                                HarvestSeasonComparisonDifferenceResponse
+                                                        ::percentageDifference,
+                                                Comparator.comparing(BigDecimal::abs))
+                                        .reversed())
+                        .limit(3)
+                        .toList());
+    }
+
+    private HarvestSeasonDetailSummaryResponse buildDetailSummary(HarvestSeason harvestSeason) {
         HarvestSeasonFinancialTotalsProjection totals =
                 financialTransactionRepository.summarizeHarvestSeasonFinancialTotals(
-                        harvestSeason.getFarm().getId(), List.of(id), LocalDate.now(clock));
+                        harvestSeason.getFarm().getId(),
+                        List.of(harvestSeason.getId()),
+                        LocalDate.now(clock));
         HarvestPlanningSummaryResponse planning =
                 harvestFinancialSummaryCalculator.planning(
                         plannedAmount(List.of(harvestSeason), TransactionType.EXPENSE),
@@ -273,6 +322,279 @@ public class HarvestSeasonService {
                 zeroIfNull(totals.getTransactionCount()),
                 zeroIfNull(totals.getIncomeCount()),
                 zeroIfNull(totals.getExpenseCount()));
+    }
+
+    private HarvestSeasonComparisonHarvestResponse toComparisonHarvest(
+            HarvestSeason harvestSeason) {
+        HarvestSeasonDetailSummaryResponse summary = buildDetailSummary(harvestSeason);
+        boolean hasPlanning =
+                !harvestSeasonBudgetItemRepository
+                        .findAllByHarvestSeasonId(harvestSeason.getId())
+                        .isEmpty();
+        boolean hasTransactions = summary.transactionCount() > 0;
+
+        return new HarvestSeasonComparisonHarvestResponse(
+                harvestSeason.getId(),
+                harvestSeason.getName(),
+                harvestSeason.getStatus(),
+                harvestSeason.getProductionActivity().getName(),
+                harvestSeason.getStartDate(),
+                harvestSeason.getEndDate(),
+                harvestSeason.getAreaHectares(),
+                hasPlanning ? summary.planning() : null,
+                hasTransactions ? summary.projection() : null,
+                hasTransactions ? summary.realized() : null,
+                new HarvestSeasonPerHectareComparisonResponse(
+                        hasPlanning ? summary.plannedCostPerHectare() : null,
+                        hasPlanning ? summary.plannedRevenuePerHectare() : null,
+                        hasPlanning ? summary.plannedResultPerHectare() : null,
+                        hasTransactions ? summary.projectedCostPerHectare() : null,
+                        hasTransactions ? summary.projectedRevenuePerHectare() : null,
+                        hasTransactions ? summary.projectedProfitPerHectare() : null,
+                        hasTransactions ? summary.realizedCostPerHectare() : null,
+                        hasTransactions ? summary.realizedRevenuePerHectare() : null,
+                        hasTransactions ? summary.realizedProfitPerHectare() : null));
+    }
+
+    private List<HarvestSeasonComparisonDifferenceResponse> comparisonDifferences(
+            HarvestSeasonComparisonHarvestResponse harvestA,
+            HarvestSeasonComparisonHarvestResponse harvestB) {
+        return List.of(
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.AREA_HECTARES,
+                        harvestA,
+                        harvestB,
+                        HarvestSeasonComparisonHarvestResponse::areaHectares,
+                        false),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.PLANNED_COST,
+                        harvestA,
+                        harvestB,
+                        harvest ->
+                                harvest.planning() == null
+                                        ? null
+                                        : harvest.planning().plannedCost(),
+                        true),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.PLANNED_REVENUE,
+                        harvestA,
+                        harvestB,
+                        harvest ->
+                                harvest.planning() == null
+                                        ? null
+                                        : harvest.planning().plannedRevenue(),
+                        false),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.PLANNED_RESULT,
+                        harvestA,
+                        harvestB,
+                        harvest ->
+                                harvest.planning() == null
+                                        ? null
+                                        : harvest.planning().plannedProfit(),
+                        false),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.PLANNED_MARGIN,
+                        harvestA,
+                        harvestB,
+                        harvest ->
+                                harvest.planning() == null
+                                        ? null
+                                        : harvest.planning().plannedMargin(),
+                        false),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.PROJECTED_COST,
+                        harvestA,
+                        harvestB,
+                        harvest ->
+                                harvest.projection() == null
+                                        ? null
+                                        : harvest.projection().projectedCost(),
+                        true),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.PROJECTED_REVENUE,
+                        harvestA,
+                        harvestB,
+                        harvest ->
+                                harvest.projection() == null
+                                        ? null
+                                        : harvest.projection().projectedRevenue(),
+                        false),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.PROJECTED_PROFIT,
+                        harvestA,
+                        harvestB,
+                        harvest ->
+                                harvest.projection() == null
+                                        ? null
+                                        : harvest.projection().projectedProfit(),
+                        false),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.PROJECTED_MARGIN,
+                        harvestA,
+                        harvestB,
+                        harvest ->
+                                harvest.projection() == null
+                                        ? null
+                                        : harvest.projection().projectedMargin(),
+                        false),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.REALIZED_COST,
+                        harvestA,
+                        harvestB,
+                        harvest ->
+                                harvest.realized() == null
+                                        ? null
+                                        : harvest.realized().realizedCost(),
+                        true),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.REALIZED_REVENUE,
+                        harvestA,
+                        harvestB,
+                        harvest ->
+                                harvest.realized() == null
+                                        ? null
+                                        : harvest.realized().realizedRevenue(),
+                        false),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.REALIZED_PROFIT,
+                        harvestA,
+                        harvestB,
+                        harvest ->
+                                harvest.realized() == null
+                                        ? null
+                                        : harvest.realized().realizedProfit(),
+                        false),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.REALIZED_MARGIN,
+                        harvestA,
+                        harvestB,
+                        harvest ->
+                                harvest.realized() == null
+                                        ? null
+                                        : harvest.realized().realizedMargin(),
+                        false),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.PLANNED_COST_PER_HECTARE,
+                        harvestA,
+                        harvestB,
+                        harvest -> harvest.perHectare().plannedCostPerHectare(),
+                        true),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.PLANNED_REVENUE_PER_HECTARE,
+                        harvestA,
+                        harvestB,
+                        harvest -> harvest.perHectare().plannedRevenuePerHectare(),
+                        false),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.PLANNED_RESULT_PER_HECTARE,
+                        harvestA,
+                        harvestB,
+                        harvest -> harvest.perHectare().plannedResultPerHectare(),
+                        false),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.PROJECTED_COST_PER_HECTARE,
+                        harvestA,
+                        harvestB,
+                        harvest -> harvest.perHectare().projectedCostPerHectare(),
+                        true),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.PROJECTED_REVENUE_PER_HECTARE,
+                        harvestA,
+                        harvestB,
+                        harvest -> harvest.perHectare().projectedRevenuePerHectare(),
+                        false),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.PROJECTED_PROFIT_PER_HECTARE,
+                        harvestA,
+                        harvestB,
+                        harvest -> harvest.perHectare().projectedProfitPerHectare(),
+                        false),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.REALIZED_COST_PER_HECTARE,
+                        harvestA,
+                        harvestB,
+                        harvest -> harvest.perHectare().realizedCostPerHectare(),
+                        true),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.REALIZED_REVENUE_PER_HECTARE,
+                        harvestA,
+                        harvestB,
+                        harvest -> harvest.perHectare().realizedRevenuePerHectare(),
+                        false),
+                comparisonDifference(
+                        HarvestSeasonComparisonMetric.REALIZED_PROFIT_PER_HECTARE,
+                        harvestA,
+                        harvestB,
+                        harvest -> harvest.perHectare().realizedProfitPerHectare(),
+                        false));
+    }
+
+    private HarvestSeasonComparisonDifferenceResponse comparisonDifference(
+            HarvestSeasonComparisonMetric metric,
+            HarvestSeasonComparisonHarvestResponse harvestA,
+            HarvestSeasonComparisonHarvestResponse harvestB,
+            Function<HarvestSeasonComparisonHarvestResponse, BigDecimal> valueExtractor,
+            boolean lowerIsBetter) {
+        BigDecimal valueA = valueExtractor.apply(harvestA);
+        BigDecimal valueB = valueExtractor.apply(harvestB);
+
+        if (valueA == null || valueB == null) {
+            return new HarvestSeasonComparisonDifferenceResponse(metric, null, null, null);
+        }
+
+        BigDecimal difference = valueB.subtract(valueA);
+        return new HarvestSeasonComparisonDifferenceResponse(
+                metric,
+                difference,
+                percentageDifference(difference, valueA),
+                comparisonSemantic(difference, lowerIsBetter));
+    }
+
+    private BigDecimal percentageDifference(BigDecimal difference, BigDecimal base) {
+        if (base.compareTo(BigDecimal.ZERO) == 0) {
+            return null;
+        }
+
+        return difference
+                .multiply(BigDecimal.valueOf(100))
+                .divide(base.abs(), 2, RoundingMode.HALF_UP);
+    }
+
+    private ComparisonSemantic comparisonSemantic(BigDecimal difference, boolean lowerIsBetter) {
+        int comparison = difference.compareTo(BigDecimal.ZERO);
+
+        if (comparison == 0) {
+            return ComparisonSemantic.NEUTRAL;
+        }
+
+        if ((comparison < 0 && lowerIsBetter) || (comparison > 0 && !lowerIsBetter)) {
+            return ComparisonSemantic.BETTER;
+        }
+
+        return ComparisonSemantic.WORSE;
+    }
+
+    private boolean isHighlightCandidate(HarvestSeasonComparisonDifferenceResponse difference) {
+        return switch (difference.metric()) {
+            case PLANNED_COST,
+                            PLANNED_REVENUE,
+                            PLANNED_RESULT,
+                            PROJECTED_COST,
+                            PROJECTED_REVENUE,
+                            PROJECTED_PROFIT,
+                            REALIZED_COST,
+                            REALIZED_REVENUE,
+                            REALIZED_PROFIT ->
+                    true;
+            default -> false;
+        };
+    }
+
+    private void ensureHarvestSeasonBelongsToFarm(HarvestSeason harvestSeason, Farm farm) {
+        if (!harvestSeason.getFarm().getId().equals(farm.getId())) {
+            throw new BusinessException("Harvest seasons must belong to the selected farm.");
+        }
     }
 
     @Transactional

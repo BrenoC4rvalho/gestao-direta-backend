@@ -1076,6 +1076,26 @@ class HarvestControllerTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldProtectAndReturnHarvestSeasonComparison() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        ProductionActivity activity = saveActivity(farm, "Coffee", ProductionActivityStatus.ACTIVE);
+        HarvestSeason first = saveSeason(farm, activity, "Safra A", HarvestSeasonStatus.PLANNED);
+        HarvestSeason second = saveSeason(farm, activity, "Safra B", HarvestSeasonStatus.FINISHED);
+        User admin = saveUser("Admin", "admin-comparison@example.com", UserType.ADMIN);
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/compare")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("harvestSeasonIdA", String.valueOf(first.getId()))
+                                .param("harvestSeasonIdB", String.valueOf(second.getId()))
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.harvestA.id").value(first.getId()))
+                .andExpect(jsonPath("$.harvestB.id").value(second.getId()));
+    }
+
+    @Test
     void shouldProtectAndReturnDashboardHarvestSeasons() throws Exception {
         Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
         ProductionActivity activity = saveActivity(farm, "Coffee", ProductionActivityStatus.ACTIVE);

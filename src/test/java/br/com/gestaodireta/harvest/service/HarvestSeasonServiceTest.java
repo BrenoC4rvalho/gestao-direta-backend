@@ -813,6 +813,73 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldCompareTwoHarvestSeasonsUsingExistingFinancialSummaries() {
+        Farm farm = saveFarm("Farm");
+        ProductionActivity activity = saveActivity(farm, "Soy");
+        FinancialCategory expense = saveCategory(farm, "Inputs", TransactionType.EXPENSE);
+        FinancialCategory income = saveCategory(farm, "Sales", TransactionType.INCOME);
+        HarvestSeason first = saveSeason(farm, activity, null, null, "10", "Safra A");
+        HarvestSeason second = saveSeason(farm, activity, null, null, "20", "Safra B");
+        User user = saveUser();
+
+        harvestSeasonBudgetItemService.create(
+                first.getId(),
+                budgetItemRequest(expense.getId(), TransactionType.EXPENSE, "Input", "100"));
+        harvestSeasonBudgetItemService.create(
+                first.getId(),
+                budgetItemRequest(income.getId(), TransactionType.INCOME, "Sale", "200"));
+        harvestSeasonBudgetItemService.create(
+                second.getId(),
+                budgetItemRequest(expense.getId(), TransactionType.EXPENSE, "Input", "150"));
+        harvestSeasonBudgetItemService.create(
+                second.getId(),
+                budgetItemRequest(income.getId(), TransactionType.INCOME, "Sale", "300"));
+        saveTransaction(farm, user, first, TransactionType.EXPENSE, PaymentStatus.PAID, "40");
+        saveTransaction(farm, user, first, TransactionType.INCOME, PaymentStatus.PAID, "80");
+        saveTransaction(farm, user, second, TransactionType.EXPENSE, PaymentStatus.PAID, "70");
+        saveTransaction(farm, user, second, TransactionType.INCOME, PaymentStatus.PAID, "140");
+
+        var comparison = harvestSeasonService.compare(farm.getId(), first.getId(), second.getId());
+
+        assertThat(comparison.harvestA().planning().plannedCost()).isEqualByComparingTo("100");
+        assertThat(comparison.harvestB().planning().plannedCost()).isEqualByComparingTo("150");
+        assertThat(comparison.harvestB().perHectare().plannedCostPerHectare())
+                .isEqualByComparingTo("7.50");
+        assertThat(comparison.differences())
+                .anySatisfy(
+                        difference -> {
+                            assertThat(difference.metric().name()).isEqualTo("PLANNED_COST");
+                            assertThat(difference.difference()).isEqualByComparingTo("50");
+                            assertThat(difference.percentageDifference())
+                                    .isEqualByComparingTo("50.00");
+                            assertThat(difference.semantic().name()).isEqualTo("WORSE");
+                        });
+    }
+
+    @Test
+    void shouldRejectComparisonForDifferentOrEqualHarvestSeasons() {
+        Farm farm = saveFarm("Farm");
+        Farm otherFarm = saveFarm("Other farm");
+        ProductionActivity activity = saveActivity(farm, "Soy");
+        ProductionActivity otherActivity = saveActivity(otherFarm, "Corn");
+        HarvestSeason season = saveSeason(farm, activity, null, null, null, "Safra A");
+        HarvestSeason otherSeason =
+                saveSeason(otherFarm, otherActivity, null, null, null, "Safra B");
+
+        assertThatThrownBy(
+                        () ->
+                                harvestSeasonService.compare(
+                                        farm.getId(), season.getId(), season.getId()))
+                .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(
+                        () ->
+                                harvestSeasonService.compare(
+                                        farm.getId(), season.getId(), otherSeason.getId()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Harvest seasons must belong to the selected farm.");
+    }
+
+    @Test
     void shouldReturnOnlyThreeMostRecentInProgressDashboardSeasons() {
         Farm farm = saveFarm("Farm");
         ProductionActivity activity = saveActivity(farm, "Coffee");
