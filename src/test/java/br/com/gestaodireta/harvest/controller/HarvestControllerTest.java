@@ -1170,7 +1170,8 @@ class HarvestControllerTest extends PostgresIntegrationTest {
                                 .with(user(String.valueOf(admin.getId())).roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.harvestA.id").value(first.getId()))
-                .andExpect(jsonPath("$.harvestB.id").value(second.getId()));
+                .andExpect(jsonPath("$.harvestB.id").value(second.getId()))
+                .andExpect(jsonPath("$.bestMetrics").isArray());
     }
 
     @Test

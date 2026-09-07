@@ -21,6 +21,7 @@ import br.com.gestaodireta.harvest.dto.HarvestCategoryMovementsResponse;
 import br.com.gestaodireta.harvest.dto.HarvestPlanningSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestProjectionSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestRealizedSummaryResponse;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonComparisonBestResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonComparisonDifferenceResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonComparisonHarvestResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonComparisonResponse;
@@ -36,6 +37,7 @@ import br.com.gestaodireta.harvest.entity.HarvestSeason;
 import br.com.gestaodireta.harvest.entity.ProductionActivity;
 import br.com.gestaodireta.harvest.enumeration.ComparisonSemantic;
 import br.com.gestaodireta.harvest.enumeration.HarvestCategoryComparisonStatus;
+import br.com.gestaodireta.harvest.enumeration.HarvestSeasonComparisonDirection;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonComparisonMetric;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
 import br.com.gestaodireta.harvest.enumeration.ProductionActivityStatus;
@@ -319,7 +321,8 @@ public class HarvestSeasonService {
                                                 Comparator.comparing(BigDecimal::abs))
                                         .reversed())
                         .limit(3)
-                        .toList());
+                        .toList(),
+                bestMetrics(harvestSeasonA, harvestSeasonB, harvestA, harvestB, differences));
     }
 
     private HarvestSeasonDetailSummaryResponse buildDetailSummary(HarvestSeason harvestSeason) {
@@ -791,6 +794,53 @@ public class HarvestSeasonService {
                         harvestB,
                         harvest -> harvest.perHectare().realizedProfitPerHectare(),
                         false));
+    }
+
+    private List<HarvestSeasonComparisonBestResponse> bestMetrics(
+            HarvestSeason harvestSeasonA,
+            HarvestSeason harvestSeasonB,
+            HarvestSeasonComparisonHarvestResponse harvestA,
+            HarvestSeasonComparisonHarvestResponse harvestB,
+            List<HarvestSeasonComparisonDifferenceResponse> differences) {
+        if (!harvestSeasonA
+                .getProductionActivity()
+                .getId()
+                .equals(harvestSeasonB.getProductionActivity().getId())) {
+            return List.of();
+        }
+
+        return differences.stream()
+                .filter(difference -> difference.difference() != null)
+                .filter(
+                        difference ->
+                                difference.metric().direction()
+                                        != HarvestSeasonComparisonDirection.NO_COMPARISON)
+                .map(
+                        difference ->
+                                new HarvestSeasonComparisonBestResponse(
+                                        difference.metric(),
+                                        bestHarvestSeasonIds(
+                                                difference, harvestA.id(), harvestB.id())))
+                .toList();
+    }
+
+    private List<Long> bestHarvestSeasonIds(
+            HarvestSeasonComparisonDifferenceResponse difference,
+            Long harvestAId,
+            Long harvestBId) {
+        int comparison = difference.difference().compareTo(BigDecimal.ZERO);
+        if (comparison == 0) {
+            return List.of(harvestAId, harvestBId);
+        }
+
+        boolean harvestBIsBest =
+                (comparison > 0
+                                && difference.metric().direction()
+                                        == HarvestSeasonComparisonDirection.HIGHER_IS_BETTER)
+                        || (comparison < 0
+                                && difference.metric().direction()
+                                        == HarvestSeasonComparisonDirection.LOWER_IS_BETTER);
+        return List.of(harvestBIsBest ? harvestBId : harvestAId);
     }
 
     private HarvestSeasonComparisonDifferenceResponse comparisonDifference(

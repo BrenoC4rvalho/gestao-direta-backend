@@ -18,6 +18,7 @@ import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
 import br.com.gestaodireta.harvest.repository.HarvestSeasonRepository;
+import br.com.gestaodireta.shared.pdf.PdfReportStyle;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.text.NumberFormat;
@@ -33,10 +34,8 @@ import org.openpdf.text.FontFactory;
 import org.openpdf.text.PageSize;
 import org.openpdf.text.Paragraph;
 import org.openpdf.text.Phrase;
-import org.openpdf.text.pdf.PdfContentByte;
 import org.openpdf.text.pdf.PdfPCell;
 import org.openpdf.text.pdf.PdfPTable;
-import org.openpdf.text.pdf.PdfPageEventHelper;
 import org.openpdf.text.pdf.PdfWriter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,13 +47,13 @@ public class FinancialReportExportService {
 
     private static final int CATEGORY_LIMIT = 10;
 
-    private static final java.awt.Color PRIMARY_COLOR = new java.awt.Color(28, 100, 69);
+    private static final java.awt.Color PRIMARY_COLOR = PdfReportStyle.PRIMARY_COLOR;
 
     private static final java.awt.Color INCOME_COLOR = new java.awt.Color(22, 130, 75);
 
     private static final java.awt.Color EXPENSE_COLOR = new java.awt.Color(183, 48, 48);
 
-    private static final java.awt.Color MUTED_COLOR = new java.awt.Color(88, 99, 112);
+    private static final java.awt.Color MUTED_COLOR = PdfReportStyle.MUTED_COLOR;
 
     private static final DateTimeFormatter DATE_FORMATTER =
             DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -102,7 +101,7 @@ public class FinancialReportExportService {
             Document document = new Document(PageSize.A4, 36, 36, 36, 42);
             PdfWriter writer = PdfWriter.getInstance(document, output);
             writer.setPdfVersion(PdfWriter.PDF_VERSION_1_7);
-            writer.setPageEvent(new ReportFooter());
+            writer.setPageEvent(PdfReportStyle.footer("Relatório Financeiro"));
             document.addTitle("Relatório Financeiro");
             document.addAuthor("Gestão Direta");
             document.open();
@@ -430,7 +429,7 @@ public class FinancialReportExportService {
     private void addMetric(PdfPTable table, String label, String value, java.awt.Color color) {
         PdfPCell cell = new PdfPCell();
         cell.setPadding(8);
-        cell.setBorderColor(new java.awt.Color(220, 225, 220));
+        cell.setBorderColor(PdfReportStyle.BORDER_COLOR);
         cell.addElement(new Paragraph(label, bodyFont(8)));
         cell.addElement(new Paragraph(value, valueFont(color)));
         table.addCell(cell);
@@ -459,7 +458,7 @@ public class FinancialReportExportService {
         cell.setHorizontalAlignment(alignment);
         cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
         cell.setPadding(5);
-        cell.setBorderColor(new java.awt.Color(220, 225, 220));
+        cell.setBorderColor(PdfReportStyle.BORDER_COLOR);
         if (background != null) {
             cell.setBackgroundColor(background);
         }
@@ -576,25 +575,4 @@ public class FinancialReportExportService {
             String farmName,
             List<String> categoryNames,
             List<String> harvestNames) {}
-
-    private static class ReportFooter extends PdfPageEventHelper {
-
-        @Override
-        public void onEndPage(PdfWriter writer, Document document) {
-            PdfContentByte canvas = writer.getDirectContent();
-            org.openpdf.text.Font font = FontFactory.getFont(FontFactory.HELVETICA, 8, MUTED_COLOR);
-            Phrase footer =
-                    new Phrase(
-                            "Gestão Direta · Relatório Financeiro · Página "
-                                    + writer.getPageNumber(),
-                            font);
-            org.openpdf.text.pdf.ColumnText.showTextAligned(
-                    canvas,
-                    Element.ALIGN_CENTER,
-                    footer,
-                    (document.left() + document.right()) / 2,
-                    22,
-                    0);
-        }
-    }
 }

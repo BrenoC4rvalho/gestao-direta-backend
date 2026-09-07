@@ -29,6 +29,7 @@ import br.com.gestaodireta.harvest.entity.HarvestSeasonBudgetItem;
 import br.com.gestaodireta.harvest.entity.ProductionActivity;
 import br.com.gestaodireta.harvest.enumeration.ComparisonSemantic;
 import br.com.gestaodireta.harvest.enumeration.HarvestCategoryComparisonStatus;
+import br.com.gestaodireta.harvest.enumeration.HarvestSeasonComparisonMetric;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
 import br.com.gestaodireta.harvest.enumeration.ProductionActivityStatus;
 import br.com.gestaodireta.harvest.repository.HarvestSeasonBudgetItemRepository;
@@ -1088,6 +1089,15 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
                                     .isEqualByComparingTo("50.00");
                             assertThat(difference.semantic().name()).isEqualTo("WORSE");
                         });
+        assertThat(comparison.bestMetrics())
+                .anySatisfy(
+                        best -> {
+                            assertThat(best.metric())
+                                    .isEqualTo(
+                                            HarvestSeasonComparisonMetric.PLANNED_COST_PER_HECTARE);
+                            assertThat(best.harvestSeasonIds()).containsExactly(second.getId());
+                        })
+                .noneMatch(best -> best.metric() == HarvestSeasonComparisonMetric.PLANNED_COST);
     }
 
     @Test

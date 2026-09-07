@@ -6,6 +6,7 @@ import br.com.gestaodireta.harvest.dto.HarvestCategoryMovementsResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonBudgetItemRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonBudgetItemResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonBudgetResponse;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonComparisonExportFile;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonComparisonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonDetailSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonFinancialSummaryResponse;
@@ -16,6 +17,7 @@ import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryListResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonUpdateRequest;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
 import br.com.gestaodireta.harvest.service.HarvestSeasonBudgetItemService;
+import br.com.gestaodireta.harvest.service.HarvestSeasonComparisonExportService;
 import br.com.gestaodireta.harvest.service.HarvestSeasonService;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
@@ -23,7 +25,9 @@ import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -45,12 +49,15 @@ public class HarvestSeasonController {
     private final HarvestSeasonService harvestSeasonService;
 
     private final HarvestSeasonBudgetItemService harvestSeasonBudgetItemService;
+    private final HarvestSeasonComparisonExportService harvestSeasonComparisonExportService;
 
     public HarvestSeasonController(
             HarvestSeasonService harvestSeasonService,
-            HarvestSeasonBudgetItemService harvestSeasonBudgetItemService) {
+            HarvestSeasonBudgetItemService harvestSeasonBudgetItemService,
+            HarvestSeasonComparisonExportService harvestSeasonComparisonExportService) {
         this.harvestSeasonService = harvestSeasonService;
         this.harvestSeasonBudgetItemService = harvestSeasonBudgetItemService;
+        this.harvestSeasonComparisonExportService = harvestSeasonComparisonExportService;
     }
 
     @PostMapping
@@ -143,6 +150,23 @@ public class HarvestSeasonController {
             @RequestParam Long harvestSeasonIdA,
             @RequestParam Long harvestSeasonIdB) {
         return harvestSeasonService.compare(farmId, harvestSeasonIdA, harvestSeasonIdB);
+    }
+
+    @GetMapping("/compare/export/pdf")
+    @PreAuthorize("@harvestAccess.canViewSeasons(#farmId)")
+    public ResponseEntity<byte[]> exportComparisonPdf(
+            @RequestParam Long farmId,
+            @RequestParam Long harvestSeasonIdA,
+            @RequestParam Long harvestSeasonIdB) {
+        HarvestSeasonComparisonExportFile file =
+                harvestSeasonComparisonExportService.exportPdf(
+                        farmId, harvestSeasonIdA, harvestSeasonIdB);
+        return ResponseEntity.ok()
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + file.filename() + "\"")
+                .header(HttpHeaders.CONTENT_TYPE, file.contentType())
+                .body(file.content());
     }
 
     @GetMapping("/{id}")

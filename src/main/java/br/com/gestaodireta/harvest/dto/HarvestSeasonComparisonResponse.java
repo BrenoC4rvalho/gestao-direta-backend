@@ -6,4 +6,5 @@ public record HarvestSeasonComparisonResponse(
         HarvestSeasonComparisonHarvestResponse harvestA,
         HarvestSeasonComparisonHarvestResponse harvestB,
         List<HarvestSeasonComparisonDifferenceResponse> differences,
-        List<HarvestSeasonComparisonDifferenceResponse> highlights) {}
+        List<HarvestSeasonComparisonDifferenceResponse> highlights,
+        List<HarvestSeasonComparisonBestResponse> bestMetrics) {}
