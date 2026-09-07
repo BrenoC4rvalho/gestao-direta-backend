@@ -339,6 +339,27 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
 
     @Query(
             """
+            select
+              category.id as categoryId,
+              category.name as categoryName,
+              sum(transaction.amount) as amount
+            from FinancialTransaction transaction
+            left join transaction.category category
+            where transaction.farm.id = :farmId
+              and transaction.harvestSeason.id = :harvestSeasonId
+              and transaction.recordStatus = br.com.gestaodireta.financial.enumeration.FinancialRecordStatus.ACTIVE
+              and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PAID
+              and transaction.type = :type
+            group by category.id, category.name
+            order by sum(transaction.amount) desc, category.name asc
+            """)
+    List<HarvestSeasonCategoryAmountProjection> summarizeHarvestSeasonAmountsByCategory(
+            @Param("farmId") Long farmId,
+            @Param("harvestSeasonId") Long harvestSeasonId,
+            @Param("type") TransactionType type);
+
+    @Query(
+            """
             select transaction
             from FinancialTransaction transaction
             where transaction.farm.id = :farmId

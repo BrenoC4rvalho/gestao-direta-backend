@@ -965,6 +965,41 @@ class HarvestControllerTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldProtectAndReturnHarvestSeasonCategoryBreakdown() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        ProductionActivity activity = saveActivity("Soja", ProductionActivityStatus.ACTIVE);
+        User accountant = saveUser("Accountant", "accountant-breakdown@example.com", UserType.USER);
+        User unlinked = saveUser("Unlinked", "unlinked-breakdown@example.com", UserType.USER);
+        saveFarmUser(farm, accountant, FarmUserRole.ACCOUNTANT);
+        HarvestSeason season =
+                saveSeason(farm, activity, "Safra Soja", HarvestSeasonStatus.IN_PROGRESS);
+        saveTransaction(
+                farm, accountant, season, TransactionType.EXPENSE, PaymentStatus.PAID, "120.00");
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/{id}/category-breakdown", season.getId())
+                                .contextPath(CONTEXT_PATH))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/{id}/category-breakdown", season.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(unlinked.getId())).roles("USER")))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/{id}/category-breakdown", season.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(accountant.getId())).roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.expenses.total").value(120.00))
+                .andExpect(jsonPath("$.expenses.categories[0].categoryId").doesNotExist())
+                .andExpect(jsonPath("$.expenses.categories[0].categoryName").value("Sem categoria"))
+                .andExpect(jsonPath("$.expenses.categories[0].percentage").value(100.00))
+                .andExpect(jsonPath("$.incomes.total").value(0));
+    }
+
+    @Test
     void shouldInactivateHarvestSeasonAndDenyCommonUserUpdate() throws Exception {
         Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
         ProductionActivity activity = saveActivity("Soja", ProductionActivityStatus.ACTIVE);

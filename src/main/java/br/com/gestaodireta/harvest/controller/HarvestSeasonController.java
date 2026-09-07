@@ -1,6 +1,7 @@
 package br.com.gestaodireta.harvest.controller;
 
 import br.com.gestaodireta.harvest.dto.DashboardHarvestSeasonResponse;
+import br.com.gestaodireta.harvest.dto.HarvestCategoryMovementsResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonBudgetItemRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonBudgetItemResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonBudgetResponse;
@@ -153,6 +154,12 @@ public class HarvestSeasonController {
     @PreAuthorize("@harvestAccess.canViewSeason(#id)")
     public HarvestSeasonDetailSummaryResponse getSummary(@PathVariable Long id) {
         return harvestSeasonService.getSummary(id);
+    }
+
+    @GetMapping("/{id}/category-breakdown")
+    @PreAuthorize("@harvestAccess.canViewSeason(#id)")
+    public HarvestCategoryMovementsResponse getCategoryBreakdown(@PathVariable Long id) {
+        return harvestSeasonService.getCategoryBreakdown(id);
     }
 
     @GetMapping("/{id}/budget-items")

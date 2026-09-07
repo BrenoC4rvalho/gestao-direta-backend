@@ -15,6 +15,7 @@ import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
+import br.com.gestaodireta.harvest.dto.HarvestCategoryMovementsResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonBudgetItemRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonDetailSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonFinancialSummaryResponse;
@@ -838,6 +839,105 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldBreakDownRealizedMovementsByCategoryForHarvestSeason() {
+        Farm farm = saveFarm("Farm");
+        Farm otherFarm = saveFarm("Other farm");
+        ProductionActivity activity = saveActivity(farm, "Soy");
+        ProductionActivity otherActivity = saveActivity(otherFarm, "Corn");
+        HarvestSeason season = saveSeason(farm, activity, null, null, null, "Safra A");
+        HarvestSeason otherSeason =
+                saveSeason(otherFarm, otherActivity, null, null, null, "Safra B");
+        HarvestSeason anotherSeason = saveSeason(farm, activity, null, null, null, "Safra C");
+        FinancialCategory diesel = saveCategory(farm, "Diesel", TransactionType.EXPENSE);
+        FinancialCategory fertilizer = saveCategory(farm, "Fertilizantes", TransactionType.EXPENSE);
+        FinancialCategory sales = saveCategory(farm, "Vendas", TransactionType.INCOME);
+        User user = saveUser();
+
+        saveTransactionWithCategory(
+                farm, user, season, diesel, TransactionType.EXPENSE, PaymentStatus.PAID, "40");
+        saveTransactionWithCategory(
+                farm, user, season, diesel, TransactionType.EXPENSE, PaymentStatus.PAID, "60");
+        saveTransactionWithCategory(
+                farm, user, season, fertilizer, TransactionType.EXPENSE, PaymentStatus.PAID, "100");
+        saveTransaction(farm, user, season, TransactionType.EXPENSE, PaymentStatus.PAID, "50");
+        saveTransactionWithCategory(
+                farm, user, season, sales, TransactionType.INCOME, PaymentStatus.PAID, "300");
+        saveTransactionWithCategory(
+                farm, user, season, diesel, TransactionType.EXPENSE, PaymentStatus.PENDING, "500");
+        FinancialTransaction inactiveTransaction =
+                saveTransactionWithCategory(
+                        farm,
+                        user,
+                        season,
+                        diesel,
+                        TransactionType.EXPENSE,
+                        PaymentStatus.PAID,
+                        "1000");
+        inactiveTransaction.setRecordStatus(FinancialRecordStatus.DELETED);
+        financialTransactionRepository.save(inactiveTransaction);
+        saveTransactionWithCategory(
+                farm,
+                user,
+                anotherSeason,
+                diesel,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                "2000");
+        saveTransactionWithCategory(
+                otherFarm,
+                user,
+                otherSeason,
+                diesel,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                "3000");
+
+        HarvestCategoryMovementsResponse response =
+                harvestSeasonService.getCategoryBreakdown(season.getId());
+        HarvestSeasonDetailSummaryResponse summary =
+                harvestSeasonService.getSummary(season.getId());
+
+        assertThat(response.expenses().total()).isEqualByComparingTo("250.00");
+        assertThat(response.expenses().categories())
+                .extracting(category -> category.categoryName())
+                .containsExactly("Diesel", "Fertilizantes", "Sem categoria");
+        assertThat(response.expenses().categories())
+                .extracting(category -> category.amount())
+                .containsExactly(
+                        new BigDecimal("100.00"),
+                        new BigDecimal("100.00"),
+                        new BigDecimal("50.00"));
+        assertThat(response.expenses().categories())
+                .extracting(category -> category.percentage())
+                .containsExactly(
+                        new BigDecimal("40.00"), new BigDecimal("40.00"), new BigDecimal("20.00"));
+        assertThat(response.expenses().categories().getLast().categoryId()).isNull();
+        assertThat(response.incomes().total()).isEqualByComparingTo("300.00");
+        assertThat(response.incomes().categories())
+                .extracting(category -> category.categoryName())
+                .containsExactly("Vendas");
+        assertThat(response.incomes().categories().getFirst().percentage())
+                .isEqualByComparingTo("100.00");
+        assertThat(response.expenses().total()).isEqualByComparingTo(summary.realizedCost());
+        assertThat(response.incomes().total()).isEqualByComparingTo(summary.realizedRevenue());
+    }
+
+    @Test
+    void shouldReturnZeroTotalsAndNoCategoriesWhenHarvestHasNoPaidMovements() {
+        Farm farm = saveFarm("Farm");
+        ProductionActivity activity = saveActivity(farm, "Soy");
+        HarvestSeason season = saveSeason(farm, activity, null, null, null, "Safra A");
+
+        HarvestCategoryMovementsResponse response =
+                harvestSeasonService.getCategoryBreakdown(season.getId());
+
+        assertThat(response.expenses().total()).isEqualByComparingTo("0.00");
+        assertThat(response.expenses().categories()).isEmpty();
+        assertThat(response.incomes().total()).isEqualByComparingTo("0.00");
+        assertThat(response.incomes().categories()).isEmpty();
+    }
+
+    @Test
     void shouldCompareTwoHarvestSeasonsUsingExistingFinancialSummaries() {
         Farm farm = saveFarm("Farm");
         ProductionActivity activity = saveActivity(farm, "Soy");
@@ -1061,6 +1161,21 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         transaction.setHarvestSeason(harvestSeason);
         transaction.setCreatedByUser(user);
         transaction.setRecordStatus(FinancialRecordStatus.ACTIVE);
+
+        return financialTransactionRepository.save(transaction);
+    }
+
+    private FinancialTransaction saveTransactionWithCategory(
+            Farm farm,
+            User user,
+            HarvestSeason harvestSeason,
+            FinancialCategory category,
+            TransactionType type,
+            PaymentStatus status,
+            String amount) {
+        FinancialTransaction transaction =
+                saveTransaction(farm, user, harvestSeason, type, status, amount);
+        transaction.setCategory(category);
 
         return financialTransactionRepository.save(transaction);
     }

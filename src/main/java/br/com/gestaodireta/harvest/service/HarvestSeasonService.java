@@ -7,10 +7,14 @@ import br.com.gestaodireta.financial.entity.FinancialTransaction;
 import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
+import br.com.gestaodireta.financial.repository.HarvestSeasonCategoryAmountProjection;
 import br.com.gestaodireta.financial.repository.HarvestSeasonFinancialTotalsProjection;
 import br.com.gestaodireta.harvest.dto.DashboardHarvestFinancialValuesResponse;
 import br.com.gestaodireta.harvest.dto.DashboardHarvestSeasonResponse;
 import br.com.gestaodireta.harvest.dto.FinancialAmountCountResponse;
+import br.com.gestaodireta.harvest.dto.HarvestCategoryAmountResponse;
+import br.com.gestaodireta.harvest.dto.HarvestCategoryBreakdownResponse;
+import br.com.gestaodireta.harvest.dto.HarvestCategoryMovementsResponse;
 import br.com.gestaodireta.harvest.dto.HarvestPlanningSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestProjectionSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestRealizedSummaryResponse;
@@ -258,6 +262,16 @@ public class HarvestSeasonService {
     }
 
     @Transactional(readOnly = true)
+    public HarvestCategoryMovementsResponse getCategoryBreakdown(Long id) {
+        HarvestSeason harvestSeason = findEntityById(id);
+        Long farmId = harvestSeason.getFarm().getId();
+
+        return new HarvestCategoryMovementsResponse(
+                categoryBreakdown(farmId, id, TransactionType.EXPENSE),
+                categoryBreakdown(farmId, id, TransactionType.INCOME));
+    }
+
+    @Transactional(readOnly = true)
     public HarvestSeasonComparisonResponse compare(
             Long farmId, Long harvestSeasonIdA, Long harvestSeasonIdB) {
         if (harvestSeasonIdA.equals(harvestSeasonIdB)) {
@@ -330,6 +344,42 @@ public class HarvestSeasonService {
                 zeroIfNull(totals.getTransactionCount()),
                 zeroIfNull(totals.getIncomeCount()),
                 zeroIfNull(totals.getExpenseCount()));
+    }
+
+    private HarvestCategoryBreakdownResponse categoryBreakdown(
+            Long farmId, Long harvestSeasonId, TransactionType type) {
+        List<HarvestSeasonCategoryAmountProjection> projections =
+                financialTransactionRepository.summarizeHarvestSeasonAmountsByCategory(
+                        farmId, harvestSeasonId, type);
+        BigDecimal total =
+                projections.stream()
+                        .map(HarvestSeasonCategoryAmountProjection::getAmount)
+                        .map(this::zeroIfNull)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        List<HarvestCategoryAmountResponse> categories =
+                projections.stream()
+                        .map(
+                                projection ->
+                                        new HarvestCategoryAmountResponse(
+                                                projection.getCategoryId(),
+                                                projection.getCategoryName() == null
+                                                        ? "Sem categoria"
+                                                        : projection.getCategoryName(),
+                                                zeroIfNull(projection.getAmount()),
+                                                percentageOf(
+                                                        zeroIfNull(projection.getAmount()), total)))
+                        .toList();
+
+        return new HarvestCategoryBreakdownResponse(total, categories);
+    }
+
+    private BigDecimal percentageOf(BigDecimal amount, BigDecimal total) {
+        if (total.compareTo(BigDecimal.ZERO) == 0) {
+            return BigDecimal.ZERO.setScale(2);
+        }
+
+        return amount.multiply(BigDecimal.valueOf(100)).divide(total, 2, RoundingMode.HALF_UP);
     }
 
     private boolean hasPlanning(HarvestSeason harvestSeason) {
