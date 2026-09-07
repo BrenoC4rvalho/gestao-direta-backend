@@ -14,6 +14,9 @@ import br.com.gestaodireta.harvest.dto.DashboardHarvestSeasonResponse;
 import br.com.gestaodireta.harvest.dto.FinancialAmountCountResponse;
 import br.com.gestaodireta.harvest.dto.HarvestCategoryAmountResponse;
 import br.com.gestaodireta.harvest.dto.HarvestCategoryBreakdownResponse;
+import br.com.gestaodireta.harvest.dto.HarvestCategoryComparisonBreakdownResponse;
+import br.com.gestaodireta.harvest.dto.HarvestCategoryComparisonCategoryResponse;
+import br.com.gestaodireta.harvest.dto.HarvestCategoryComparisonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestCategoryMovementsResponse;
 import br.com.gestaodireta.harvest.dto.HarvestPlanningSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestProjectionSummaryResponse;
@@ -32,6 +35,7 @@ import br.com.gestaodireta.harvest.dto.HarvestSeasonUpdateRequest;
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
 import br.com.gestaodireta.harvest.entity.ProductionActivity;
 import br.com.gestaodireta.harvest.enumeration.ComparisonSemantic;
+import br.com.gestaodireta.harvest.enumeration.HarvestCategoryComparisonStatus;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonComparisonMetric;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
 import br.com.gestaodireta.harvest.enumeration.ProductionActivityStatus;
@@ -49,8 +53,10 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -272,6 +278,16 @@ public class HarvestSeasonService {
     }
 
     @Transactional(readOnly = true)
+    public HarvestCategoryComparisonResponse getCategoryComparison(Long id) {
+        HarvestSeason harvestSeason = findEntityById(id);
+        Long farmId = harvestSeason.getFarm().getId();
+
+        return new HarvestCategoryComparisonResponse(
+                categoryComparison(farmId, harvestSeason, TransactionType.EXPENSE),
+                categoryComparison(farmId, harvestSeason, TransactionType.INCOME));
+    }
+
+    @Transactional(readOnly = true)
     public HarvestSeasonComparisonResponse compare(
             Long farmId, Long harvestSeasonIdA, Long harvestSeasonIdB) {
         if (harvestSeasonIdA.equals(harvestSeasonIdB)) {
@@ -374,12 +390,191 @@ public class HarvestSeasonService {
         return new HarvestCategoryBreakdownResponse(total, categories);
     }
 
+    private HarvestCategoryComparisonBreakdownResponse categoryComparison(
+            Long farmId, HarvestSeason harvestSeason, TransactionType type) {
+        Map<Long, CategoryComparisonAmount> plannedAmounts =
+                plannedAmountsByCategory(harvestSeason, type);
+        Map<Long, CategoryComparisonAmount> realizedAmounts =
+                realizedAmountsByCategory(farmId, harvestSeason.getId(), type);
+        Map<Long, CategoryComparisonAmount> categoriesById = new HashMap<>(plannedAmounts);
+        realizedAmounts.forEach(
+                (categoryId, realized) ->
+                        categoriesById.merge(
+                                categoryId, realized, CategoryComparisonAmount::withRealized));
+
+        List<HarvestCategoryComparisonCategoryResponse> categories =
+                categoriesById.values().stream()
+                        .map(amount -> categoryComparisonCategory(amount, type))
+                        .sorted(
+                                Comparator.comparing(
+                                                HarvestCategoryComparisonCategoryResponse
+                                                        ::realizedAmount)
+                                        .reversed()
+                                        .thenComparing(
+                                                HarvestCategoryComparisonCategoryResponse
+                                                        ::plannedAmount,
+                                                Comparator.nullsLast(Comparator.reverseOrder()))
+                                        .thenComparing(
+                                                HarvestCategoryComparisonCategoryResponse
+                                                        ::categoryName,
+                                                String.CASE_INSENSITIVE_ORDER))
+                        .toList();
+        BigDecimal plannedTotal =
+                categories.stream()
+                        .filter(HarvestCategoryComparisonCategoryResponse::planned)
+                        .map(HarvestCategoryComparisonCategoryResponse::plannedAmount)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal realizedTotal =
+                categories.stream()
+                        .map(HarvestCategoryComparisonCategoryResponse::realizedAmount)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return new HarvestCategoryComparisonBreakdownResponse(
+                plannedTotal, realizedTotal, realizedTotal.subtract(plannedTotal), categories);
+    }
+
+    private Map<Long, CategoryComparisonAmount> plannedAmountsByCategory(
+            HarvestSeason harvestSeason, TransactionType type) {
+        Map<Long, CategoryComparisonAmount> amounts = new HashMap<>();
+        harvestSeasonBudgetItemRepository.findAllByHarvestSeasonId(harvestSeason.getId()).stream()
+                .filter(item -> type.equals(item.getType()))
+                .forEach(
+                        item -> {
+                            Long categoryId =
+                                    item.getCategory() == null ? null : item.getCategory().getId();
+                            String categoryName =
+                                    item.getCategory() == null
+                                            ? "Sem categoria"
+                                            : item.getCategory().getName();
+                            amounts.merge(
+                                    categoryId,
+                                    CategoryComparisonAmount.planned(
+                                            categoryId, categoryName, item.getPlannedAmount()),
+                                    CategoryComparisonAmount::withPlanned);
+                        });
+        return amounts;
+    }
+
+    private Map<Long, CategoryComparisonAmount> realizedAmountsByCategory(
+            Long farmId, Long harvestSeasonId, TransactionType type) {
+        Map<Long, CategoryComparisonAmount> amounts = new HashMap<>();
+        financialTransactionRepository
+                .summarizeHarvestSeasonAmountsByCategory(farmId, harvestSeasonId, type)
+                .forEach(
+                        projection ->
+                                amounts.put(
+                                        projection.getCategoryId(),
+                                        CategoryComparisonAmount.realized(
+                                                projection.getCategoryId(),
+                                                projection.getCategoryName() == null
+                                                        ? "Sem categoria"
+                                                        : projection.getCategoryName(),
+                                                zeroIfNull(projection.getAmount()))));
+        return amounts;
+    }
+
+    private HarvestCategoryComparisonCategoryResponse categoryComparisonCategory(
+            CategoryComparisonAmount amount, TransactionType type) {
+        BigDecimal realizedAmount = zeroIfNull(amount.realizedAmount());
+        if (!amount.planned()) {
+            return new HarvestCategoryComparisonCategoryResponse(
+                    amount.categoryId(),
+                    amount.categoryName(),
+                    false,
+                    null,
+                    realizedAmount,
+                    realizedAmount,
+                    null,
+                    HarvestCategoryComparisonStatus.UNPLANNED,
+                    type == TransactionType.EXPENSE
+                            ? ComparisonSemantic.WORSE
+                            : ComparisonSemantic.BETTER);
+        }
+
+        BigDecimal plannedAmount = zeroIfNull(amount.plannedAmount());
+        BigDecimal difference = realizedAmount.subtract(plannedAmount);
+        int comparison = realizedAmount.compareTo(plannedAmount);
+        HarvestCategoryComparisonStatus status =
+                categoryComparisonStatus(plannedAmount, realizedAmount, comparison);
+        ComparisonSemantic semantic =
+                status == HarvestCategoryComparisonStatus.NO_MOVEMENT
+                        ? ComparisonSemantic.NEUTRAL
+                        : comparisonSemantic(difference, TransactionType.EXPENSE.equals(type));
+
+        return new HarvestCategoryComparisonCategoryResponse(
+                amount.categoryId(),
+                amount.categoryName(),
+                true,
+                plannedAmount,
+                realizedAmount,
+                difference,
+                percentageDifference(difference, plannedAmount),
+                status,
+                semantic);
+    }
+
+    private HarvestCategoryComparisonStatus categoryComparisonStatus(
+            BigDecimal plannedAmount, BigDecimal realizedAmount, int comparison) {
+        if (plannedAmount.signum() > 0 && realizedAmount.signum() == 0) {
+            return HarvestCategoryComparisonStatus.NO_MOVEMENT;
+        }
+        if (comparison > 0) {
+            return HarvestCategoryComparisonStatus.ABOVE_PLAN;
+        }
+        if (comparison < 0) {
+            return HarvestCategoryComparisonStatus.BELOW_PLAN;
+        }
+        return HarvestCategoryComparisonStatus.ON_PLAN;
+    }
+
     private BigDecimal percentageOf(BigDecimal amount, BigDecimal total) {
         if (total.compareTo(BigDecimal.ZERO) == 0) {
             return BigDecimal.ZERO.setScale(2);
         }
 
         return amount.multiply(BigDecimal.valueOf(100)).divide(total, 2, RoundingMode.HALF_UP);
+    }
+
+    private record CategoryComparisonAmount(
+            Long categoryId,
+            String categoryName,
+            boolean planned,
+            BigDecimal plannedAmount,
+            BigDecimal realizedAmount) {
+
+        static CategoryComparisonAmount planned(
+                Long categoryId, String categoryName, BigDecimal plannedAmount) {
+            return new CategoryComparisonAmount(
+                    categoryId, categoryName, true, plannedAmount, BigDecimal.ZERO);
+        }
+
+        static CategoryComparisonAmount realized(
+                Long categoryId, String categoryName, BigDecimal realizedAmount) {
+            return new CategoryComparisonAmount(
+                    categoryId, categoryName, false, null, realizedAmount);
+        }
+
+        CategoryComparisonAmount withPlanned(CategoryComparisonAmount other) {
+            return new CategoryComparisonAmount(
+                    categoryId,
+                    categoryName,
+                    true,
+                    valueOrZero(plannedAmount).add(valueOrZero(other.plannedAmount)),
+                    valueOrZero(realizedAmount).add(valueOrZero(other.realizedAmount)));
+        }
+
+        CategoryComparisonAmount withRealized(CategoryComparisonAmount other) {
+            return new CategoryComparisonAmount(
+                    categoryId,
+                    categoryName,
+                    planned || other.planned,
+                    planned ? plannedAmount : other.plannedAmount,
+                    valueOrZero(realizedAmount).add(valueOrZero(other.realizedAmount)));
+        }
+
+        private static BigDecimal valueOrZero(BigDecimal value) {
+            return value == null ? BigDecimal.ZERO : value;
+        }
     }
 
     private boolean hasPlanning(HarvestSeason harvestSeason) {

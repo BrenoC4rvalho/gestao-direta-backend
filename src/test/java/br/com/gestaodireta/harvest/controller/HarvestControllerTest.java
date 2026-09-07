@@ -1000,6 +1000,42 @@ class HarvestControllerTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldProtectAndReturnHarvestSeasonCategoryComparison() throws Exception {
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        ProductionActivity activity = saveActivity("Soja", ProductionActivityStatus.ACTIVE);
+        User accountant =
+                saveUser("Accountant", "accountant-comparison@example.com", UserType.USER);
+        User unlinked = saveUser("Unlinked", "unlinked-comparison@example.com", UserType.USER);
+        saveFarmUser(farm, accountant, FarmUserRole.ACCOUNTANT);
+        HarvestSeason season =
+                saveSeason(farm, activity, "Safra Soja", HarvestSeasonStatus.IN_PROGRESS);
+        saveTransaction(
+                farm, accountant, season, TransactionType.EXPENSE, PaymentStatus.PAID, "120.00");
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/{id}/category-comparison", season.getId())
+                                .contextPath(CONTEXT_PATH))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/{id}/category-comparison", season.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(unlinked.getId())).roles("USER")))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        get("/api/harvest/seasons/{id}/category-comparison", season.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(accountant.getId())).roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.expenses.plannedTotal").value(0))
+                .andExpect(jsonPath("$.expenses.realizedTotal").value(120.00))
+                .andExpect(jsonPath("$.expenses.categories[0].planned").value(false))
+                .andExpect(jsonPath("$.expenses.categories[0].status").value("UNPLANNED"))
+                .andExpect(jsonPath("$.expenses.categories[0].semantic").value("WORSE"));
+    }
+
+    @Test
     void shouldInactivateHarvestSeasonAndDenyCommonUserUpdate() throws Exception {
         Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
         ProductionActivity activity = saveActivity("Soja", ProductionActivityStatus.ACTIVE);

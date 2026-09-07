@@ -15,6 +15,7 @@ import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
+import br.com.gestaodireta.harvest.dto.HarvestCategoryComparisonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestCategoryMovementsResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonBudgetItemRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonDetailSummaryResponse;
@@ -26,6 +27,8 @@ import br.com.gestaodireta.harvest.dto.HarvestSeasonUpdateRequest;
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
 import br.com.gestaodireta.harvest.entity.HarvestSeasonBudgetItem;
 import br.com.gestaodireta.harvest.entity.ProductionActivity;
+import br.com.gestaodireta.harvest.enumeration.ComparisonSemantic;
+import br.com.gestaodireta.harvest.enumeration.HarvestCategoryComparisonStatus;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
 import br.com.gestaodireta.harvest.enumeration.ProductionActivityStatus;
 import br.com.gestaodireta.harvest.repository.HarvestSeasonBudgetItemRepository;
@@ -935,6 +938,112 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         assertThat(response.expenses().categories()).isEmpty();
         assertThat(response.incomes().total()).isEqualByComparingTo("0.00");
         assertThat(response.incomes().categories()).isEmpty();
+    }
+
+    @Test
+    void shouldComparePlannedAndRealizedAmountsByCategory() {
+        Farm farm = saveFarm("Farm");
+        Farm otherFarm = saveFarm("Other farm");
+        ProductionActivity activity = saveActivity(farm, "Soy");
+        ProductionActivity otherActivity = saveActivity(otherFarm, "Corn");
+        HarvestSeason season = saveSeason(farm, activity, null, null, null, "Safra A");
+        HarvestSeason otherSeason =
+                saveSeason(otherFarm, otherActivity, null, null, null, "Safra B");
+        FinancialCategory seeds = saveCategory(farm, "Sementes", TransactionType.EXPENSE);
+        FinancialCategory fertilizer = saveCategory(farm, "Fertilizantes", TransactionType.EXPENSE);
+        FinancialCategory fuel = saveCategory(farm, "Combustível", TransactionType.EXPENSE);
+        FinancialCategory sale = saveCategory(farm, "Venda", TransactionType.INCOME);
+        FinancialCategory bonus = saveCategory(farm, "Bônus", TransactionType.INCOME);
+        User user = saveUser();
+
+        harvestSeasonBudgetItemService.create(
+                season.getId(),
+                budgetItemRequest(seeds.getId(), TransactionType.EXPENSE, "A", "10000"));
+        harvestSeasonBudgetItemService.create(
+                season.getId(),
+                budgetItemRequest(seeds.getId(), TransactionType.EXPENSE, "B", "7000"));
+        harvestSeasonBudgetItemService.create(
+                season.getId(),
+                budgetItemRequest(fertilizer.getId(), TransactionType.EXPENSE, "C", "25000"));
+        harvestSeasonBudgetItemService.create(
+                season.getId(),
+                budgetItemRequest(sale.getId(), TransactionType.INCOME, "D", "20000"));
+        saveLegacyBudgetItem(season, TransactionType.EXPENSE, "15000");
+        saveTransactionWithCategory(
+                farm, user, season, seeds, TransactionType.EXPENSE, PaymentStatus.PAID, "26000");
+        saveTransactionWithCategory(
+                farm, user, season, fuel, TransactionType.EXPENSE, PaymentStatus.PAID, "8000");
+        saveTransaction(farm, user, season, TransactionType.EXPENSE, PaymentStatus.PAID, "3000");
+        saveTransactionWithCategory(
+                farm, user, season, sale, TransactionType.INCOME, PaymentStatus.PAID, "15000");
+        saveTransactionWithCategory(
+                farm, user, season, bonus, TransactionType.INCOME, PaymentStatus.PAID, "8000");
+        saveTransactionWithCategory(
+                otherFarm,
+                user,
+                otherSeason,
+                fuel,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                "9000");
+
+        HarvestCategoryComparisonResponse response =
+                harvestSeasonService.getCategoryComparison(season.getId());
+
+        assertThat(response.expenses().plannedTotal()).isEqualByComparingTo("42000.00");
+        assertThat(response.expenses().realizedTotal()).isEqualByComparingTo("37000.00");
+        assertThat(response.expenses().difference()).isEqualByComparingTo("-5000.00");
+        assertThat(response.expenses().categories())
+                .extracting(category -> category.categoryName())
+                .containsExactly("Sementes", "Combustível", "Sem categoria", "Fertilizantes");
+        assertThat(response.expenses().categories().getFirst())
+                .extracting(
+                        category -> category.plannedAmount(),
+                        category -> category.realizedAmount(),
+                        category -> category.difference(),
+                        category -> category.percentageDifference(),
+                        category -> category.status(),
+                        category -> category.semantic())
+                .containsExactly(
+                        new BigDecimal("17000.00"),
+                        new BigDecimal("26000.00"),
+                        new BigDecimal("9000.00"),
+                        new BigDecimal("52.94"),
+                        HarvestCategoryComparisonStatus.ABOVE_PLAN,
+                        ComparisonSemantic.WORSE);
+        assertThat(response.expenses().categories().get(1))
+                .extracting(
+                        category -> category.planned(),
+                        category -> category.plannedAmount(),
+                        category -> category.status(),
+                        category -> category.semantic())
+                .containsExactly(
+                        false,
+                        null,
+                        HarvestCategoryComparisonStatus.UNPLANNED,
+                        ComparisonSemantic.WORSE);
+        assertThat(response.expenses().categories().get(2))
+                .extracting(category -> category.status(), category -> category.semantic())
+                .containsExactly(
+                        HarvestCategoryComparisonStatus.BELOW_PLAN, ComparisonSemantic.BETTER);
+        assertThat(response.expenses().categories().getLast())
+                .extracting(
+                        category -> category.realizedAmount(),
+                        category -> category.status(),
+                        category -> category.semantic())
+                .containsExactly(
+                        BigDecimal.ZERO,
+                        HarvestCategoryComparisonStatus.NO_MOVEMENT,
+                        ComparisonSemantic.NEUTRAL);
+        assertThat(response.incomes().categories())
+                .extracting(category -> category.categoryName())
+                .containsExactly("Venda", "Bônus");
+        assertThat(response.incomes().categories().getFirst().semantic())
+                .isEqualTo(ComparisonSemantic.WORSE);
+        assertThat(response.incomes().categories().getLast())
+                .extracting(category -> category.status(), category -> category.semantic())
+                .containsExactly(
+                        HarvestCategoryComparisonStatus.UNPLANNED, ComparisonSemantic.BETTER);
     }
 
     @Test
