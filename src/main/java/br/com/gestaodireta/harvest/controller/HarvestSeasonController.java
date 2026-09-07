@@ -1,6 +1,9 @@
 package br.com.gestaodireta.harvest.controller;
 
 import br.com.gestaodireta.harvest.dto.DashboardHarvestSeasonResponse;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonBudgetItemRequest;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonBudgetItemResponse;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonBudgetResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonDetailSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonFinancialSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonRequest;
@@ -9,6 +12,7 @@ import br.com.gestaodireta.harvest.dto.HarvestSeasonStatusUpdateRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryListResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonUpdateRequest;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
+import br.com.gestaodireta.harvest.service.HarvestSeasonBudgetItemService;
 import br.com.gestaodireta.harvest.service.HarvestSeasonService;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
@@ -37,8 +41,13 @@ public class HarvestSeasonController {
 
     private final HarvestSeasonService harvestSeasonService;
 
-    public HarvestSeasonController(HarvestSeasonService harvestSeasonService) {
+    private final HarvestSeasonBudgetItemService harvestSeasonBudgetItemService;
+
+    public HarvestSeasonController(
+            HarvestSeasonService harvestSeasonService,
+            HarvestSeasonBudgetItemService harvestSeasonBudgetItemService) {
         this.harvestSeasonService = harvestSeasonService;
+        this.harvestSeasonBudgetItemService = harvestSeasonBudgetItemService;
     }
 
     @PostMapping
@@ -134,6 +143,36 @@ public class HarvestSeasonController {
     @PreAuthorize("@harvestAccess.canViewSeason(#id)")
     public HarvestSeasonDetailSummaryResponse getSummary(@PathVariable Long id) {
         return harvestSeasonService.getSummary(id);
+    }
+
+    @GetMapping("/{id}/budget-items")
+    @PreAuthorize("@harvestAccess.canViewSeason(#id)")
+    public HarvestSeasonBudgetResponse findBudgetItems(@PathVariable Long id) {
+        return harvestSeasonBudgetItemService.findAll(id);
+    }
+
+    @PostMapping("/{id}/budget-items")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("@harvestAccess.canManageSeason(#id)")
+    public HarvestSeasonBudgetItemResponse createBudgetItem(
+            @PathVariable Long id, @Valid @RequestBody HarvestSeasonBudgetItemRequest request) {
+        return harvestSeasonBudgetItemService.create(id, request);
+    }
+
+    @PutMapping("/{id}/budget-items/{itemId}")
+    @PreAuthorize("@harvestAccess.canManageSeason(#id)")
+    public HarvestSeasonBudgetItemResponse updateBudgetItem(
+            @PathVariable Long id,
+            @PathVariable Long itemId,
+            @Valid @RequestBody HarvestSeasonBudgetItemRequest request) {
+        return harvestSeasonBudgetItemService.update(id, itemId, request);
+    }
+
+    @DeleteMapping("/{id}/budget-items/{itemId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("@harvestAccess.canManageSeason(#id)")
+    public void deleteBudgetItem(@PathVariable Long id, @PathVariable Long itemId) {
+        harvestSeasonBudgetItemService.delete(id, itemId);
     }
 
     @PutMapping("/{id}")

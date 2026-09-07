@@ -7,12 +7,15 @@ import br.com.gestaodireta.farm.entity.Farm;
 import br.com.gestaodireta.farm.enumeration.FarmStatus;
 import br.com.gestaodireta.farm.repository.FarmRepository;
 import br.com.gestaodireta.farm.repository.FarmUserRepository;
+import br.com.gestaodireta.financial.entity.FinancialCategory;
 import br.com.gestaodireta.financial.entity.FinancialTransaction;
+import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
 import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
 import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonBudgetItemRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonDetailSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonFinancialSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonRequest;
@@ -20,11 +23,14 @@ import br.com.gestaodireta.harvest.dto.HarvestSeasonStatusUpdateRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryListResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonUpdateRequest;
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
+import br.com.gestaodireta.harvest.entity.HarvestSeasonBudgetItem;
 import br.com.gestaodireta.harvest.entity.ProductionActivity;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
 import br.com.gestaodireta.harvest.enumeration.ProductionActivityStatus;
+import br.com.gestaodireta.harvest.repository.HarvestSeasonBudgetItemRepository;
 import br.com.gestaodireta.harvest.repository.HarvestSeasonRepository;
 import br.com.gestaodireta.harvest.repository.ProductionActivityRepository;
+import br.com.gestaodireta.shared.exception.BusinessException;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
@@ -49,11 +55,15 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
 
     @Autowired private HarvestSeasonService harvestSeasonService;
 
+    @Autowired private HarvestSeasonBudgetItemService harvestSeasonBudgetItemService;
+
     @Autowired private FinancialTransactionRepository financialTransactionRepository;
 
     @Autowired private FinancialCategoryRepository financialCategoryRepository;
 
     @Autowired private HarvestSeasonRepository harvestSeasonRepository;
+
+    @Autowired private HarvestSeasonBudgetItemRepository harvestSeasonBudgetItemRepository;
 
     @Autowired private ProductionActivityRepository productionActivityRepository;
 
@@ -69,6 +79,7 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
     void setUp() {
         SecurityContextHolder.clearContext();
         financialTransactionRepository.deleteAll();
+        harvestSeasonBudgetItemRepository.deleteAll();
         financialCategoryRepository.deleteAll();
         harvestSeasonRepository.deleteAll();
         productionActivityRepository.deleteAll();
@@ -88,6 +99,74 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
 
         assertThat(response.farmId()).isEqualTo(farm.getId());
         assertThat(response.productionActivityId()).isEqualTo(activity.getId());
+    }
+
+    @Test
+    void shouldCreateMultipleBudgetItemsForTheSameCategoryAndCalculateTotals() {
+        Farm farm = saveFarm("Farm");
+        ProductionActivity activity = saveActivity(farm, "Soja");
+        HarvestSeason season = saveSeason(farm, activity, null, null, "10", "Safra");
+        FinancialCategory expenseCategory =
+                saveCategory(farm, "Fertilizantes", TransactionType.EXPENSE);
+        FinancialCategory incomeCategory = saveCategory(farm, "Venda", TransactionType.INCOME);
+
+        harvestSeasonBudgetItemService.create(
+                season.getId(),
+                budgetItemRequest(
+                        expenseCategory.getId(), TransactionType.EXPENSE, "Plantio", "20000"));
+        harvestSeasonBudgetItemService.create(
+                season.getId(),
+                budgetItemRequest(
+                        expenseCategory.getId(), TransactionType.EXPENSE, "Cobertura", "12000"));
+        harvestSeasonBudgetItemService.create(
+                season.getId(),
+                budgetItemRequest(
+                        incomeCategory.getId(), TransactionType.INCOME, "Venda estimada", "80000"));
+
+        var budget = harvestSeasonBudgetItemService.findAll(season.getId());
+
+        assertThat(budget.expenses()).hasSize(1);
+        assertThat(budget.expenses().getFirst().itemCount()).isEqualTo(2);
+        assertThat(budget.plannedExpense()).isEqualByComparingTo("32000");
+        assertThat(budget.plannedRevenue()).isEqualByComparingTo("80000");
+        assertThat(budget.plannedResult()).isEqualByComparingTo("48000");
+        assertThat(budget.plannedMargin()).isEqualByComparingTo("60.00");
+    }
+
+    @Test
+    void shouldRejectBudgetItemCategoryFromAnotherFarmAndFinishedSeasonChanges() {
+        Farm farm = saveFarm("Farm");
+        Farm otherFarm = saveFarm("Other Farm");
+        ProductionActivity activity = saveActivity(farm, "Soja");
+        HarvestSeason season = saveSeason(farm, activity, null, null, "10", "Safra");
+        FinancialCategory otherCategory =
+                saveCategory(otherFarm, "Diesel", TransactionType.EXPENSE);
+
+        assertThatThrownBy(
+                        () ->
+                                harvestSeasonBudgetItemService.create(
+                                        season.getId(),
+                                        budgetItemRequest(
+                                                otherCategory.getId(),
+                                                TransactionType.EXPENSE,
+                                                "Diesel",
+                                                "100")))
+                .isInstanceOf(BusinessException.class);
+
+        season.setStatus(HarvestSeasonStatus.FINISHED);
+        harvestSeasonRepository.save(season);
+        FinancialCategory category = saveCategory(farm, "Insumos", TransactionType.EXPENSE);
+
+        assertThatThrownBy(
+                        () ->
+                                harvestSeasonBudgetItemService.create(
+                                        season.getId(),
+                                        budgetItemRequest(
+                                                category.getId(),
+                                                TransactionType.EXPENSE,
+                                                "Insumos",
+                                                "100")))
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -748,6 +827,21 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         return productionActivityRepository.save(activity);
     }
 
+    private FinancialCategory saveCategory(Farm farm, String name, TransactionType type) {
+        FinancialCategory category = new FinancialCategory();
+        category.setFarm(farm);
+        category.setName(name);
+        category.setType(type);
+        category.setStatus(FinancialCategoryStatus.ACTIVE);
+        return financialCategoryRepository.save(category);
+    }
+
+    private HarvestSeasonBudgetItemRequest budgetItemRequest(
+            Long categoryId, TransactionType type, String description, String amount) {
+        return new HarvestSeasonBudgetItemRequest(
+                categoryId, type, description, toBigDecimal(amount));
+    }
+
     private HarvestSeason saveSeason(
             Farm farm,
             ProductionActivity activity,
@@ -765,7 +859,24 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         season.setAreaHectares(toBigDecimal(areaHectares));
         season.setStatus(HarvestSeasonStatus.PLANNED);
 
-        return harvestSeasonRepository.save(season);
+        HarvestSeason savedSeason = harvestSeasonRepository.save(season);
+        saveLegacyBudgetItem(savedSeason, TransactionType.INCOME, expectedRevenue);
+        saveLegacyBudgetItem(savedSeason, TransactionType.EXPENSE, expectedCost);
+        return savedSeason;
+    }
+
+    private void saveLegacyBudgetItem(
+            HarvestSeason season, TransactionType type, String plannedAmount) {
+        if (plannedAmount == null) {
+            return;
+        }
+
+        HarvestSeasonBudgetItem item = new HarvestSeasonBudgetItem();
+        item.setHarvestSeason(season);
+        item.setType(type);
+        item.setDescription("Planejamento anterior");
+        item.setPlannedAmount(toBigDecimal(plannedAmount));
+        harvestSeasonBudgetItemRepository.save(item);
     }
 
     private HarvestSeasonRequest seasonRequest(Long farmId, Long activityId, String name) {
@@ -776,8 +887,6 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
                 "Season description",
                 LocalDate.of(2026, 1, 1),
                 null,
-                new BigDecimal("1000.00"),
-                new BigDecimal("500.00"),
                 BigDecimal.ZERO);
     }
 
@@ -788,8 +897,6 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
                 "Updated description",
                 LocalDate.of(2026, 1, 1),
                 null,
-                new BigDecimal("1000.00"),
-                new BigDecimal("500.00"),
                 BigDecimal.ZERO);
     }
 

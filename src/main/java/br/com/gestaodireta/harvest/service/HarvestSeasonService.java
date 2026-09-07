@@ -26,6 +26,7 @@ import br.com.gestaodireta.harvest.entity.ProductionActivity;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
 import br.com.gestaodireta.harvest.enumeration.ProductionActivityStatus;
 import br.com.gestaodireta.harvest.mapper.HarvestSeasonMapper;
+import br.com.gestaodireta.harvest.repository.HarvestSeasonBudgetItemRepository;
 import br.com.gestaodireta.harvest.repository.HarvestSeasonRepository;
 import br.com.gestaodireta.harvest.repository.HarvestSeasonSummaryListProjection;
 import br.com.gestaodireta.shared.exception.BusinessException;
@@ -50,6 +51,8 @@ public class HarvestSeasonService {
 
     private final HarvestSeasonRepository harvestSeasonRepository;
 
+    private final HarvestSeasonBudgetItemRepository harvestSeasonBudgetItemRepository;
+
     private final FarmService farmService;
 
     private final FinancialTransactionRepository financialTransactionRepository;
@@ -64,6 +67,7 @@ public class HarvestSeasonService {
 
     public HarvestSeasonService(
             HarvestSeasonRepository harvestSeasonRepository,
+            HarvestSeasonBudgetItemRepository harvestSeasonBudgetItemRepository,
             FarmService farmService,
             FinancialTransactionRepository financialTransactionRepository,
             ProductionActivityService productionActivityService,
@@ -71,6 +75,7 @@ public class HarvestSeasonService {
             HarvestFinancialSummaryCalculator harvestFinancialSummaryCalculator,
             Clock clock) {
         this.harvestSeasonRepository = harvestSeasonRepository;
+        this.harvestSeasonBudgetItemRepository = harvestSeasonBudgetItemRepository;
         this.farmService = farmService;
         this.financialTransactionRepository = financialTransactionRepository;
         this.productionActivityService = productionActivityService;
@@ -93,8 +98,6 @@ public class HarvestSeasonService {
                 request.description(),
                 request.startDate(),
                 request.endDate(),
-                request.expectedRevenue(),
-                request.expectedCost(),
                 request.areaHectares(),
                 null);
         harvestSeason.setStatus(HarvestSeasonStatus.PLANNED);
@@ -199,14 +202,8 @@ public class HarvestSeasonService {
                         normalizeSearch(search));
         HarvestPlanningSummaryResponse planning =
                 harvestFinancialSummaryCalculator.planning(
-                        seasons.stream()
-                                .map(HarvestSeason::getExpectedCost)
-                                .map(this::zeroIfNull)
-                                .reduce(BigDecimal.ZERO, BigDecimal::add),
-                        seasons.stream()
-                                .map(HarvestSeason::getExpectedRevenue)
-                                .map(this::zeroIfNull)
-                                .reduce(BigDecimal.ZERO, BigDecimal::add));
+                        plannedAmount(seasons, TransactionType.EXPENSE),
+                        plannedAmount(seasons, TransactionType.INCOME));
         HarvestSeasonFinancialTotalsProjection totals =
                 financialTransactionRepository.summarizeHarvestSeasonFinancialTotals(
                         farmId,
@@ -253,7 +250,8 @@ public class HarvestSeasonService {
                         harvestSeason.getFarm().getId(), List.of(id), LocalDate.now(clock));
         HarvestPlanningSummaryResponse planning =
                 harvestFinancialSummaryCalculator.planning(
-                        harvestSeason.getExpectedCost(), harvestSeason.getExpectedRevenue());
+                        plannedAmount(List.of(harvestSeason), TransactionType.EXPENSE),
+                        plannedAmount(List.of(harvestSeason), TransactionType.INCOME));
         HarvestRealizedSummaryResponse realized =
                 harvestFinancialSummaryCalculator.realized(totals);
         HarvestProjectionSummaryResponse projection =
@@ -291,8 +289,6 @@ public class HarvestSeasonService {
                 request.description(),
                 request.startDate(),
                 request.endDate(),
-                request.expectedRevenue(),
-                request.expectedCost(),
                 request.areaHectares(),
                 id);
 
@@ -344,8 +340,6 @@ public class HarvestSeasonService {
             String description,
             LocalDate startDate,
             LocalDate endDate,
-            BigDecimal expectedRevenue,
-            BigDecimal expectedCost,
             BigDecimal areaHectares,
             Long ignoredSeasonId) {
         String sanitizedName = sanitizeName(name);
@@ -362,8 +356,6 @@ public class HarvestSeasonService {
         harvestSeason.setDescription(description);
         harvestSeason.setStartDate(startDate);
         harvestSeason.setEndDate(endDate);
-        harvestSeason.setExpectedRevenue(expectedRevenue);
-        harvestSeason.setExpectedCost(expectedCost);
         harvestSeason.setAreaHectares(areaHectares);
     }
 
@@ -491,6 +483,19 @@ public class HarvestSeasonService {
         return transactions.stream()
                 .filter(filter)
                 .map(FinancialTransaction::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal plannedAmount(List<HarvestSeason> seasons, TransactionType type) {
+        if (seasons.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+
+        return harvestSeasonBudgetItemRepository
+                .findAllByHarvestSeasonIdIn(seasons.stream().map(HarvestSeason::getId).toList())
+                .stream()
+                .filter(item -> type.equals(item.getType()))
+                .map(item -> item.getPlannedAmount())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 

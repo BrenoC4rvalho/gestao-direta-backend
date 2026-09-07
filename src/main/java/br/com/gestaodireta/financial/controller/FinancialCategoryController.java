@@ -4,6 +4,7 @@ import br.com.gestaodireta.financial.dto.FinancialCategoryCreateRequest;
 import br.com.gestaodireta.financial.dto.FinancialCategoryResponse;
 import br.com.gestaodireta.financial.dto.FinancialCategoryUpdateRequest;
 import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
+import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.service.FinancialCategoryService;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
@@ -49,9 +50,10 @@ public class FinancialCategoryController {
             @RequestParam(defaultValue = "false") boolean includeInactive,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) FinancialCategoryStatus status,
+            @RequestParam(required = false) TransactionType type,
             @Valid @ModelAttribute PaginationParams paginationParams) {
         return financialCategoryService.findAll(
-                farmId, includeInactive, search, status, paginationParams);
+                farmId, includeInactive, search, status, type, paginationParams);
     }
 
     @GetMapping("/used-in-transactions")

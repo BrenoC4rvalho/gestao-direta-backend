@@ -71,8 +71,18 @@ public interface HarvestSeasonRepository extends JpaRepository<HarvestSeason, Lo
                       season.description as description,
                       season.startDate as startDate,
                       season.endDate as endDate,
-                      season.expectedCost as expectedCost,
-                      season.expectedRevenue as expectedRevenue,
+                      coalesce((
+                        select sum(budgetItem.plannedAmount)
+                        from HarvestSeasonBudgetItem budgetItem
+                        where budgetItem.harvestSeason.id = season.id
+                          and budgetItem.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+                      ), 0) as expectedCost,
+                      coalesce((
+                        select sum(budgetItem.plannedAmount)
+                        from HarvestSeasonBudgetItem budgetItem
+                        where budgetItem.harvestSeason.id = season.id
+                          and budgetItem.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME
+                      ), 0) as expectedRevenue,
                       season.areaHectares as areaHectares,
                       season.status as status,
                       season.createdAt as createdAt,
@@ -151,8 +161,6 @@ public interface HarvestSeasonRepository extends JpaRepository<HarvestSeason, Lo
                       season.description,
                       season.startDate,
                       season.endDate,
-                      season.expectedCost,
-                      season.expectedRevenue,
                       season.areaHectares,
                       season.status,
                       season.createdAt,

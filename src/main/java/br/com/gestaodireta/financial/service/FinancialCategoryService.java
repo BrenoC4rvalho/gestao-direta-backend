@@ -68,6 +68,7 @@ public class FinancialCategoryService {
             boolean includeInactive,
             String search,
             FinancialCategoryStatus status,
+            TransactionType type,
             PaginationParams paginationParams) {
         farmService.findEntityById(farmId);
         Page<FinancialCategoryResponse> categories =
@@ -77,6 +78,7 @@ public class FinancialCategoryService {
                                 includeInactive,
                                 normalizeSearch(search),
                                 status,
+                                type,
                                 paginationParams.toPageable())
                         .map(financialCategoryMapper::toResponse);
 
@@ -86,7 +88,7 @@ public class FinancialCategoryService {
     @Transactional(readOnly = true)
     public PageResponse<FinancialCategoryResponse> findAll(
             Long farmId, boolean includeInactive, PaginationParams paginationParams) {
-        return findAll(farmId, includeInactive, null, null, paginationParams);
+        return findAll(farmId, includeInactive, null, null, null, paginationParams);
     }
 
     @Transactional(readOnly = true)

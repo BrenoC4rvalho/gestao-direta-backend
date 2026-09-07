@@ -23,9 +23,11 @@ import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
+import br.com.gestaodireta.harvest.entity.HarvestSeasonBudgetItem;
 import br.com.gestaodireta.harvest.entity.ProductionActivity;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
 import br.com.gestaodireta.harvest.enumeration.ProductionActivityStatus;
+import br.com.gestaodireta.harvest.repository.HarvestSeasonBudgetItemRepository;
 import br.com.gestaodireta.harvest.repository.HarvestSeasonRepository;
 import br.com.gestaodireta.harvest.repository.ProductionActivityRepository;
 import br.com.gestaodireta.support.PostgresIntegrationTest;
@@ -58,6 +60,8 @@ class HarvestControllerTest extends PostgresIntegrationTest {
 
     @Autowired private HarvestSeasonRepository harvestSeasonRepository;
 
+    @Autowired private HarvestSeasonBudgetItemRepository harvestSeasonBudgetItemRepository;
+
     @Autowired private ProductionActivityRepository productionActivityRepository;
 
     @Autowired private FarmUserRepository farmUserRepository;
@@ -71,6 +75,7 @@ class HarvestControllerTest extends PostgresIntegrationTest {
     @BeforeEach
     void setUp() {
         financialTransactionRepository.deleteAll();
+        harvestSeasonBudgetItemRepository.deleteAll();
         harvestSeasonRepository.deleteAll();
         productionActivityRepository.deleteAll();
         farmUserRepository.deleteAll();
@@ -439,8 +444,8 @@ class HarvestControllerTest extends PostgresIntegrationTest {
         saveFarmUser(farm, accountant, FarmUserRole.ACCOUNTANT);
         HarvestSeason season =
                 saveSeason(farm, activity, "Safra Soja", HarvestSeasonStatus.PLANNED);
-        season.setExpectedRevenue(new BigDecimal("210000.00"));
-        season.setExpectedCost(new BigDecimal("96500.00"));
+        saveLegacyBudgetItem(season, TransactionType.INCOME, "210000.00");
+        saveLegacyBudgetItem(season, TransactionType.EXPENSE, "96500.00");
         season.setAreaHectares(new BigDecimal("120.00"));
         harvestSeasonRepository.save(season);
         saveTransaction(
@@ -486,8 +491,8 @@ class HarvestControllerTest extends PostgresIntegrationTest {
         saveFarmUser(farm, accountant, FarmUserRole.ACCOUNTANT);
         HarvestSeason season =
                 saveSeason(farm, activity, "Safra Soja", HarvestSeasonStatus.PLANNED);
-        season.setExpectedRevenue(new BigDecimal("210000.00"));
-        season.setExpectedCost(new BigDecimal("96500.00"));
+        saveLegacyBudgetItem(season, TransactionType.INCOME, "210000.00");
+        saveLegacyBudgetItem(season, TransactionType.EXPENSE, "96500.00");
         season.setAreaHectares(new BigDecimal("120.00"));
         harvestSeasonRepository.save(season);
         saveTransaction(
@@ -1155,6 +1160,15 @@ class HarvestControllerTest extends PostgresIntegrationTest {
         season.setStatus(status);
 
         return harvestSeasonRepository.save(season);
+    }
+
+    private void saveLegacyBudgetItem(HarvestSeason season, TransactionType type, String amount) {
+        HarvestSeasonBudgetItem item = new HarvestSeasonBudgetItem();
+        item.setHarvestSeason(season);
+        item.setType(type);
+        item.setDescription("Planejamento anterior");
+        item.setPlannedAmount(new BigDecimal(amount));
+        harvestSeasonBudgetItemRepository.save(item);
     }
 
     private FinancialTransaction saveTransaction(

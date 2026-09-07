@@ -13,6 +13,4 @@ public record HarvestSeasonUpdateRequest(
         @Size(max = 500) String description,
         @NotNull LocalDate startDate,
         LocalDate endDate,
-        @DecimalMin("0.00") BigDecimal expectedRevenue,
-        @DecimalMin("0.00") BigDecimal expectedCost,
         @DecimalMin("0.00") BigDecimal areaHectares) {}

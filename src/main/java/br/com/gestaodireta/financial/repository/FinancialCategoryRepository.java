@@ -21,6 +21,7 @@ public interface FinancialCategoryRepository extends JpaRepository<FinancialCate
             from FinancialCategory category
             where category.farm.id = :farmId
               and (:search is null or lower(category.name) like :search)
+              and (:type is null or category.type = :type)
               and (
                     :status is not null and category.status = :status
                     or :status is null and (
@@ -34,11 +35,12 @@ public interface FinancialCategoryRepository extends JpaRepository<FinancialCate
             @Param("includeInactive") boolean includeInactive,
             @Param("search") String search,
             @Param("status") FinancialCategoryStatus status,
+            @Param("type") TransactionType type,
             Pageable pageable);
 
     default Page<FinancialCategory> findByFarmId(
             Long farmId, boolean includeInactive, Pageable pageable) {
-        return findByFarmIdAndFilters(farmId, includeInactive, null, null, pageable);
+        return findByFarmIdAndFilters(farmId, includeInactive, null, null, null, pageable);
     }
 
     @Query(
