@@ -1051,10 +1051,11 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
     void shouldCompareTwoHarvestSeasonsUsingExistingFinancialSummaries() {
         Farm farm = saveFarm("Farm");
         ProductionActivity activity = saveActivity(farm, "Soy");
+        ProductionActivity secondActivity = saveActivity(farm, "Corn");
         FinancialCategory expense = saveCategory(farm, "Inputs", TransactionType.EXPENSE);
         FinancialCategory income = saveCategory(farm, "Sales", TransactionType.INCOME);
         HarvestSeason first = saveSeason(farm, activity, null, null, "10", "Safra A");
-        HarvestSeason second = saveSeason(farm, activity, null, null, "20", "Safra B");
+        HarvestSeason second = saveSeason(farm, secondActivity, null, null, "20", "Safra B");
         User user = saveUser();
 
         harvestSeasonBudgetItemService.create(
@@ -1097,7 +1098,50 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
                                             HarvestSeasonComparisonMetric.PLANNED_COST_PER_HECTARE);
                             assertThat(best.harvestSeasonIds()).containsExactly(second.getId());
                         })
+                .anySatisfy(
+                        best -> {
+                            assertThat(best.metric())
+                                    .isEqualTo(
+                                            HarvestSeasonComparisonMetric
+                                                    .PLANNED_REVENUE_PER_HECTARE);
+                            assertThat(best.harvestSeasonIds()).containsExactly(first.getId());
+                        })
+                .anySatisfy(
+                        best -> {
+                            assertThat(best.metric())
+                                    .isEqualTo(HarvestSeasonComparisonMetric.PLANNED_MARGIN);
+                            assertThat(best.harvestSeasonIds())
+                                    .containsExactly(first.getId(), second.getId());
+                        })
                 .noneMatch(best -> best.metric() == HarvestSeasonComparisonMetric.PLANNED_COST);
+    }
+
+    @Test
+    void shouldNotMarkBestWhenOnlyOneHarvestSeasonHasAComparableValue() {
+        Farm farm = saveFarm("Farm");
+        ProductionActivity firstActivity = saveActivity(farm, "Soy");
+        ProductionActivity secondActivity = saveActivity(farm, "Corn");
+        FinancialCategory expense = saveCategory(farm, "Inputs", TransactionType.EXPENSE);
+        HarvestSeason first = saveSeason(farm, firstActivity, null, null, null, "Safra A");
+        HarvestSeason second = saveSeason(farm, secondActivity, null, null, "20", "Safra B");
+
+        harvestSeasonBudgetItemService.create(
+                first.getId(),
+                budgetItemRequest(expense.getId(), TransactionType.EXPENSE, "Input", "100"));
+        harvestSeasonBudgetItemService.create(
+                second.getId(),
+                budgetItemRequest(expense.getId(), TransactionType.EXPENSE, "Input", "150"));
+
+        var comparison = harvestSeasonService.compare(farm.getId(), first.getId(), second.getId());
+
+        assertThat(comparison.harvestA().perHectare().plannedCostPerHectare()).isNull();
+        assertThat(comparison.harvestB().perHectare().plannedCostPerHectare())
+                .isEqualByComparingTo("7.50");
+        assertThat(comparison.bestMetrics())
+                .noneMatch(
+                        best ->
+                                best.metric()
+                                        == HarvestSeasonComparisonMetric.PLANNED_COST_PER_HECTARE);
     }
 
     @Test

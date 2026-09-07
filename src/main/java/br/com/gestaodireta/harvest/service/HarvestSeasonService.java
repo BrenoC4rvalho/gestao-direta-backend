@@ -322,7 +322,7 @@ public class HarvestSeasonService {
                                         .reversed())
                         .limit(3)
                         .toList(),
-                bestMetrics(harvestSeasonA, harvestSeasonB, harvestA, harvestB, differences));
+                bestMetrics(harvestA, harvestB, differences));
     }
 
     private HarvestSeasonDetailSummaryResponse buildDetailSummary(HarvestSeason harvestSeason) {
@@ -797,18 +797,9 @@ public class HarvestSeasonService {
     }
 
     private List<HarvestSeasonComparisonBestResponse> bestMetrics(
-            HarvestSeason harvestSeasonA,
-            HarvestSeason harvestSeasonB,
             HarvestSeasonComparisonHarvestResponse harvestA,
             HarvestSeasonComparisonHarvestResponse harvestB,
             List<HarvestSeasonComparisonDifferenceResponse> differences) {
-        if (!harvestSeasonA
-                .getProductionActivity()
-                .getId()
-                .equals(harvestSeasonB.getProductionActivity().getId())) {
-            return List.of();
-        }
-
         return differences.stream()
                 .filter(difference -> difference.difference() != null)
                 .filter(
