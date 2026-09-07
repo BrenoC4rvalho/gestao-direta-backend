@@ -302,11 +302,8 @@ public class HarvestSeasonService {
     @Transactional
     public HarvestSeasonResponse updateStatus(Long id, HarvestSeasonStatusUpdateRequest request) {
         HarvestSeason harvestSeason = findEntityById(id);
-
-        if (!HarvestSeasonStatus.INACTIVE.equals(request.status())) {
-            ensureFarmIsActive(harvestSeason.getFarm());
-        }
-
+        ensureFarmIsActive(harvestSeason.getFarm());
+        validateStatusTransition(harvestSeason.getStatus(), request.status());
         harvestSeason.setStatus(request.status());
 
         return harvestSeasonMapper.toResponse(harvestSeasonRepository.save(harvestSeason));
@@ -316,6 +313,11 @@ public class HarvestSeasonService {
     public HarvestSeasonResponse activate(Long id) {
         HarvestSeason harvestSeason = findEntityById(id);
         ensureFarmIsActive(harvestSeason.getFarm());
+
+        if (!HarvestSeasonStatus.INACTIVE.equals(harvestSeason.getStatus())) {
+            throw new BusinessException("Only inactive harvest seasons can be activated.");
+        }
+
         harvestSeason.setStatus(HarvestSeasonStatus.PLANNED);
 
         return harvestSeasonMapper.toResponse(harvestSeasonRepository.save(harvestSeason));
@@ -324,6 +326,7 @@ public class HarvestSeasonService {
     @Transactional
     public void inactivate(Long id) {
         HarvestSeason harvestSeason = findEntityById(id);
+        validateStatusTransition(harvestSeason.getStatus(), HarvestSeasonStatus.INACTIVE);
         harvestSeason.setStatus(HarvestSeasonStatus.INACTIVE);
         harvestSeasonRepository.save(harvestSeason);
     }
@@ -384,17 +387,40 @@ public class HarvestSeasonService {
         String normalizedName = name.toLowerCase(Locale.ROOT);
         boolean duplicateExists =
                 ignoredSeasonId == null
-                        ? harvestSeasonRepository.existsActiveByFarmIdAndNormalizedName(
-                                farmId, normalizedName, HarvestSeasonStatus.INACTIVE)
-                        : harvestSeasonRepository.existsActiveByFarmIdAndNormalizedNameAndIdNot(
-                                farmId,
-                                ignoredSeasonId,
-                                normalizedName,
-                                HarvestSeasonStatus.INACTIVE);
+                        ? harvestSeasonRepository.existsByFarmIdAndNormalizedName(
+                                farmId, normalizedName)
+                        : harvestSeasonRepository.existsByFarmIdAndNormalizedNameAndIdNot(
+                                farmId, ignoredSeasonId, normalizedName);
 
         if (duplicateExists) {
             throw new BusinessException(
                     "A harvest season with this name already exists for this farm.");
+        }
+    }
+
+    private void validateStatusTransition(
+            HarvestSeasonStatus currentStatus, HarvestSeasonStatus targetStatus) {
+        boolean allowed =
+                switch (currentStatus) {
+                    case PLANNED ->
+                            HarvestSeasonStatus.IN_PROGRESS.equals(targetStatus)
+                                    || HarvestSeasonStatus.INACTIVE.equals(targetStatus);
+                    case IN_PROGRESS ->
+                            HarvestSeasonStatus.FINISHED.equals(targetStatus)
+                                    || HarvestSeasonStatus.INACTIVE.equals(targetStatus);
+                    case FINISHED ->
+                            HarvestSeasonStatus.IN_PROGRESS.equals(targetStatus)
+                                    || HarvestSeasonStatus.INACTIVE.equals(targetStatus);
+                    case INACTIVE -> false;
+                };
+
+        if (!allowed) {
+            throw new BusinessException(
+                    "Invalid harvest season status transition from "
+                            + currentStatus
+                            + " to "
+                            + targetStatus
+                            + ".");
         }
     }
 

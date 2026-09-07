@@ -16,6 +16,7 @@ import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonDetailSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonFinancialSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonRequest;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonStatusUpdateRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryListResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonUpdateRequest;
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
@@ -140,9 +141,146 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldCreateHarvestSeasonAsPlanned() {
+        Farm farm = saveFarm("Farm");
+        ProductionActivity activity = saveActivity(farm, "Soja");
+
+        var response =
+                harvestSeasonService.create(
+                        seasonRequest(farm.getId(), activity.getId(), "Safra Soja"));
+
+        assertThat(response.status()).isEqualTo(HarvestSeasonStatus.PLANNED);
+    }
+
+    @Test
+    void shouldApplyOnlyAllowedHarvestSeasonStatusTransitions() {
+        Farm farm = saveFarm("Farm");
+        ProductionActivity activity = saveActivity(farm, "Soja");
+        HarvestSeason season = saveSeason(farm, activity, null, null, null, "Safra Soja");
+
+        assertThat(
+                        harvestSeasonService
+                                .updateStatus(
+                                        season.getId(),
+                                        new HarvestSeasonStatusUpdateRequest(
+                                                HarvestSeasonStatus.IN_PROGRESS))
+                                .status())
+                .isEqualTo(HarvestSeasonStatus.IN_PROGRESS);
+        assertThat(
+                        harvestSeasonService
+                                .updateStatus(
+                                        season.getId(),
+                                        new HarvestSeasonStatusUpdateRequest(
+                                                HarvestSeasonStatus.FINISHED))
+                                .status())
+                .isEqualTo(HarvestSeasonStatus.FINISHED);
+        assertThat(
+                        harvestSeasonService
+                                .updateStatus(
+                                        season.getId(),
+                                        new HarvestSeasonStatusUpdateRequest(
+                                                HarvestSeasonStatus.IN_PROGRESS))
+                                .status())
+                .isEqualTo(HarvestSeasonStatus.IN_PROGRESS);
+
+        harvestSeasonService.inactivate(season.getId());
+
+        assertThat(harvestSeasonService.findById(season.getId()).status())
+                .isEqualTo(HarvestSeasonStatus.INACTIVE);
+        assertThat(harvestSeasonService.activate(season.getId()).status())
+                .isEqualTo(HarvestSeasonStatus.PLANNED);
+    }
+
+    @Test
+    void shouldRejectInvalidHarvestSeasonStatusTransitions() {
+        Farm farm = saveFarm("Farm");
+        ProductionActivity activity = saveActivity(farm, "Soja");
+        HarvestSeason season = saveSeason(farm, activity, null, null, null, "Safra Soja");
+
+        assertThatThrownBy(
+                        () ->
+                                harvestSeasonService.updateStatus(
+                                        season.getId(),
+                                        new HarvestSeasonStatusUpdateRequest(
+                                                HarvestSeasonStatus.FINISHED)))
+                .isInstanceOf(br.com.gestaodireta.shared.exception.BusinessException.class)
+                .hasMessageContaining("Invalid harvest season status transition");
+
+        harvestSeasonService.inactivate(season.getId());
+
+        assertThatThrownBy(
+                        () ->
+                                harvestSeasonService.updateStatus(
+                                        season.getId(),
+                                        new HarvestSeasonStatusUpdateRequest(
+                                                HarvestSeasonStatus.IN_PROGRESS)))
+                .isInstanceOf(br.com.gestaodireta.shared.exception.BusinessException.class)
+                .hasMessageContaining("Invalid harvest season status transition");
+
+        assertThatThrownBy(
+                        () ->
+                                harvestSeasonService.updateStatus(
+                                        season.getId(),
+                                        new HarvestSeasonStatusUpdateRequest(
+                                                HarvestSeasonStatus.FINISHED)))
+                .isInstanceOf(br.com.gestaodireta.shared.exception.BusinessException.class)
+                .hasMessageContaining("Invalid harvest season status transition");
+        harvestSeasonService.activate(season.getId());
+
+        HarvestSeason plannedSeason =
+                harvestSeasonRepository.findById(season.getId()).orElseThrow();
+        plannedSeason.setStatus(HarvestSeasonStatus.PLANNED);
+        harvestSeasonRepository.saveAndFlush(plannedSeason);
+
+        assertThatThrownBy(() -> harvestSeasonService.activate(season.getId()))
+                .isInstanceOf(br.com.gestaodireta.shared.exception.BusinessException.class)
+                .hasMessage("Only inactive harvest seasons can be activated.");
+    }
+
+    @Test
+    void shouldRejectHarvestSeasonNameAlreadyUsedByInactiveSeason() {
+        Farm farm = saveFarm("Farm");
+        ProductionActivity activity = saveActivity(farm, "Soja");
+        HarvestSeason inactive = saveSeason(farm, activity, null, null, null, "Safra Soja");
+        inactive.setStatus(HarvestSeasonStatus.INACTIVE);
+        harvestSeasonRepository.save(inactive);
+
+        assertThatThrownBy(
+                        () ->
+                                harvestSeasonService.create(
+                                        seasonRequest(
+                                                farm.getId(), activity.getId(), " safra soja ")))
+                .isInstanceOf(br.com.gestaodireta.shared.exception.BusinessException.class)
+                .hasMessage("A harvest season with this name already exists for this farm.");
+    }
+
+    @Test
+    void shouldRejectHarvestSeasonUpdateToAnotherSeasonNameAndAllowOwnName() {
+        Farm farm = saveFarm("Farm");
+        ProductionActivity activity = saveActivity(farm, "Soja");
+        HarvestSeason soy = saveSeason(farm, activity, null, null, null, "Safra Soja");
+        HarvestSeason corn = saveSeason(farm, activity, null, null, null, "Safra Milho");
+
+        assertThatThrownBy(
+                        () ->
+                                harvestSeasonService.update(
+                                        corn.getId(),
+                                        seasonUpdateRequest(activity.getId(), "Safra Soja")))
+                .isInstanceOf(br.com.gestaodireta.shared.exception.BusinessException.class)
+                .hasMessage("A harvest season with this name already exists for this farm.");
+        assertThat(
+                        harvestSeasonService
+                                .update(
+                                        soy.getId(),
+                                        seasonUpdateRequest(activity.getId(), " safra soja "))
+                                .name())
+                .isEqualTo("safra soja");
+    }
+
+    @Test
     void shouldReturnZeroSummaryWhenHarvestSeasonHasNoTransactions() {
         Farm farm = saveFarm("Farm");
-        ProductionActivity activity = saveActivity("Soja");
+        ProductionActivity activity = saveActivity(farm, "Soja");
         HarvestSeason season = saveSeason(farm, activity, null, null, null, "Safra Soja");
 
         HarvestSeasonDetailSummaryResponse response =
@@ -175,11 +313,12 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
     void shouldCalculateFinancialSummaryForHarvestSeason() {
         Farm farm = saveFarm("Farm");
         Farm otherFarm = saveFarm("Other Farm");
-        ProductionActivity activity = saveActivity("Soja");
+        ProductionActivity activity = saveActivity(farm, "Soja");
+        ProductionActivity otherActivity = saveActivity(otherFarm, "Soja");
         HarvestSeason season =
                 saveSeason(farm, activity, "210000.00", "96500.00", "120.00", "Safra Soja");
         HarvestSeason otherSeason =
-                saveSeason(otherFarm, activity, "1.00", "1.00", "1.00", "Safra Milho");
+                saveSeason(otherFarm, otherActivity, "1.00", "1.00", "1.00", "Safra Milho");
         User user = saveUser();
 
         saveTransaction(
@@ -230,7 +369,8 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
     void shouldListHarvestSeasonsWithFinancialSummary() {
         Farm farm = saveFarm("Farm");
         Farm otherFarm = saveFarm("Other Farm");
-        ProductionActivity activity = saveActivity("Soja");
+        ProductionActivity activity = saveActivity(farm, "Soja");
+        ProductionActivity otherActivity = saveActivity(otherFarm, "Soja");
         HarvestSeason season =
                 saveSeason(farm, activity, "210000.00", "96500.00", "120.00", "Safra Soja");
         HarvestSeason emptySeason =
@@ -238,7 +378,7 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         HarvestSeason inactiveSeason =
                 saveSeason(farm, activity, "1.00", "1.00", "1.00", "Safra Inativa");
         HarvestSeason otherSeason =
-                saveSeason(otherFarm, activity, "1.00", "1.00", "1.00", "Safra Outra");
+                saveSeason(otherFarm, otherActivity, "1.00", "1.00", "1.00", "Safra Outra");
         inactiveSeason.setStatus(HarvestSeasonStatus.INACTIVE);
         harvestSeasonRepository.save(inactiveSeason);
         User user = saveUser();

@@ -257,12 +257,9 @@ public interface HarvestSeasonRepository extends JpaRepository<HarvestSeason, Lo
             from HarvestSeason season
             where season.farm.id = :farmId
               and lower(trim(season.name)) = :normalizedName
-              and season.status <> :inactiveStatus
             """)
-    boolean existsActiveByFarmIdAndNormalizedName(
-            @Param("farmId") Long farmId,
-            @Param("normalizedName") String normalizedName,
-            @Param("inactiveStatus") HarvestSeasonStatus inactiveStatus);
+    boolean existsByFarmIdAndNormalizedName(
+            @Param("farmId") Long farmId, @Param("normalizedName") String normalizedName);
 
     @Query(
             """
@@ -271,11 +268,9 @@ public interface HarvestSeasonRepository extends JpaRepository<HarvestSeason, Lo
             where season.farm.id = :farmId
               and season.id <> :seasonId
               and lower(trim(season.name)) = :normalizedName
-              and season.status <> :inactiveStatus
             """)
-    boolean existsActiveByFarmIdAndNormalizedNameAndIdNot(
+    boolean existsByFarmIdAndNormalizedNameAndIdNot(
             @Param("farmId") Long farmId,
             @Param("seasonId") Long seasonId,
-            @Param("normalizedName") String normalizedName,
-            @Param("inactiveStatus") HarvestSeasonStatus inactiveStatus);
+            @Param("normalizedName") String normalizedName);
 }
