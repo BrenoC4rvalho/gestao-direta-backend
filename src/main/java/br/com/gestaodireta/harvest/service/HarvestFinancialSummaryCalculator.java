@@ -4,10 +4,17 @@ import br.com.gestaodireta.financial.repository.HarvestSeasonFinancialTotalsProj
 import br.com.gestaodireta.harvest.dto.FinancialAmountSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestComparisonSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestOpenAmountsSummaryResponse;
+import br.com.gestaodireta.harvest.dto.HarvestPlanningComparisonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestPlanningSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestProjectionSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestRealizedSummaryResponse;
+import br.com.gestaodireta.harvest.dto.PlanningComparisonMetricResponse;
+import br.com.gestaodireta.harvest.enumeration.ComparisonSemantic;
 import br.com.gestaodireta.harvest.enumeration.CostVarianceStatus;
+import br.com.gestaodireta.harvest.enumeration.PlanningComparisonBasis;
+import br.com.gestaodireta.harvest.enumeration.PlanningComparisonDifferenceUnit;
+import br.com.gestaodireta.harvest.enumeration.PlanningComparisonPosition;
+import br.com.gestaodireta.harvest.enumeration.PlanningComparisonState;
 import br.com.gestaodireta.harvest.enumeration.ProfitPerformanceStatus;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -82,6 +89,117 @@ public class HarvestFinancialSummaryCalculator {
                 new FinancialAmountSummaryResponse(
                         zeroIfNull(totals.getOverduePayableAmount()),
                         zeroIfNull(totals.getOverdueReceivableAmount())));
+    }
+
+    public HarvestPlanningComparisonResponse planningComparison(
+            boolean hasPlanning,
+            boolean hasCurrentData,
+            boolean isPlanned,
+            boolean useProjection,
+            HarvestPlanningSummaryResponse planning,
+            HarvestRealizedSummaryResponse realized,
+            HarvestProjectionSummaryResponse projection) {
+        if (!hasPlanning) {
+            return emptyPlanningComparison(PlanningComparisonState.MISSING_PLANNING);
+        }
+        if (isPlanned) {
+            return emptyPlanningComparison(PlanningComparisonState.PLANNED);
+        }
+        if (!hasCurrentData) {
+            return emptyPlanningComparison(PlanningComparisonState.MISSING_CURRENT_DATA);
+        }
+        if (useProjection) {
+            return comparison(
+                    PlanningComparisonBasis.PROJECTED,
+                    planning,
+                    projection.projectedCost(),
+                    projection.projectedRevenue(),
+                    projection.projectedProfit(),
+                    projection.projectedMargin());
+        }
+        return comparison(
+                PlanningComparisonBasis.REALIZED,
+                planning,
+                realized.realizedCost(),
+                realized.realizedRevenue(),
+                realized.realizedProfit(),
+                realized.realizedMargin());
+    }
+
+    private HarvestPlanningComparisonResponse emptyPlanningComparison(
+            PlanningComparisonState state) {
+        return new HarvestPlanningComparisonResponse(state, null, null, null, null, null);
+    }
+
+    private HarvestPlanningComparisonResponse comparison(
+            PlanningComparisonBasis basis,
+            HarvestPlanningSummaryResponse planning,
+            BigDecimal currentCost,
+            BigDecimal currentRevenue,
+            BigDecimal currentProfit,
+            BigDecimal currentMargin) {
+        return new HarvestPlanningComparisonResponse(
+                PlanningComparisonState.READY,
+                basis,
+                comparisonMetric(
+                        planning.plannedCost(),
+                        currentCost,
+                        true,
+                        PlanningComparisonDifferenceUnit.AMOUNT),
+                comparisonMetric(
+                        planning.plannedRevenue(),
+                        currentRevenue,
+                        false,
+                        PlanningComparisonDifferenceUnit.AMOUNT),
+                comparisonMetric(
+                        planning.plannedProfit(),
+                        currentProfit,
+                        false,
+                        PlanningComparisonDifferenceUnit.AMOUNT),
+                comparisonMetric(
+                        planning.plannedMargin(),
+                        currentMargin,
+                        false,
+                        PlanningComparisonDifferenceUnit.PERCENTAGE_POINTS));
+    }
+
+    private PlanningComparisonMetricResponse comparisonMetric(
+            BigDecimal planned,
+            BigDecimal current,
+            boolean lowerIsBetter,
+            PlanningComparisonDifferenceUnit differenceUnit) {
+        BigDecimal difference = current.subtract(planned);
+        int comparison = difference.compareTo(BigDecimal.ZERO);
+        return new PlanningComparisonMetricResponse(
+                planned,
+                current,
+                difference,
+                differenceUnit == PlanningComparisonDifferenceUnit.AMOUNT
+                        ? percentage(difference, planned.abs())
+                        : null,
+                position(comparison),
+                semantic(comparison, lowerIsBetter),
+                differenceUnit);
+    }
+
+    private PlanningComparisonPosition position(int comparison) {
+        if (comparison > 0) {
+            return PlanningComparisonPosition.ABOVE_PLANNED;
+        }
+        if (comparison < 0) {
+            return PlanningComparisonPosition.BELOW_PLANNED;
+        }
+        return PlanningComparisonPosition.ON_TARGET;
+    }
+
+    private ComparisonSemantic semantic(int comparison, boolean lowerIsBetter) {
+        if (comparison == 0) {
+            return ComparisonSemantic.NEUTRAL;
+        }
+        if ((comparison < 0 && lowerIsBetter) || (comparison > 0 && !lowerIsBetter)) {
+            return ComparisonSemantic.BETTER;
+        }
+        return ComparisonSemantic.WORSE;
     }
 
     private BigDecimal percentage(BigDecimal value, BigDecimal base) {

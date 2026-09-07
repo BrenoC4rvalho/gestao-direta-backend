@@ -17,6 +17,7 @@ public record HarvestSeasonDetailSummaryResponse(
         HarvestRealizedSummaryResponse realized,
         HarvestProjectionSummaryResponse projection,
         HarvestComparisonSummaryResponse comparison,
+        HarvestPlanningComparisonResponse planningComparison,
         HarvestOpenAmountsSummaryResponse openAmounts,
         Long transactionCount,
         Long incomeCount,

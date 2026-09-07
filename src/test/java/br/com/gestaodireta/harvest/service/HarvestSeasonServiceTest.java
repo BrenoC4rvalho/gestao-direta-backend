@@ -386,6 +386,10 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         assertThat(response.costPerHectare()).isNull();
         assertThat(response.revenuePerHectare()).isNull();
         assertThat(response.profitPerHectare()).isNull();
+        assertThat(response.planningComparison().state())
+                .isEqualTo(
+                        br.com.gestaodireta.harvest.enumeration.PlanningComparisonState
+                                .MISSING_PLANNING);
     }
 
     @Test
@@ -458,6 +462,27 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         assertThat(response.realizedCostPerHectare()).isEqualByComparingTo("604.17");
         assertThat(response.realizedRevenuePerHectare()).isEqualByComparingTo("1250.00");
         assertThat(response.realizedProfitPerHectare()).isEqualByComparingTo("645.83");
+        assertThat(response.planningComparison().state())
+                .isEqualTo(br.com.gestaodireta.harvest.enumeration.PlanningComparisonState.PLANNED);
+    }
+
+    @Test
+    void shouldReturnMissingCurrentDataWhenActiveHarvestSeasonHasPlanningOnly() {
+        Farm farm = saveFarm("Farm");
+        ProductionActivity activity = saveActivity(farm, "Soja");
+        HarvestSeason season = saveSeason(farm, activity, "200.00", "100.00", null, "Safra Soja");
+        season.setStatus(HarvestSeasonStatus.IN_PROGRESS);
+        harvestSeasonRepository.save(season);
+
+        HarvestSeasonDetailSummaryResponse response =
+                harvestSeasonService.getSummary(season.getId());
+
+        assertThat(response.planningComparison().state())
+                .isEqualTo(
+                        br.com.gestaodireta.harvest.enumeration.PlanningComparisonState
+                                .MISSING_CURRENT_DATA);
+        assertThat(response.planningComparison().basis()).isNull();
+        assertThat(response.planningComparison().cost()).isNull();
     }
 
     @Test

@@ -318,10 +318,28 @@ public class HarvestSeasonService {
                 realized,
                 projection,
                 harvestFinancialSummaryCalculator.comparison(planning, projection),
+                harvestFinancialSummaryCalculator.planningComparison(
+                        hasPlanning(harvestSeason),
+                        hasCurrentData(totals),
+                        harvestSeason.getStatus() == HarvestSeasonStatus.PLANNED,
+                        harvestSeason.getStatus() == HarvestSeasonStatus.IN_PROGRESS,
+                        planning,
+                        realized,
+                        projection),
                 harvestFinancialSummaryCalculator.openAmounts(totals),
                 zeroIfNull(totals.getTransactionCount()),
                 zeroIfNull(totals.getIncomeCount()),
                 zeroIfNull(totals.getExpenseCount()));
+    }
+
+    private boolean hasPlanning(HarvestSeason harvestSeason) {
+        return !harvestSeasonBudgetItemRepository
+                .findAllByHarvestSeasonId(harvestSeason.getId())
+                .isEmpty();
+    }
+
+    private boolean hasCurrentData(HarvestSeasonFinancialTotalsProjection totals) {
+        return zeroIfNull(totals.getTransactionCount()) > 0;
     }
 
     private HarvestSeasonComparisonHarvestResponse toComparisonHarvest(

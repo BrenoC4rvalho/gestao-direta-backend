@@ -443,7 +443,7 @@ class HarvestControllerTest extends PostgresIntegrationTest {
         User accountant = saveUser("Accountant", "accountant@example.com", UserType.USER);
         saveFarmUser(farm, accountant, FarmUserRole.ACCOUNTANT);
         HarvestSeason season =
-                saveSeason(farm, activity, "Safra Soja", HarvestSeasonStatus.PLANNED);
+                saveSeason(farm, activity, "Safra Soja", HarvestSeasonStatus.IN_PROGRESS);
         saveLegacyBudgetItem(season, TransactionType.INCOME, "210000.00");
         saveLegacyBudgetItem(season, TransactionType.EXPENSE, "96500.00");
         season.setAreaHectares(new BigDecimal("120.00"));
@@ -491,6 +491,13 @@ class HarvestControllerTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.openAmounts.payableAmount").value(18000.00))
                 .andExpect(jsonPath("$.openAmounts.pending.payableAmount").value(18000.00))
                 .andExpect(jsonPath("$.comparison.profitPerformanceAmount").value(-54000.00))
+                .andExpect(jsonPath("$.planningComparison.state").value("READY"))
+                .andExpect(jsonPath("$.planningComparison.basis").value("PROJECTED"))
+                .andExpect(jsonPath("$.planningComparison.cost.difference").value(-6000.00))
+                .andExpect(jsonPath("$.planningComparison.cost.semantic").value("BETTER"))
+                .andExpect(
+                        jsonPath("$.planningComparison.margin.differenceUnit")
+                                .value("PERCENTAGE_POINTS"))
                 .andExpect(jsonPath("$.transactionCount").value(3))
                 .andExpect(jsonPath("$.expectedCost").doesNotExist());
     }

@@ -4,6 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import br.com.gestaodireta.harvest.dto.HarvestPlanningSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestRealizedSummaryResponse;
+import br.com.gestaodireta.harvest.enumeration.ComparisonSemantic;
+import br.com.gestaodireta.harvest.enumeration.PlanningComparisonBasis;
+import br.com.gestaodireta.harvest.enumeration.PlanningComparisonDifferenceUnit;
+import br.com.gestaodireta.harvest.enumeration.PlanningComparisonPosition;
+import br.com.gestaodireta.harvest.enumeration.PlanningComparisonState;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 
@@ -108,6 +113,80 @@ class HarvestFinancialSummaryCalculatorTest {
                                                 null))
                                 .costVarianceAmount())
                 .isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void shouldCalculateProjectedPlanningComparisonWithMetricSemantics() {
+        HarvestPlanningSummaryResponse planning =
+                calculator.planning(decimal("100"), decimal("200"));
+        HarvestRealizedSummaryResponse realized =
+                calculator.realized(decimal("80"), decimal("190"));
+        var projection = calculator.projection(realized, decimal("10"), decimal("30"));
+
+        var response =
+                calculator.planningComparison(
+                        true, true, false, true, planning, realized, projection);
+
+        assertThat(response.state()).isEqualTo(PlanningComparisonState.READY);
+        assertThat(response.basis()).isEqualTo(PlanningComparisonBasis.PROJECTED);
+        assertThat(response.cost().difference()).isEqualByComparingTo("-10.00");
+        assertThat(response.cost().percentageDifference()).isEqualByComparingTo("-10.00");
+        assertThat(response.cost().position()).isEqualTo(PlanningComparisonPosition.BELOW_PLANNED);
+        assertThat(response.cost().semantic()).isEqualTo(ComparisonSemantic.BETTER);
+        assertThat(response.revenue().semantic()).isEqualTo(ComparisonSemantic.BETTER);
+        assertThat(response.profit().semantic()).isEqualTo(ComparisonSemantic.BETTER);
+        assertThat(response.margin().difference()).isEqualByComparingTo("9.09");
+        assertThat(response.margin().percentageDifference()).isNull();
+        assertThat(response.margin().differenceUnit())
+                .isEqualTo(PlanningComparisonDifferenceUnit.PERCENTAGE_POINTS);
+    }
+
+    @Test
+    void shouldUseRealizedValuesAndHandleZeroPlanningBases() {
+        HarvestPlanningSummaryResponse planning =
+                calculator.planning(BigDecimal.ZERO, BigDecimal.ZERO);
+        HarvestRealizedSummaryResponse realized = calculator.realized(decimal("10"), decimal("5"));
+        var projection = calculator.projection(realized, null, null);
+
+        var response =
+                calculator.planningComparison(
+                        true, true, false, false, planning, realized, projection);
+
+        assertThat(response.basis()).isEqualTo(PlanningComparisonBasis.REALIZED);
+        assertThat(response.cost().percentageDifference()).isNull();
+        assertThat(response.revenue().percentageDifference()).isNull();
+        assertThat(response.profit().percentageDifference()).isNull();
+        assertThat(response.cost().semantic()).isEqualTo(ComparisonSemantic.WORSE);
+        assertThat(response.revenue().semantic()).isEqualTo(ComparisonSemantic.BETTER);
+        assertThat(response.profit().semantic()).isEqualTo(ComparisonSemantic.WORSE);
+    }
+
+    @Test
+    void shouldReturnInformativeStatesWithoutMetrics() {
+        HarvestPlanningSummaryResponse planning =
+                calculator.planning(decimal("100"), decimal("200"));
+        HarvestRealizedSummaryResponse realized =
+                calculator.realized(decimal("50"), decimal("100"));
+        var projection = calculator.projection(realized, null, null);
+
+        assertThat(
+                        calculator
+                                .planningComparison(
+                                        false, true, false, true, planning, realized, projection)
+                                .state())
+                .isEqualTo(PlanningComparisonState.MISSING_PLANNING);
+        assertThat(
+                        calculator
+                                .planningComparison(
+                                        true, false, true, true, planning, realized, projection)
+                                .state())
+                .isEqualTo(PlanningComparisonState.PLANNED);
+        assertThat(
+                        calculator
+                                .planningComparison(
+                                        true, false, false, true, planning, realized, projection)
+                                .state())
+                .isEqualTo(PlanningComparisonState.MISSING_CURRENT_DATA);
     }
 
     private BigDecimal decimal(String value) {
