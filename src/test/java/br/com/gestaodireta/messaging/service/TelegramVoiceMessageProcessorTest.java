@@ -10,6 +10,7 @@ import br.com.gestaodireta.ai.transcription.AudioTranscriptionClient;
 import br.com.gestaodireta.ai.transcription.AudioTranscriptionException;
 import br.com.gestaodireta.ai.transcription.AudioTranscriptionProperties;
 import br.com.gestaodireta.ai.transcription.AudioTranscriptionRequest;
+import br.com.gestaodireta.ai.transcription.AudioTranscriptionResult;
 import br.com.gestaodireta.messaging.domain.MessagingAccount;
 import br.com.gestaodireta.messaging.domain.MessagingConversation;
 import br.com.gestaodireta.messaging.domain.MessagingMessage;
@@ -30,7 +31,9 @@ class TelegramVoiceMessageProcessorTest {
         Fixture fixture = fixture();
         when(fixture.telegram.getFilePath("voice-file")).thenReturn("voice/file.oga");
         when(fixture.telegram.downloadFile("voice/file.oga")).thenReturn(new byte[] {1, 2, 3});
-        when(fixture.transcriber.transcribe(any())).thenReturn("Gastei R$ 850 com diesel hoje.");
+        when(fixture.transcriber.transcribe(any()))
+                .thenReturn(
+                        new AudioTranscriptionResult("Gastei R$ 850 com diesel hoje.", "pt", 2.0));
 
         fixture.processor.process(
                 fixture.account,
@@ -101,7 +104,9 @@ class TelegramVoiceMessageProcessorTest {
                         new TelegramAudioDebugFileSaver(debugProperties));
         when(fixture.telegram.getFilePath("voice-file")).thenReturn("voice/file.oga");
         when(fixture.telegram.downloadFile("voice/file.oga")).thenReturn(new byte[] {1, 2, 3});
-        when(fixture.transcriber.transcribe(any())).thenReturn("Gastei R$ 850 com diesel hoje.");
+        when(fixture.transcriber.transcribe(any()))
+                .thenReturn(
+                        new AudioTranscriptionResult("Gastei R$ 850 com diesel hoje.", "pt", 2.0));
 
         processor.process(
                 fixture.account,

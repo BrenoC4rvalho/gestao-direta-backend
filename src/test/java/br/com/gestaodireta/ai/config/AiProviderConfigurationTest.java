@@ -8,9 +8,12 @@ import br.com.gestaodireta.ai.infrastructure.gemini.GeminiAiTextGenerationClient
 import br.com.gestaodireta.ai.infrastructure.gemini.GeminiMultimodalAudioTranscriptionClient;
 import br.com.gestaodireta.ai.infrastructure.ollama.OllamaAiProperties;
 import br.com.gestaodireta.ai.infrastructure.ollama.OllamaAiTextGenerationClient;
+import br.com.gestaodireta.ai.infrastructure.whisper.WhisperAudioTranscriptionClient;
 import br.com.gestaodireta.ai.service.provider.AiTextGenerationClient;
 import br.com.gestaodireta.ai.transcription.AudioTranscriptionClient;
 import br.com.gestaodireta.ai.transcription.AudioTranscriptionProperties;
+import br.com.gestaodireta.ai.transcription.AudioTranscriptionProvider;
+import br.com.gestaodireta.ai.transcription.AudioTranscriptionProviderProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
 
@@ -48,12 +51,32 @@ class AiProviderConfigurationTest {
     }
 
     @Test
+    void shouldSelectWhisperAudioTranscriptionClientWithoutGeminiApiKey() {
+        AudioTranscriptionProperties transcriptionProperties = new AudioTranscriptionProperties();
+        transcriptionProperties.setEnabled(true);
+        AudioTranscriptionProviderProperties providerProperties =
+                new AudioTranscriptionProviderProperties();
+        providerProperties.setProvider(AudioTranscriptionProvider.WHISPER);
+
+        assertThat(
+                        configuration.audioTranscriptionClient(
+                                transcriptionProperties,
+                                providerProperties,
+                                new GeminiAiProperties(),
+                                RestClient.builder()))
+                .isInstanceOf(WhisperAudioTranscriptionClient.class);
+    }
+
+    @Test
     void shouldUseDisabledClientWhenAudioTranscriptionIsDisabled() {
         AudioTranscriptionProperties properties = new AudioTranscriptionProperties();
 
         assertThat(
                         configuration.audioTranscriptionClient(
-                                properties, new GeminiAiProperties(), RestClient.builder()))
+                                properties,
+                                new AudioTranscriptionProviderProperties(),
+                                new GeminiAiProperties(),
+                                RestClient.builder()))
                 .isInstanceOf(
                         br.com.gestaodireta.ai.transcription.DisabledAudioTranscriptionClient
                                 .class);
@@ -86,6 +109,9 @@ class AiProviderConfigurationTest {
         GeminiAiProperties geminiProperties = new GeminiAiProperties();
         geminiProperties.setApiKey("test-key");
         return configuration.audioTranscriptionClient(
-                transcriptionProperties, geminiProperties, RestClient.builder());
+                transcriptionProperties,
+                new AudioTranscriptionProviderProperties(),
+                geminiProperties,
+                RestClient.builder());
     }
 }

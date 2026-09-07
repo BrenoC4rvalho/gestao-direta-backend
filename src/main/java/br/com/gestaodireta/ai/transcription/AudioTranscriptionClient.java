@@ -2,5 +2,11 @@ package br.com.gestaodireta.ai.transcription;
 
 public interface AudioTranscriptionClient {
 
-    String transcribe(AudioTranscriptionRequest request);
+    AudioTranscriptionResult transcribe(AudioTranscriptionRequest request);
+
+    String providerName();
+
+    String modelName();
+
+    default void probe() {}
 }

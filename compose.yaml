@@ -30,6 +30,23 @@ services:
       - gestao-direta-network
     restart: unless-stopped
 
+  transcription-whisper:
+    build: ./services/transcription-whisper
+    environment:
+      WHISPER_MODEL: ${WHISPER_MODEL:-small}
+      WHISPER_DEVICE: ${WHISPER_DEVICE:-cpu}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
+      WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-pt}
+      WHISPER_MAX_UPLOAD_SIZE_MB: ${WHISPER_MAX_UPLOAD_SIZE_MB:-10}
+      WHISPER_MAX_CONCURRENCY: ${WHISPER_MAX_CONCURRENCY:-1}
+    ports:
+      - "127.0.0.1:8090:8090"
+    volumes:
+      - whisper_huggingface_cache:/root/.cache/huggingface
+    networks:
+      - gestao-direta-network
+    restart: unless-stopped
+
 networks:
   gestao-direta-network:
     name: gestao-direta-network
@@ -37,3 +54,4 @@ networks:
 
 volumes:
   ollama_data:
+  whisper_huggingface_cache:

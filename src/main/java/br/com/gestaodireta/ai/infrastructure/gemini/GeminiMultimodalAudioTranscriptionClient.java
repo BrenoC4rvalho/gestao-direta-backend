@@ -4,6 +4,7 @@ import br.com.gestaodireta.ai.transcription.AudioTranscriptionClient;
 import br.com.gestaodireta.ai.transcription.AudioTranscriptionException;
 import br.com.gestaodireta.ai.transcription.AudioTranscriptionProperties;
 import br.com.gestaodireta.ai.transcription.AudioTranscriptionRequest;
+import br.com.gestaodireta.ai.transcription.AudioTranscriptionResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
@@ -60,7 +61,7 @@ public class GeminiMultimodalAudioTranscriptionClient implements AudioTranscript
     }
 
     @Override
-    public String transcribe(AudioTranscriptionRequest request) {
+    public AudioTranscriptionResult transcribe(AudioTranscriptionRequest request) {
         long startNanos = System.nanoTime();
         String fileName = null;
         try {
@@ -97,7 +98,7 @@ public class GeminiMultimodalAudioTranscriptionClient implements AudioTranscript
                         "Gemini returned an empty transcript",
                         null);
             }
-            return details.text().trim();
+            return new AudioTranscriptionResult(details.text().trim(), null, null);
         } catch (AudioTranscriptionException exception) {
             throw exception;
         } catch (RestClientResponseException exception) {
@@ -126,6 +127,16 @@ public class GeminiMultimodalAudioTranscriptionClient implements AudioTranscript
         } finally {
             deleteFile(fileName);
         }
+    }
+
+    @Override
+    public String providerName() {
+        return "gemini";
+    }
+
+    @Override
+    public String modelName() {
+        return properties.getModel();
     }
 
     private UploadedFile upload(AudioTranscriptionRequest request, long startNanos) {

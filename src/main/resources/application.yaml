@@ -61,6 +61,11 @@ server:
   forward-headers-strategy: framework
 
 app:
+  transcription:
+    provider: ${APP_TRANSCRIPTION_PROVIDER:gemini}
+    whisper:
+      base-url: ${APP_TRANSCRIPTION_WHISPER_BASE_URL:http://localhost:8090}
+      timeout: ${APP_TRANSCRIPTION_WHISPER_TIMEOUT:120s}
   telegram:
     audio-debug:
       save-enabled: ${APP_TELEGRAM_AUDIO_DEBUG_SAVE_ENABLED:false}

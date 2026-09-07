@@ -124,6 +124,9 @@ APP_AI_OLLAMA_FORMAT=json
 APP_AI_OLLAMA_TEMPERATURE=0
 APP_AI_GEMINI_API_KEY=
 APP_AI_GEMINI_MODEL=gemini-3.1-flash-lite
+APP_TRANSCRIPTION_PROVIDER=gemini
+APP_TRANSCRIPTION_WHISPER_BASE_URL=http://localhost:8090
+APP_TRANSCRIPTION_WHISPER_TIMEOUT=120s
 AI_HEALTH_CHECK_ENABLED=true
 AI_HEALTH_CHECK_TIMEOUT_SECONDS=5
 AI_HEALTH_CHECK_CACHE_SECONDS=60
@@ -164,6 +167,9 @@ MESSAGING_CONVERSATION_EXPIRATION_HOURS=24
 | `APP_AI_OLLAMA_TEMPERATURE` | Não | Temperatura enviada ao Ollama. | `0` |
 | `APP_AI_GEMINI_API_KEY` | Sim, se Gemini estiver habilitado | Chave da Gemini API, usada somente pelo backend. | — |
 | `APP_AI_GEMINI_MODEL` | Não | Modelo Gemini enviado à API. | `gemini-3.1-flash-lite` |
+| `APP_TRANSCRIPTION_PROVIDER` | Não | Provider de transcrição: `gemini` ou `whisper`; independente de `APP_AI_PROVIDER`. | `gemini` |
+| `APP_TRANSCRIPTION_WHISPER_BASE_URL` | Não | URL do serviço local Whisper. | `http://localhost:8090` |
+| `APP_TRANSCRIPTION_WHISPER_TIMEOUT` | Não | Timeout exclusivo da chamada ao Whisper. | `120s` |
 | `APP_AI_AUDIO_TRANSCRIPTION_ENABLED` | Não | Habilita transcrição de mensagens de voz do Telegram. | `false` |
 | `APP_AI_AUDIO_TRANSCRIPTION_MODEL` | Não | Modelo Gemini multimodal usado na transcrição. | `gemini-3.1-flash-lite` |
 | `APP_AI_AUDIO_TRANSCRIPTION_MAX_DURATION_SECONDS` | Não | Duração máxima aceita para uma voz. | `60` |
@@ -186,12 +192,12 @@ Nunca versione `.env`, tokens ou segredos. Em produção, use `APP_JWT_SECRET` f
 
 ## Banco de dados e Docker
 
-O banco é PostgreSQL. O arquivo `compose.yaml` disponibiliza o serviço `postgres` com PostgreSQL 16 Alpine, banco `gestaodireta` e porta `5432` publicada localmente. Ele também disponibiliza o serviço `ollama` na porta `11434`; não há container da aplicação backend no Compose atual.
+O banco é PostgreSQL. O arquivo `compose.yaml` disponibiliza PostgreSQL, Ollama e o serviço local `transcription-whisper`. O Whisper publica somente `127.0.0.1:8090` e mantém o cache de modelos em volume Docker; não há container da aplicação backend no Compose atual.
 
 Para iniciar os serviços locais:
 
 ```bash
-docker compose up -d postgres ollama
+docker compose up -d postgres ollama transcription-whisper
 ```
 
 Configure `DB_URL`, `DB_USERNAME` e `DB_PASSWORD` em `.env` de acordo com o PostgreSQL utilizado. Para uma instância manual, crie o banco antes de iniciar a aplicação. O schema é criado e evoluído pelo Flyway.
@@ -206,7 +212,7 @@ O plugin Maven do Flyway usa `DB_URL`, `DB_USERNAME` e `DB_PASSWORD` do ambiente
 
 ## Inteligência artificial
 
-O provider é escolhido por `APP_AI_PROVIDER`. A API aceita `gemini` e `ollama`; não há fallback automático entre eles. Independentemente do provider, a resposta estruturada passa por validações determinísticas de valor, tipo, descrição e confiança antes de poder criar uma pendência financeira para revisão.
+O provider de extração de texto é escolhido por `APP_AI_PROVIDER`. A API aceita `gemini` e `ollama`; não há fallback automático entre eles. A transcrição é escolhida separadamente por `APP_TRANSCRIPTION_PROVIDER`, aceitando `gemini` e `whisper`.
 
 ### Gemini
 
@@ -277,9 +283,9 @@ Mensagens sem contexto financeiro suficiente não criam movimentações. Campos 
 
 ### Mensagens de voz
 
-Quando `APP_AI_AUDIO_TRANSCRIPTION_ENABLED=true`, mensagens de voz do Telegram são baixadas uma única vez, enviadas como áudio multimodal ao Gemini e encaminhadas ao mesmo fluxo de texto acima. A transcrição usa Files API e `generateContent` com `gemini-3.1-flash-lite` por padrão. `audio/ogg` e `audio/opus` são enviados diretamente, sem conversão ou FFmpeg.
+Quando `APP_AI_AUDIO_TRANSCRIPTION_ENABLED=true`, mensagens de voz do Telegram são baixadas uma única vez e encaminhadas ao mesmo fluxo de texto acima. Com `APP_TRANSCRIPTION_PROVIDER=gemini`, a transcrição usa Files API e `generateContent`. Com `APP_TRANSCRIPTION_PROVIDER=whisper`, o backend envia multipart ao serviço local configurado. `audio/ogg` e `audio/opus` são enviados diretamente, sem conversão nem FFmpeg do sistema.
 
-O áudio não é salvo no banco. Para diagnóstico local temporário, defina `APP_TELEGRAM_AUDIO_DEBUG_SAVE_ENABLED=true`: os mesmos bytes recebidos do Telegram são copiados, antes da transcrição, para `telegram-audio-debug/telegram-{updateId}-{sourceMessageId}.ogg`. O salvamento é best-effort e uma falha local não interrompe a transcrição; por padrão ele está desabilitado. O arquivo temporário criado na Files API é removido após a transcrição em modo best-effort; apenas o texto transcrito é mantido no histórico da mensagem para permitir as validações financeiras existentes. A chave `APP_AI_GEMINI_API_KEY` é obrigatória quando a transcrição estiver habilitada, mesmo que a extração financeira use Ollama.
+O áudio não é salvo no banco. Para diagnóstico local temporário, defina `APP_TELEGRAM_AUDIO_DEBUG_SAVE_ENABLED=true`: os mesmos bytes recebidos do Telegram são copiados, antes da transcrição, para `telegram-audio-debug/telegram-{updateId}-{sourceMessageId}.ogg`. O salvamento é best-effort e uma falha local não interrompe a transcrição; por padrão ele está desabilitado. O arquivo temporário criado na Files API é removido após a transcrição em modo best-effort; apenas o texto transcrito é mantido no histórico da mensagem para permitir as validações financeiras existentes. A chave `APP_AI_GEMINI_API_KEY` é obrigatória para a transcrição apenas quando `APP_TRANSCRIPTION_PROVIDER=gemini`.
 
 Para registrar o corpo JSON retornado pelo Gemini multimodal, ative `APP_AI_AUDIO_TRANSCRIPTION_DEBUG_RESPONSE=true`. A resposta é salva como `telegram-audio-debug/gemini-response-{updateId}-{sourceMessageId}.json`; não inclui headers, credenciais ou áudio.
 

@@ -54,7 +54,7 @@ class GeminiMultimodalAudioTranscriptionClientTest {
                                 MediaType.APPLICATION_JSON));
         expectCleanup(server);
 
-        assertThat(client.transcribe(request())).isEqualTo("Gastei R$ 850 com diesel hoje.");
+        assertThat(client.transcribe(request()).text()).isEqualTo("Gastei R$ 850 com diesel hoje.");
         server.verify();
     }
 

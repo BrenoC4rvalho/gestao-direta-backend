@@ -4,6 +4,7 @@ import br.com.gestaodireta.ai.transcription.AudioTranscriptionClient;
 import br.com.gestaodireta.ai.transcription.AudioTranscriptionException;
 import br.com.gestaodireta.ai.transcription.AudioTranscriptionProperties;
 import br.com.gestaodireta.ai.transcription.AudioTranscriptionRequest;
+import br.com.gestaodireta.ai.transcription.AudioTranscriptionResult;
 import br.com.gestaodireta.messaging.domain.MessagingAccount;
 import br.com.gestaodireta.messaging.domain.MessagingConversation;
 import br.com.gestaodireta.messaging.domain.MessagingMessage;
@@ -127,13 +128,14 @@ public class TelegramVoiceMessageProcessor {
         audioDebugFileSaver.save(
                 message.getProviderUpdateId(), message.getProviderMessageId(), audio, mimeType);
         try {
-            String transcript =
+            AudioTranscriptionResult transcription =
                     transcriber.transcribe(
                             new AudioTranscriptionRequest(
                                     audio,
                                     mimeType,
                                     message.getProviderUpdateId(),
                                     message.getProviderMessageId()));
+            String transcript = transcription == null ? null : transcription.text();
             if (transcript == null || transcript.isBlank()) {
                 outgoing.send(conversation, EMPTY_TRANSCRIPT_MESSAGE);
                 return;

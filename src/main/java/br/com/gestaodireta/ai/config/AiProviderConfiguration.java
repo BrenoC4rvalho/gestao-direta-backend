@@ -6,9 +6,12 @@ import br.com.gestaodireta.ai.infrastructure.gemini.GeminiAiTextGenerationClient
 import br.com.gestaodireta.ai.infrastructure.gemini.GeminiMultimodalAudioTranscriptionClient;
 import br.com.gestaodireta.ai.infrastructure.ollama.OllamaAiProperties;
 import br.com.gestaodireta.ai.infrastructure.ollama.OllamaAiTextGenerationClient;
+import br.com.gestaodireta.ai.infrastructure.whisper.WhisperAudioTranscriptionClient;
 import br.com.gestaodireta.ai.service.provider.AiTextGenerationClient;
 import br.com.gestaodireta.ai.transcription.AudioTranscriptionClient;
 import br.com.gestaodireta.ai.transcription.AudioTranscriptionProperties;
+import br.com.gestaodireta.ai.transcription.AudioTranscriptionProvider;
+import br.com.gestaodireta.ai.transcription.AudioTranscriptionProviderProperties;
 import br.com.gestaodireta.ai.transcription.DisabledAudioTranscriptionClient;
 import java.util.Locale;
 import org.springframework.context.annotation.Bean;
@@ -21,14 +24,23 @@ public class AiProviderConfiguration {
     @Bean
     public AudioTranscriptionClient audioTranscriptionClient(
             AudioTranscriptionProperties transcriptionProperties,
+            AudioTranscriptionProviderProperties providerProperties,
             GeminiAiProperties geminiProperties,
             RestClient.Builder restClientBuilder) {
         if (!transcriptionProperties.isEnabled()) {
             return new DisabledAudioTranscriptionClient();
         }
-        validateGeminiApiKey(geminiProperties.getApiKey());
-        return new GeminiMultimodalAudioTranscriptionClient(
-                restClientBuilder, geminiProperties, transcriptionProperties, true);
+        AudioTranscriptionProvider provider = providerProperties.getProvider();
+        if (provider == AudioTranscriptionProvider.GEMINI) {
+            validateGeminiApiKey(geminiProperties.getApiKey());
+            return new GeminiMultimodalAudioTranscriptionClient(
+                    restClientBuilder, geminiProperties, transcriptionProperties, true);
+        }
+        if (provider == AudioTranscriptionProvider.WHISPER) {
+            return new WhisperAudioTranscriptionClient(
+                    restClientBuilder, providerProperties.getWhisper());
+        }
+        throw new IllegalStateException("Unsupported audio transcription provider: " + provider);
     }
 
     @Bean
