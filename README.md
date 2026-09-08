@@ -210,6 +210,19 @@ Para mudanças estruturais, crie uma nova migration versionada nesse diretório.
 
 O plugin Maven do Flyway usa `DB_URL`, `DB_USERNAME` e `DB_PASSWORD` do ambiente.
 
+## Base demonstrativa para desenvolvimento/TCC
+
+O reset e seed da base demonstrativa está em [`scripts/reset_and_seed_tcc_demo.sql`](scripts/reset_and_seed_tcc_demo.sql). Ele remove os dados atuais do banco local `gestaodireta` e recria os dados usados no desenvolvimento e nas demonstrações do TCC.
+
+```bash
+set -a
+source .env
+set +a
+PGPASSWORD="$DB_PASSWORD" psql "${DB_URL#jdbc:}" -U "$DB_USERNAME" -v ON_ERROR_STOP=1 -f scripts/reset_and_seed_tcc_demo.sql
+```
+
+Consulte usuários, senhas, pré-requisitos e as validações em [`scripts/SEED_TCC_DEMO.md`](scripts/SEED_TCC_DEMO.md). Execute somente em desenvolvimento.
+
 ## Inteligência artificial
 
 O provider de extração de texto é escolhido por `APP_AI_PROVIDER`. A API aceita `gemini` e `ollama`; não há fallback automático entre eles. A transcrição é escolhida separadamente por `APP_TRANSCRIPTION_PROVIDER`, aceitando `gemini` e `whisper`.
