@@ -1,6 +1,6 @@
 -- Gestão Direta — base demonstrativa para desenvolvimento e TCC.
 -- DESTRUTIVO: remove todos os dados de negócio e usuários, mas não altera o schema
--- nem a tabela flyway_schema_history. Data de referência do cenário: 2026-09-07.
+-- nem a tabela flyway_schema_history. Data de referência do cenário: 2026-09-08.
 
 BEGIN;
 
@@ -64,6 +64,7 @@ VALUES
     ('Ana Ribeiro', 'produtor.santahelena@gestaodireta.local', '$2a$10$bVzr6y4xJNLJVQexuIQv/OARRsCL0I5ggfuXXnUYZjIk8VzOh8WbO', NULL, 'USER', 'ACTIVE', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('Carlos Mendes', 'produtor.saomiguel@gestaodireta.local', '$2a$10$bVzr6y4xJNLJVQexuIQv/OARRsCL0I5ggfuXXnUYZjIk8VzOh8WbO', NULL, 'USER', 'ACTIVE', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('Renata Lopes', 'produtor.valeverde@gestaodireta.local', '$2a$10$bVzr6y4xJNLJVQexuIQv/OARRsCL0I5ggfuXXnUYZjIk8VzOh8WbO', NULL, 'USER', 'ACTIVE', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('Eduardo Lima', 'produtor.horizonte@gestaodireta.local', '$2a$10$bVzr6y4xJNLJVQexuIQv/OARRsCL0I5ggfuXXnUYZjIk8VzOh8WbO', NULL, 'USER', 'ACTIVE', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('Diego Martins', 'colaborador.valeverde@gestaodireta.local', '$2a$10$bVzr6y4xJNLJVQexuIQv/OARRsCL0I5ggfuXXnUYZjIk8VzOh8WbO', NULL, 'USER', 'ACTIVE', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('Paula Nogueira', 'contador@gestaodireta.local', '$2a$10$bVzr6y4xJNLJVQexuIQv/OARRsCL0I5ggfuXXnUYZjIk8VzOh8WbO', NULL, 'USER', 'ACTIVE', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
@@ -76,6 +77,7 @@ FROM (
         ('santa_produtor', 'produtor.santahelena@gestaodireta.local'),
         ('miguel_produtor', 'produtor.saomiguel@gestaodireta.local'),
         ('vale_produtor', 'produtor.valeverde@gestaodireta.local'),
+        ('horizonte_produtor', 'produtor.horizonte@gestaodireta.local'),
         ('vale_colaborador', 'colaborador.valeverde@gestaodireta.local'),
         ('contador', 'contador@gestaodireta.local')
 ) AS seed(user_key, email)
@@ -101,6 +103,7 @@ FROM (
         ('santa_produtor', '+5531991001003'),
         ('miguel_produtor', '+5531991001004'),
         ('vale_produtor', '+5531991001005'),
+        ('horizonte_produtor', '+5531991001008'),
         ('vale_colaborador', '+5531991001006'),
         ('contador', '+5531991001007')
 ) AS contact_seed(user_key, phone_number)
@@ -119,7 +122,8 @@ VALUES
     ('Fazenda Boa Esperança', NULL, 'Patrocínio', 'MG', 68.00, 'AGRICULTURE', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('Fazenda Santa Helena', NULL, 'Rio Verde', 'GO', 245.00, 'AGRICULTURE', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('Fazenda São Miguel', NULL, 'Unaí', 'MG', 118.00, 'AGRICULTURE', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('Fazenda Vale Verde', NULL, 'Campo Verde', 'MT', 430.00, 'AGRICULTURE', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    ('Fazenda Vale Verde', NULL, 'Campo Verde', 'MT', 430.00, 'AGRICULTURE', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('Fazenda Horizonte', NULL, 'Rio Verde', 'GO', 185.00, 'AGRICULTURE', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO demo_farms (farm_key, farm_id, producer_user_key)
 SELECT seed.farm_key, farm.id, seed.producer_user_key
@@ -128,7 +132,8 @@ FROM (
         ('boa', 'Fazenda Boa Esperança', 'boa_produtor'),
         ('santa', 'Fazenda Santa Helena', 'santa_produtor'),
         ('miguel', 'Fazenda São Miguel', 'miguel_produtor'),
-        ('vale', 'Fazenda Vale Verde', 'vale_produtor')
+        ('vale', 'Fazenda Vale Verde', 'vale_produtor'),
+        ('horizonte', 'Fazenda Horizonte', 'horizonte_produtor')
 ) AS seed(farm_key, farm_name, producer_user_key)
 JOIN farms farm ON farm.name = seed.farm_name;
 
@@ -207,7 +212,8 @@ JOIN (
         ('santa', 'Milho Safrinha', 'Milho de segunda safra integrado ao calendário da soja.'),
         ('miguel', 'Feijão', 'Produção de feijão com atenção a custos de manejo e qualidade.'),
         ('vale', 'Feijão', 'Feijão em talhões selecionados para diversificação da receita.'),
-        ('vale', 'Milho Safrinha', 'Milho de segunda safra como complemento da operação diversificada.')
+        ('vale', 'Milho Safrinha', 'Milho de segunda safra como complemento da operação diversificada.'),
+        ('horizonte', 'Soja', 'Produção de soja com histórico consolidado e planejamento disciplinado de safra.')
 ) AS activity(farm_key, name, description) ON activity.farm_key = farm_seed.farm_key;
 
 INSERT INTO demo_activities (farm_key, activity_name, activity_id)
@@ -272,7 +278,15 @@ VALUES
     ('vale_feijao_2026', 'vale', 'Feijão', 'Feijão 2026', DATE '2026-02-12', DATE '2026-10-18', 182.00, 'IN_PROGRESS', 7),
     ('vale_feijao_2027', 'vale', 'Feijão', 'Feijão 2027', DATE '2027-02-11', DATE '2027-07-23', 185.00, 'PLANNED', 8),
     ('vale_feijao_2028', 'vale', 'Feijão', 'Feijão 2028', DATE '2028-02-10', DATE '2028-07-22', 190.00, 'PLANNED', 9),
-    ('vale_milho_2026', 'vale', 'Milho Safrinha', 'Milho Safrinha 2026', DATE '2026-03-17', DATE '2026-10-25', 160.00, 'IN_PROGRESS', 4);
+    ('vale_milho_2026', 'vale', 'Milho Safrinha', 'Milho Safrinha 2026', DATE '2026-03-17', DATE '2026-10-25', 160.00, 'IN_PROGRESS', 4),
+    ('horizonte_2020', 'horizonte', 'Soja', 'Soja 2020/2021', DATE '2020-09-14', DATE '2021-03-12', 160.00, 'FINISHED', 1),
+    ('horizonte_2021', 'horizonte', 'Soja', 'Soja 2021/2022', DATE '2021-09-15', DATE '2022-03-13', 165.00, 'FINISHED', 2),
+    ('horizonte_2022', 'horizonte', 'Soja', 'Soja 2022/2023', DATE '2022-09-14', DATE '2023-03-12', 170.00, 'FINISHED', 1),
+    ('horizonte_2023', 'horizonte', 'Soja', 'Soja 2023/2024', DATE '2023-09-15', DATE '2024-03-13', 175.00, 'FINISHED', 2),
+    ('horizonte_2024', 'horizonte', 'Soja', 'Soja 2024/2025', DATE '2024-09-13', DATE '2025-03-12', 180.00, 'FINISHED', 1),
+    ('horizonte_2025', 'horizonte', 'Soja', 'Soja 2025/2026', DATE '2025-09-15', DATE '2026-03-13', 185.00, 'FINISHED', 2),
+    ('horizonte_2026', 'horizonte', 'Soja', 'Soja 2026/2027', DATE '2026-08-18', DATE '2027-03-12', 185.00, 'IN_PROGRESS', 7),
+    ('horizonte_2027', 'horizonte', 'Soja', 'Soja 2027/2028', DATE '2027-09-15', DATE '2028-03-12', 190.00, 'PLANNED', 2);
 
 INSERT INTO harvest_seasons (
     farm_id, production_activity_id, name, description, start_date, end_date,
@@ -311,19 +325,27 @@ SELECT
     season.variance_group,
     season.start_date,
     season.season_status,
-    CASE season.activity_name
-        WHEN 'Café' THEN 11200
-        WHEN 'Soja' THEN 3450
-        WHEN 'Milho Safrinha' THEN 3050
-        WHEN 'Feijão' THEN 4350
-    END * season.area_hectares * (1 + ((EXTRACT(YEAR FROM season.start_date) - 2020) * 0.052)) AS planned_cost,
-    CASE season.activity_name
-        WHEN 'Café' THEN 19400
-        WHEN 'Soja' THEN 6400
-        WHEN 'Milho Safrinha' THEN 5450
-        WHEN 'Feijão' THEN 7450
-    END * season.area_hectares * (1 + ((EXTRACT(YEAR FROM season.start_date) - 2020) * 0.038)
-        + CASE season.variance_group % 4 WHEN 0 THEN -0.055 WHEN 1 THEN 0.035 WHEN 2 THEN 0.075 ELSE -0.020 END) AS planned_revenue
+    CASE season.season_key
+        WHEN 'horizonte_2026' THEN 830000.00
+        WHEN 'horizonte_2027' THEN 760000.00
+        ELSE CASE season.activity_name
+            WHEN 'Café' THEN 11200
+            WHEN 'Soja' THEN 3450
+            WHEN 'Milho Safrinha' THEN 3050
+            WHEN 'Feijão' THEN 4350
+        END * season.area_hectares * (1 + ((EXTRACT(YEAR FROM season.start_date) - 2020) * 0.052))
+    END AS planned_cost,
+    CASE season.season_key
+        WHEN 'horizonte_2026' THEN 1450000.00
+        WHEN 'horizonte_2027' THEN 1400000.00
+        ELSE CASE season.activity_name
+            WHEN 'Café' THEN 19400
+            WHEN 'Soja' THEN 6400
+            WHEN 'Milho Safrinha' THEN 5450
+            WHEN 'Feijão' THEN 7450
+        END * season.area_hectares * (1 + ((EXTRACT(YEAR FROM season.start_date) - 2020) * 0.038)
+            + CASE season.variance_group % 4 WHEN 0 THEN -0.055 WHEN 1 THEN 0.035 WHEN 2 THEN 0.075 ELSE -0.020 END)
+    END AS planned_revenue
 FROM demo_seasons season;
 
 INSERT INTO harvest_season_budget_items (
@@ -553,7 +575,7 @@ WHERE category.season_status = 'IN_PROGRESS'
       WHEN 'Manutenção de máquinas' THEN 56
       WHEN 'Venda da produção' THEN 174
       ELSE 189
-  END <= DATE '2026-09-07';
+  END <= DATE '2026-09-08';
 
 INSERT INTO financial_transactions (
     description, amount, type, status, payment_method, transaction_date, due_date, paid_at,
@@ -604,6 +626,55 @@ JOIN demo_categories category
     AND category.transaction_type = 'EXPENSE'
 WHERE season.season_key = 'miguel_2026';
 
+-- Fazenda Horizonte: compromissos independentes em aberto representam a pressão de caixa.
+-- O modelo não possui liquidação parcial por lançamento; por isso não há pagamentos parciais simulados.
+INSERT INTO financial_transactions (
+    description, amount, type, status, payment_method, transaction_date, due_date, paid_at,
+    notes, farm_id, category_id, harvest_season_id, created_by_user_id, updated_by_user_id,
+    record_status, created_at, updated_at
+)
+SELECT
+    crisis.description, crisis.amount, crisis.transaction_type, crisis.transaction_status,
+    crisis.payment_method, crisis.transaction_date, crisis.due_date, crisis.paid_at,
+    crisis.notes, farm_seed.farm_id, category.category_id, season.harvest_season_id,
+    producer.user_id, NULL, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+FROM (
+    VALUES
+        ('Aplicação complementar de fertilizante', 120000.00, 'EXPENSE', 'PAID', 'BANK_TRANSFER', DATE '2026-09-04', NULL, DATE '2026-09-04', 'Pagamento realizado durante o manejo da safra.', 'Fertilizantes'),
+        ('Aplicação corretiva de defensivos', 86500.00, 'EXPENSE', 'PAID', 'PIX', DATE '2026-08-25', NULL, DATE '2026-08-25', 'Aplicação adicional já concluída.', 'Defensivos agrícolas'),
+        ('Reparo extraordinário na colheitadeira', 74000.00, 'EXPENSE', 'PAID', 'BANK_TRANSFER', DATE '2026-08-28', NULL, DATE '2026-08-28', 'Manutenção corretiva já liquidada.', 'Manutenção de máquinas'),
+        ('Diesel para preparo e aplicação', 42300.00, 'EXPENSE', 'PAID', 'PIX', DATE '2026-09-02', NULL, DATE '2026-09-02', 'Combustível utilizado nas operações iniciais.', 'Combustíveis'),
+        ('Equipe de campo do manejo inicial', 55800.00, 'EXPENSE', 'PAID', 'BANK_TRANSFER', DATE '2026-09-05', NULL, DATE '2026-09-05', 'Mão de obra já liquidada.', 'Mão de obra'),
+        ('Compra de fertilizante com vencimento em aberto', 104800.00, 'EXPENSE', 'OVERDUE', 'BOLETO', DATE '2026-08-20', DATE '2026-08-28', NULL, 'Fornecedor aguarda regularização do boleto.', 'Fertilizantes'),
+        ('Defensivo adquirido para controle emergencial', 88450.00, 'EXPENSE', 'OVERDUE', 'BOLETO', DATE '2026-08-21', DATE '2026-08-25', NULL, 'Compra adicional com vencimento ultrapassado.', 'Defensivos agrícolas'),
+        ('Abastecimento operacional em aberto', 43620.00, 'EXPENSE', 'OVERDUE', 'PIX', DATE '2026-08-20', DATE '2026-08-27', NULL, 'Pendência de combustível do início da safra.', 'Combustíveis'),
+        ('Manutenção corretiva contratada', 96780.00, 'EXPENSE', 'OVERDUE', 'BOLETO', DATE '2026-08-22', DATE '2026-08-29', NULL, 'Reparo extraordinário ainda não liquidado.', 'Manutenção de máquinas'),
+        ('Serviço de regulagem de equipamentos', 54930.00, 'EXPENSE', 'OVERDUE', 'BOLETO', DATE '2026-08-23', DATE '2026-08-30', NULL, 'Serviço concluído com cobrança pendente.', 'Serviços terceirizados'),
+        ('Folha complementar da equipe temporária', 71240.00, 'EXPENSE', 'OVERDUE', 'BANK_TRANSFER', DATE '2026-08-19', DATE '2026-09-01', NULL, 'Parcela de mão de obra permanece em aberto.', 'Mão de obra'),
+        ('Fatura de energia do sistema de apoio', 28760.00, 'EXPENSE', 'OVERDUE', 'BOLETO', DATE '2026-08-21', DATE '2026-09-02', NULL, 'Fatura operacional vencida.', 'Energia e irrigação'),
+        ('Frete de insumos para a propriedade', 37890.00, 'EXPENSE', 'OVERDUE', 'BOLETO', DATE '2026-08-24', DATE '2026-09-03', NULL, 'Transporte aguardando pagamento.', 'Transporte'),
+        ('Fertilizante contratado para cobertura', 68420.00, 'EXPENSE', 'PENDING', 'BOLETO', DATE '2026-09-05', DATE '2026-09-18', NULL, 'Compromisso programado para a próxima etapa de manejo.', 'Fertilizantes'),
+        ('Frete programado para recebimento de insumos', 35760.00, 'EXPENSE', 'PENDING', 'BOLETO', DATE '2026-09-05', DATE '2026-10-05', NULL, 'Vencimento futuro relacionado ao escoamento interno.', 'Transporte'),
+        ('Assistência técnica contratada para outubro', 42890.00, 'EXPENSE', 'PENDING', 'BANK_TRANSFER', DATE '2026-09-06', DATE '2026-10-17', NULL, 'Serviço técnico já contratado, ainda não vencido.', 'Serviços terceirizados'),
+        ('Recebimento de lote entregue', 95000.00, 'INCOME', 'PAID', 'BANK_TRANSFER', DATE '2026-09-05', NULL, DATE '2026-09-05', 'Entrada efetivamente recebida pela venda já entregue.', 'Venda da produção'),
+        ('Venda de soja com prazo comercial vencido', 125400.00, 'INCOME', 'OVERDUE', 'BANK_TRANSFER', DATE '2026-08-20', DATE '2026-08-26', NULL, 'Cliente ainda não liquidou o lote faturado.', 'Venda da produção'),
+        ('Recebível de lote comercializado', 98750.00, 'INCOME', 'OVERDUE', 'BOLETO', DATE '2026-08-22', DATE '2026-08-31', NULL, 'Parcela de venda vencida e não recebida.', 'Venda da produção'),
+        ('Receita de lote complementar faturado', 64980.00, 'INCOME', 'OVERDUE', 'BANK_TRANSFER', DATE '2026-08-24', DATE '2026-09-02', NULL, 'Recebimento complementar pendente.', 'Venda de lote complementar'),
+        ('Recebível complementar com vencimento ultrapassado', 42860.00, 'INCOME', 'OVERDUE', 'BOLETO', DATE '2026-08-25', DATE '2026-09-04', NULL, 'Cliente aguarda reprogramação de pagamento.', 'Venda de lote complementar'),
+        ('Venda contratada com vencimento em novembro', 165280.00, 'INCOME', 'PENDING', 'BANK_TRANSFER', DATE '2026-09-06', DATE '2026-11-10', NULL, 'Receita contratada com recebimento futuro.', 'Venda da produção'),
+        ('Venda complementar programada', 76540.00, 'INCOME', 'PENDING', 'BOLETO', DATE '2026-09-06', DATE '2026-10-12', NULL, 'Receita prevista para lote complementar.', 'Venda de lote complementar')
+) AS crisis(
+    description, amount, transaction_type, transaction_status, payment_method,
+    transaction_date, due_date, paid_at, notes, category_name
+)
+JOIN demo_seasons season ON season.season_key = 'horizonte_2026'
+JOIN demo_farms farm_seed ON farm_seed.farm_key = 'horizonte'
+JOIN demo_users producer ON producer.user_key = farm_seed.producer_user_key
+JOIN demo_categories category
+    ON category.farm_key = 'horizonte'
+    AND category.category_name = crisis.category_name
+    AND category.transaction_type = crisis.transaction_type;
+
 -- Lançamentos gerais, sem safra, para a visualização financeira consolidada e filtro "Sem safra".
 INSERT INTO financial_transactions (
     description, amount, type, status, payment_method, transaction_date, due_date, paid_at,
@@ -638,7 +709,7 @@ BEGIN
     SELECT COUNT(*) INTO future_paid_count
     FROM financial_transactions
     WHERE status = 'PAID'
-      AND (transaction_date > DATE '2026-09-07' OR paid_at > DATE '2026-09-07');
+      AND (transaction_date > DATE '2026-09-08' OR paid_at > DATE '2026-09-08');
 
     SELECT COUNT(*) INTO planned_movement_count
     FROM financial_transactions transaction
@@ -651,7 +722,7 @@ BEGIN
     WHERE transaction.category_id IS NOT NULL
       AND (transaction.farm_id <> category.farm_id OR transaction.type::TEXT <> category.type::TEXT);
 
-    IF farm_count <> 4
+    IF farm_count <> 5
         OR future_paid_count <> 0
         OR planned_movement_count <> 0
         OR mismatched_category_count <> 0 THEN
@@ -683,7 +754,7 @@ SELECT 'transactions', COUNT(*)::TEXT FROM financial_transactions
 UNION ALL
 SELECT 'commitments_open', COUNT(*)::TEXT FROM financial_transactions WHERE status IN ('PENDING', 'OVERDUE')
 UNION ALL
-SELECT 'future_paid_transactions', COUNT(*)::TEXT FROM financial_transactions WHERE status = 'PAID' AND (transaction_date > DATE '2026-09-07' OR paid_at > DATE '2026-09-07')
+SELECT 'future_paid_transactions', COUNT(*)::TEXT FROM financial_transactions WHERE status = 'PAID' AND (transaction_date > DATE '2026-09-08' OR paid_at > DATE '2026-09-08')
 UNION ALL
 SELECT 'planned_harvest_movements', COUNT(*)::TEXT
 FROM financial_transactions transaction JOIN harvest_seasons season ON season.id = transaction.harvest_season_id
@@ -700,3 +771,75 @@ FROM financial_transactions transaction
 JOIN farms farm ON farm.id = transaction.farm_id
 GROUP BY farm.name, transaction.type
 ORDER BY farm.name, transaction.type;
+
+-- Validação específica do cenário de liquidez e recuperação da Fazenda Horizonte.
+WITH horizonte AS (
+    SELECT id FROM farms WHERE name = 'Fazenda Horizonte'
+), horizonte_seasons AS (
+    SELECT season.id, season.name, season.status
+    FROM harvest_seasons season
+    JOIN horizonte ON horizonte.id = season.farm_id
+), horizon_2026_plan AS (
+    SELECT
+        COALESCE(SUM(item.planned_amount) FILTER (WHERE item.type = 'EXPENSE'), 0) AS planned_cost,
+        COALESCE(SUM(item.planned_amount) FILTER (WHERE item.type = 'INCOME'), 0) AS planned_revenue
+    FROM harvest_season_budget_items item
+    JOIN horizonte_seasons season ON season.id = item.harvest_season_id
+    WHERE season.name = 'Soja 2026/2027'
+), horizon_2026_projection AS (
+    SELECT
+        COALESCE(SUM(transaction.amount) FILTER (WHERE transaction.type = 'EXPENSE'), 0) AS projected_cost,
+        COALESCE(SUM(transaction.amount) FILTER (WHERE transaction.type = 'INCOME'), 0) AS projected_revenue,
+        COALESCE(SUM(transaction.amount) FILTER (WHERE transaction.type = 'EXPENSE' AND transaction.status = 'PAID'), 0) AS realized_cost,
+        COALESCE(SUM(transaction.amount) FILTER (WHERE transaction.type = 'INCOME' AND transaction.status = 'PAID'), 0) AS realized_revenue
+    FROM financial_transactions transaction
+    JOIN horizonte_seasons season ON season.id = transaction.harvest_season_id
+    WHERE season.name = 'Soja 2026/2027'
+), horizon_2027_plan AS (
+    SELECT
+        COALESCE(SUM(item.planned_amount) FILTER (WHERE item.type = 'EXPENSE'), 0) AS planned_cost,
+        COALESCE(SUM(item.planned_amount) FILTER (WHERE item.type = 'INCOME'), 0) AS planned_revenue
+    FROM harvest_season_budget_items item
+    JOIN horizonte_seasons season ON season.id = item.harvest_season_id
+    WHERE season.name = 'Soja 2027/2028'
+), horizon_historical_results AS (
+    SELECT
+        season.name,
+        COALESCE(SUM(transaction.amount) FILTER (WHERE transaction.type = 'INCOME'), 0)
+            - COALESCE(SUM(transaction.amount) FILTER (WHERE transaction.type = 'EXPENSE'), 0) AS result
+    FROM horizonte_seasons season
+    LEFT JOIN financial_transactions transaction ON transaction.harvest_season_id = season.id
+    WHERE season.status = 'FINISHED'
+    GROUP BY season.id, season.name
+)
+SELECT 'horizonte_2020_2025_result_by_season' AS validation,
+       string_agg(name || ': ' || TO_CHAR(result, 'FM999G999G999D00'), ' | ' ORDER BY name) AS value
+FROM horizon_historical_results
+UNION ALL
+SELECT 'horizonte_overdue_payables_2026', COUNT(*) || ' / ' || TO_CHAR(COALESCE(SUM(transaction.amount), 0), 'FM999G999G999D00')
+FROM financial_transactions transaction JOIN horizonte ON horizonte.id = transaction.farm_id
+WHERE transaction.type = 'EXPENSE' AND transaction.status = 'OVERDUE' AND transaction.due_date < DATE '2026-09-08'
+UNION ALL
+SELECT 'horizonte_overdue_receivables_2026', COUNT(*) || ' / ' || TO_CHAR(COALESCE(SUM(transaction.amount), 0), 'FM999G999G999D00')
+FROM financial_transactions transaction JOIN horizonte ON horizonte.id = transaction.farm_id
+WHERE transaction.type = 'INCOME' AND transaction.status = 'OVERDUE' AND transaction.due_date < DATE '2026-09-08'
+UNION ALL
+SELECT 'horizonte_future_payables', COUNT(*) || ' / ' || TO_CHAR(COALESCE(SUM(transaction.amount), 0), 'FM999G999G999D00')
+FROM financial_transactions transaction JOIN horizonte ON horizonte.id = transaction.farm_id
+WHERE transaction.type = 'EXPENSE' AND transaction.status = 'PENDING' AND transaction.due_date > DATE '2026-09-08'
+UNION ALL
+SELECT 'horizonte_future_receivables', COUNT(*) || ' / ' || TO_CHAR(COALESCE(SUM(transaction.amount), 0), 'FM999G999G999D00')
+FROM financial_transactions transaction JOIN horizonte ON horizonte.id = transaction.farm_id
+WHERE transaction.type = 'INCOME' AND transaction.status = 'PENDING' AND transaction.due_date > DATE '2026-09-08'
+UNION ALL
+SELECT 'horizonte_2026_planned_cost_revenue', TO_CHAR(planned_cost, 'FM999G999G999D00') || ' / ' || TO_CHAR(planned_revenue, 'FM999G999G999D00') FROM horizon_2026_plan
+UNION ALL
+SELECT 'horizonte_2026_realized_cost_revenue', TO_CHAR(realized_cost, 'FM999G999G999D00') || ' / ' || TO_CHAR(realized_revenue, 'FM999G999G999D00') FROM horizon_2026_projection
+UNION ALL
+SELECT 'horizonte_2026_projected_cost_revenue_result', TO_CHAR(projected_cost, 'FM999G999G999D00') || ' / ' || TO_CHAR(projected_revenue, 'FM999G999G999D00') || ' / ' || TO_CHAR(projected_revenue - projected_cost, 'FM999G999G999D00') FROM horizon_2026_projection
+UNION ALL
+SELECT 'horizonte_2027_planned_cost_revenue_result', TO_CHAR(planned_cost, 'FM999G999G999D00') || ' / ' || TO_CHAR(planned_revenue, 'FM999G999G999D00') || ' / ' || TO_CHAR(planned_revenue - planned_cost, 'FM999G999G999D00') FROM horizon_2027_plan
+UNION ALL
+SELECT 'horizonte_2027_realized_movements', COUNT(*)::TEXT
+FROM financial_transactions transaction JOIN horizonte_seasons season ON season.id = transaction.harvest_season_id
+WHERE season.name = 'Soja 2027/2028';
