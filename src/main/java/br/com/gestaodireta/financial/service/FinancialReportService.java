@@ -7,6 +7,7 @@ import br.com.gestaodireta.financial.dto.FinancialCashFlowPointResponse;
 import br.com.gestaodireta.financial.dto.FinancialCashFlowResponse;
 import br.com.gestaodireta.financial.dto.FinancialCategorySummaryGroupResponse;
 import br.com.gestaodireta.financial.dto.FinancialCategorySummaryResponse;
+import br.com.gestaodireta.financial.dto.FinancialCumulativeEvolutionPointResponse;
 import br.com.gestaodireta.financial.dto.FinancialEvolutionPointResponse;
 import br.com.gestaodireta.financial.dto.FinancialHarvestSummaryResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportCategoryIndicatorResponse;
@@ -34,6 +35,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -97,6 +99,8 @@ public class FinancialReportService {
                                 financialReportRepository.findEvolution(
                                         normalizedFilter, referenceDate),
                                 today);
+        List<FinancialCumulativeEvolutionPointResponse> realizedCumulativeEvolution =
+                realizedCumulativeEvolution(evolution);
         FinancialCashFlowResponse cashFlow =
                 cashFlow(
                         normalizedFilter,
@@ -119,11 +123,34 @@ public class FinancialReportService {
                 summary,
                 commitments,
                 evolution,
+                realizedCumulativeEvolution,
                 cashFlow,
                 categories,
                 harvests,
                 indicators(performanceEvolution, categories, harvests),
                 unallocated);
+    }
+
+    static List<FinancialCumulativeEvolutionPointResponse> realizedCumulativeEvolution(
+            List<FinancialEvolutionPointResponse> evolution) {
+        ArrayList<FinancialCumulativeEvolutionPointResponse> result = new ArrayList<>();
+        BigDecimal cumulativeIncome = BigDecimal.ZERO;
+        BigDecimal cumulativeExpense = BigDecimal.ZERO;
+
+        for (FinancialEvolutionPointResponse point : evolution) {
+            cumulativeIncome = cumulativeIncome.add(point.realizedIncome());
+            cumulativeExpense = cumulativeExpense.add(point.realizedExpense());
+            result.add(
+                    new FinancialCumulativeEvolutionPointResponse(
+                            point.period(),
+                            point.label(),
+                            point.periodStart(),
+                            point.periodEnd(),
+                            cumulativeIncome,
+                            cumulativeExpense));
+        }
+
+        return List.copyOf(result);
     }
 
     @Transactional(readOnly = true)

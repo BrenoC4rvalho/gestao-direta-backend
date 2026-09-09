@@ -501,6 +501,258 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldBuildFilteredRealizedCumulativeEvolution() {
+        Farm farm = saveFarm();
+        User user = saveUser();
+        FinancialCategory incomeCategory =
+                saveCategory(farm, "Venda de produção", TransactionType.INCOME);
+        FinancialCategory expenseCategory = saveCategory(farm, "Insumos", TransactionType.EXPENSE);
+        FinancialCategory ignoredCategory =
+                saveCategory(farm, "Outras receitas", TransactionType.INCOME);
+        HarvestSeason selectedHarvest = saveHarvest(farm, "Soja");
+        HarvestSeason ignoredHarvest = saveHarvest(farm, "Milho");
+
+        saveTransaction(
+                farm,
+                user,
+                incomeCategory,
+                selectedHarvest,
+                TransactionType.INCOME,
+                new BigDecimal("999.00"),
+                LocalDate.of(2026, 1, 10));
+        saveTransaction(
+                farm,
+                user,
+                incomeCategory,
+                selectedHarvest,
+                TransactionType.INCOME,
+                new BigDecimal("100.00"),
+                LocalDate.of(2026, 1, 20));
+        saveTransaction(
+                farm,
+                user,
+                expenseCategory,
+                selectedHarvest,
+                TransactionType.EXPENSE,
+                new BigDecimal("60.00"),
+                LocalDate.of(2026, 1, 21));
+        saveTransaction(
+                farm,
+                user,
+                incomeCategory,
+                selectedHarvest,
+                TransactionType.INCOME,
+                new BigDecimal("50.00"),
+                LocalDate.of(2026, 2, 10));
+        saveTransaction(
+                farm,
+                user,
+                expenseCategory,
+                selectedHarvest,
+                TransactionType.EXPENSE,
+                new BigDecimal("20.00"),
+                LocalDate.of(2026, 2, 12));
+        saveTransaction(
+                farm,
+                user,
+                incomeCategory,
+                selectedHarvest,
+                TransactionType.INCOME,
+                new BigDecimal("25.00"),
+                LocalDate.of(2026, 3, 10));
+        saveTransaction(
+                farm,
+                user,
+                expenseCategory,
+                selectedHarvest,
+                TransactionType.EXPENSE,
+                new BigDecimal("40.00"),
+                LocalDate.of(2026, 3, 12));
+        saveTransaction(
+                farm,
+                user,
+                incomeCategory,
+                selectedHarvest,
+                TransactionType.INCOME,
+                new BigDecimal("888.00"),
+                LocalDate.of(2026, 3, 20));
+        saveTransaction(
+                farm,
+                user,
+                ignoredCategory,
+                selectedHarvest,
+                TransactionType.INCOME,
+                new BigDecimal("777.00"),
+                LocalDate.of(2026, 2, 10));
+        saveTransaction(
+                farm,
+                user,
+                incomeCategory,
+                ignoredHarvest,
+                TransactionType.INCOME,
+                new BigDecimal("666.00"),
+                LocalDate.of(2026, 2, 10));
+
+        FinancialReportFilter monthlyFilter =
+                new FinancialReportFilter(
+                        farm.getId(),
+                        LocalDate.of(2026, 1, 15),
+                        LocalDate.of(2026, 3, 15),
+                        FinancialReportBasis.ACCRUAL,
+                        java.util.List.of(selectedHarvest.getId()),
+                        java.util.List.of(incomeCategory.getId(), expenseCategory.getId()),
+                        FinancialReportGranularity.MONTHLY);
+
+        FinancialReportResponse monthly = financialReportService.getReport(monthlyFilter);
+
+        assertThat(monthly.evolution()).hasSize(3);
+        assertThat(monthly.evolution().get(0).periodStart()).isEqualTo(LocalDate.of(2026, 1, 15));
+        assertThat(monthly.evolution().get(0).income()).isEqualByComparingTo("100.00");
+        assertThat(monthly.evolution().get(0).expense()).isEqualByComparingTo("60.00");
+        assertThat(monthly.evolution().get(2).periodEnd()).isEqualTo(LocalDate.of(2026, 3, 15));
+        assertThat(monthly.realizedCumulativeEvolution())
+                .extracting(point -> point.cumulativeIncome())
+                .containsExactly(
+                        new BigDecimal("100.00"),
+                        new BigDecimal("150.00"),
+                        new BigDecimal("175.00"));
+        assertThat(monthly.realizedCumulativeEvolution())
+                .extracting(point -> point.cumulativeExpense())
+                .containsExactly(
+                        new BigDecimal("60.00"), new BigDecimal("80.00"), new BigDecimal("120.00"));
+        assertThat(monthly.realizedCumulativeEvolution().getLast().cumulativeIncome())
+                .isEqualByComparingTo(monthly.summary().realizedIncome());
+        assertThat(monthly.realizedCumulativeEvolution().getLast().cumulativeExpense())
+                .isEqualByComparingTo(monthly.summary().realizedExpense());
+
+        FinancialReportResponse quarterly =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                monthlyFilter.farmId(),
+                                monthlyFilter.startDate(),
+                                monthlyFilter.endDate(),
+                                monthlyFilter.basis(),
+                                monthlyFilter.harvestSeasonIds(),
+                                monthlyFilter.categoryIds(),
+                                FinancialReportGranularity.QUARTERLY));
+
+        assertThat(quarterly.evolution()).hasSize(1);
+        assertThat(quarterly.realizedCumulativeEvolution()).hasSize(1);
+        assertThat(quarterly.realizedCumulativeEvolution().getFirst().cumulativeIncome())
+                .isEqualByComparingTo("175.00");
+        assertThat(quarterly.realizedCumulativeEvolution().getFirst().cumulativeExpense())
+                .isEqualByComparingTo("120.00");
+    }
+
+    @Test
+    void shouldCarryCumulativeValuesAcrossEmptyMonthsAndRestartAtFilteredStart() {
+        Farm farm = saveFarm();
+        User user = saveUser();
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                new BigDecimal("100.00"),
+                LocalDate.of(2026, 1, 15),
+                LocalDate.of(2026, 1, 15),
+                LocalDate.of(2026, 1, 15));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                new BigDecimal("60.00"),
+                LocalDate.of(2026, 1, 15),
+                LocalDate.of(2026, 1, 15),
+                LocalDate.of(2026, 1, 15));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PENDING,
+                new BigDecimal("500.00"),
+                LocalDate.of(2026, 2, 10),
+                LocalDate.of(2026, 2, 10),
+                null);
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PENDING,
+                new BigDecimal("400.00"),
+                LocalDate.of(2026, 2, 10),
+                LocalDate.of(2026, 2, 10),
+                null);
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                new BigDecimal("50.00"),
+                LocalDate.of(2026, 3, 10),
+                LocalDate.of(2026, 3, 10),
+                LocalDate.of(2026, 3, 10));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                new BigDecimal("40.00"),
+                LocalDate.of(2026, 3, 10),
+                LocalDate.of(2026, 3, 10),
+                LocalDate.of(2026, 3, 10));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                new BigDecimal("999.00"),
+                LocalDate.of(2026, 3, 20),
+                LocalDate.of(2026, 3, 20),
+                LocalDate.of(2026, 3, 20));
+
+        FinancialReportResponse completePeriod =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 1, 1),
+                                LocalDate.of(2026, 3, 15),
+                                FinancialReportBasis.CASH,
+                                null,
+                                null,
+                                FinancialReportGranularity.MONTHLY));
+
+        assertThat(completePeriod.realizedCumulativeEvolution())
+                .extracting(point -> point.cumulativeIncome())
+                .containsExactly(
+                        new BigDecimal("100.00"),
+                        new BigDecimal("100.00"),
+                        new BigDecimal("150.00"));
+        assertThat(completePeriod.realizedCumulativeEvolution())
+                .extracting(point -> point.cumulativeExpense())
+                .containsExactly(
+                        new BigDecimal("60.00"), new BigDecimal("60.00"), new BigDecimal("100.00"));
+
+        FinancialReportResponse restartedPeriod =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 3, 1),
+                                LocalDate.of(2026, 3, 15),
+                                FinancialReportBasis.CASH,
+                                null,
+                                null,
+                                FinancialReportGranularity.MONTHLY));
+
+        assertThat(restartedPeriod.realizedCumulativeEvolution()).hasSize(1);
+        assertThat(restartedPeriod.realizedCumulativeEvolution().getFirst().cumulativeIncome())
+                .isEqualByComparingTo("50.00");
+        assertThat(restartedPeriod.realizedCumulativeEvolution().getFirst().cumulativeExpense())
+                .isEqualByComparingTo("40.00");
+    }
+
+    @Test
     void shouldBuildCategoryRankingsByTypeWithinTheFilteredHarvestAndCategory() {
         Farm farm = saveFarm();
         User user = saveUser();
@@ -629,6 +881,30 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
         transaction.setDueDate(dueDate);
         transaction.setPaidAt(paidAt);
         transaction.setFarm(farm);
+        transaction.setCreatedByUser(user);
+        transaction.setRecordStatus(FinancialRecordStatus.ACTIVE);
+        financialTransactionRepository.save(transaction);
+    }
+
+    private void saveTransaction(
+            Farm farm,
+            User user,
+            FinancialCategory category,
+            HarvestSeason harvest,
+            TransactionType type,
+            BigDecimal amount,
+            LocalDate transactionDate) {
+        FinancialTransaction transaction = new FinancialTransaction();
+        transaction.setDescription("Filtered evolution transaction");
+        transaction.setAmount(amount);
+        transaction.setType(type);
+        transaction.setStatus(PaymentStatus.PAID);
+        transaction.setTransactionDate(transactionDate);
+        transaction.setDueDate(transactionDate);
+        transaction.setPaidAt(transactionDate);
+        transaction.setFarm(farm);
+        transaction.setCategory(category);
+        transaction.setHarvestSeason(harvest);
         transaction.setCreatedByUser(user);
         transaction.setRecordStatus(FinancialRecordStatus.ACTIVE);
         financialTransactionRepository.save(transaction);

@@ -12,6 +12,7 @@ public record FinancialReportResponse(
         FinancialReportSummaryResponse summary,
         FinancialReportCommitmentsResponse commitments,
         List<FinancialEvolutionPointResponse> evolution,
+        List<FinancialCumulativeEvolutionPointResponse> realizedCumulativeEvolution,
         FinancialCashFlowResponse cashFlow,
         List<FinancialCategorySummaryGroupResponse> categories,
         List<FinancialHarvestSummaryResponse> harvests,

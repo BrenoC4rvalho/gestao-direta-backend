@@ -125,6 +125,7 @@ class FinancialReportExportServiceTest {
                 summary,
                 commitments,
                 List.of(evolution),
+                List.of(),
                 new FinancialCashFlowResponse(BigDecimal.ZERO, BigDecimal.ZERO, List.of()),
                 List.of(),
                 List.of(),
