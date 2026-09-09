@@ -5,10 +5,11 @@ import java.math.BigDecimal;
 public record FinancialSummaryResponse(
         Long farmId,
         BigDecimal currentBalance,
-        BigDecimal expectedIncome,
-        BigDecimal expectedExpense,
+        BigDecimal totalReceivable,
+        BigDecimal totalPayable,
+        BigDecimal overduePayable,
+        int horizonDays,
+        BigDecimal receivableInHorizon,
+        BigDecimal payableInHorizon,
         BigDecimal projectedBalance,
-        BigDecimal payableNext30Days,
-        BigDecimal overdueExpenses,
-        BigDecimal receivableNext30Days,
-        BigDecimal cashFlowNext30Days) {}
+        FinancialCoverageResponse financialCoverage) {}

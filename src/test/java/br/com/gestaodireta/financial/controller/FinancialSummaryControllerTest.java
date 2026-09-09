@@ -26,6 +26,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -75,14 +77,15 @@ class FinancialSummaryControllerTest extends PostgresIntegrationTest {
                                 .with(user(String.valueOf(accountant.getId())).roles("USER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.farmId").value(farm.getId()))
+                .andExpect(jsonPath("$.horizonDays").value(30))
                 .andExpect(jsonPath("$.currentBalance").value(0.00))
-                .andExpect(jsonPath("$.expectedIncome").value(0.00))
-                .andExpect(jsonPath("$.expectedExpense").value(10.00))
+                .andExpect(jsonPath("$.totalReceivable").value(0.00))
+                .andExpect(jsonPath("$.totalPayable").value(10.00))
                 .andExpect(jsonPath("$.projectedBalance").value(-10.00))
-                .andExpect(jsonPath("$.payableNext30Days").exists())
-                .andExpect(jsonPath("$.overdueExpenses").value(0.00))
-                .andExpect(jsonPath("$.receivableNext30Days").value(0.00))
-                .andExpect(jsonPath("$.cashFlowNext30Days").exists())
+                .andExpect(jsonPath("$.payableInHorizon").exists())
+                .andExpect(jsonPath("$.overduePayable").value(0.00))
+                .andExpect(jsonPath("$.receivableInHorizon").value(0.00))
+                .andExpect(jsonPath("$.financialCoverage.status").exists())
                 .andExpect(jsonPath("$.incomeTotal").doesNotExist())
                 .andExpect(jsonPath("$.expenseTotal").doesNotExist())
                 .andExpect(jsonPath("$.balance").doesNotExist())
@@ -122,6 +125,38 @@ class FinancialSummaryControllerTest extends PostgresIntegrationTest {
                                 .contextPath(CONTEXT_PATH)
                                 .param("farmId", String.valueOf(farm.getId())))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {30, 90, 180})
+    void shouldAcceptSupportedHorizons(int horizon) throws Exception {
+        Farm farm = saveFarm();
+        User user = saveUser("Accountant", "horizon@example.com");
+        saveFarmUser(farm, user, FarmUserRole.ACCOUNTANT);
+        mockMvc.perform(
+                        get("/api/financial/summary")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", farm.getId().toString())
+                                .param("horizonDays", String.valueOf(horizon))
+                                .with(user(user.getId().toString()).roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.horizonDays").value(horizon))
+                .andExpect(jsonPath("$.financialCoverage.status").value("NO_OBLIGATIONS"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "15", "60", "365", "-30", "abc", "30.5"})
+    void shouldRejectUnsupportedHorizons(String horizon) throws Exception {
+        Farm farm = saveFarm();
+        User user = saveUser("Accountant", "invalid@example.com");
+        saveFarmUser(farm, user, FarmUserRole.ACCOUNTANT);
+        mockMvc.perform(
+                        get("/api/financial/summary")
+                                .contextPath(CONTEXT_PATH)
+                                .param("farmId", farm.getId().toString())
+                                .param("horizonDays", horizon)
+                                .with(user(user.getId().toString()).roles("USER")))
+                .andExpect(status().isBadRequest());
     }
 
     private Farm saveFarm() {

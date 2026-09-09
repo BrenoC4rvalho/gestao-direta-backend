@@ -12,11 +12,9 @@ public interface FinancialSummaryProjection {
 
     BigDecimal getExpectedExpense();
 
-    BigDecimal getPayableNext30Days();
+    BigDecimal getPayableInHorizon();
 
     BigDecimal getOverdueExpenses();
 
-    BigDecimal getOverdueIncome();
-
-    BigDecimal getReceivablePendingNext30Days();
+    BigDecimal getReceivableInHorizon();
 }

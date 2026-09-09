@@ -153,32 +153,36 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
               end), 0) as expectedExpense,
               coalesce(sum(case
                 when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
-                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                  and transaction.status in (
+                    br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING,
+                    br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                  )
                   and transaction.dueDate >= :today
-                  and transaction.dueDate <= :next30Days
+                  and transaction.dueDate <= :horizonEnd
                 then transaction.amount
                 else 0
-              end), 0) as payableNext30Days,
+              end), 0) as payableInHorizon,
               coalesce(sum(case
                 when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
-                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                  and transaction.status in (
+                    br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING,
+                    br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                  )
+                  and transaction.dueDate < :today
                 then transaction.amount
                 else 0
               end), 0) as overdueExpenses,
               coalesce(sum(case
                 when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME
-                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
-                then transaction.amount
-                else 0
-              end), 0) as overdueIncome,
-              coalesce(sum(case
-                when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME
-                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING
+                  and transaction.status in (
+                    br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING,
+                    br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                  )
                   and transaction.dueDate >= :today
-                  and transaction.dueDate <= :next30Days
+                  and transaction.dueDate <= :horizonEnd
                 then transaction.amount
                 else 0
-              end), 0) as receivablePendingNext30Days
+              end), 0) as receivableInHorizon
             from FinancialTransaction transaction
             where transaction.farm.id = :farmId
               and transaction.recordStatus = br.com.gestaodireta.financial.enumeration.FinancialRecordStatus.ACTIVE
@@ -186,7 +190,7 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
     FinancialSummaryProjection summarizeFinancialDashboard(
             @Param("farmId") Long farmId,
             @Param("today") LocalDate today,
-            @Param("next30Days") LocalDate next30Days);
+            @Param("horizonEnd") LocalDate horizonEnd);
 
     @Query(
             value =

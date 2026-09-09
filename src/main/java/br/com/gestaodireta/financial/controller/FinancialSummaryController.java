@@ -26,8 +26,9 @@ public class FinancialSummaryController {
 
     @GetMapping("/summary")
     @PreAuthorize("@financialAccess.canViewFinancialData(#farmId)")
-    public FinancialSummaryResponse summarize(@RequestParam Long farmId) {
-        return financialSummaryService.summarize(farmId);
+    public FinancialSummaryResponse summarize(
+            @RequestParam Long farmId, @RequestParam(defaultValue = "30") int horizonDays) {
+        return financialSummaryService.summarize(farmId, horizonDays);
     }
 
     @GetMapping("/cash-flow")

@@ -3,10 +3,12 @@ package br.com.gestaodireta.financial.service;
 import br.com.gestaodireta.farm.repository.FarmRepository;
 import br.com.gestaodireta.financial.dto.CashFlowPointResponse;
 import br.com.gestaodireta.financial.dto.CashFlowResponse;
+import br.com.gestaodireta.financial.dto.FinancialCoverageResponse;
 import br.com.gestaodireta.financial.dto.FinancialSummaryResponse;
 import br.com.gestaodireta.financial.dto.UpcomingBillResponse;
 import br.com.gestaodireta.financial.entity.FinancialCategory;
 import br.com.gestaodireta.financial.entity.FinancialTransaction;
+import br.com.gestaodireta.financial.enumeration.FinancialCoverageStatus;
 import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
 import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
@@ -19,6 +21,7 @@ import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
 import br.com.gestaodireta.shared.response.PageResponse;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.Year;
@@ -49,36 +52,51 @@ public class FinancialSummaryService {
     }
 
     @Transactional(readOnly = true)
-    public FinancialSummaryResponse summarize(Long farmId) {
+    public FinancialSummaryResponse summarize(Long farmId, int horizonDays) {
+        if (horizonDays != 30 && horizonDays != 90 && horizonDays != 180) {
+            throw new BusinessException("O horizonte financeiro deve ser 30, 90 ou 180 dias.");
+        }
+
         LocalDate today = LocalDate.now(clock);
-        LocalDate next30Days = today.plusDays(30);
         FinancialSummaryProjection summary =
                 financialTransactionRepository.summarizeFinancialDashboard(
-                        farmId, today, next30Days);
-        BigDecimal paidIncome = zeroIfNull(summary.getPaidIncome());
-        BigDecimal paidExpense = zeroIfNull(summary.getPaidExpense());
-        BigDecimal expectedIncome = zeroIfNull(summary.getExpectedIncome());
-        BigDecimal expectedExpense = zeroIfNull(summary.getExpectedExpense());
-        BigDecimal payableNext30Days = zeroIfNull(summary.getPayableNext30Days());
-        BigDecimal overdueExpenses = zeroIfNull(summary.getOverdueExpenses());
-        BigDecimal receivableNext30Days =
-                zeroIfNull(summary.getOverdueIncome())
-                        .add(zeroIfNull(summary.getReceivablePendingNext30Days()));
-        BigDecimal currentBalance = paidIncome.subtract(paidExpense);
-        BigDecimal projectedBalance = currentBalance.add(expectedIncome).subtract(expectedExpense);
-        BigDecimal cashFlowNext30Days =
-                receivableNext30Days.subtract(payableNext30Days).subtract(overdueExpenses);
+                        farmId, today, today.plusDays(horizonDays));
+        BigDecimal currentBalance =
+                zeroIfNull(summary.getPaidIncome()).subtract(zeroIfNull(summary.getPaidExpense()));
+        BigDecimal receivable = zeroIfNull(summary.getReceivableInHorizon());
+        BigDecimal payable = zeroIfNull(summary.getPayableInHorizon());
+        BigDecimal overdue = zeroIfNull(summary.getOverdueExpenses());
+        BigDecimal resources = currentBalance.add(receivable);
+        BigDecimal obligations = overdue.add(payable);
 
         return new FinancialSummaryResponse(
                 farmId,
                 currentBalance,
-                expectedIncome,
-                expectedExpense,
-                projectedBalance,
-                payableNext30Days,
-                overdueExpenses,
-                receivableNext30Days,
-                cashFlowNext30Days);
+                zeroIfNull(summary.getExpectedIncome()),
+                zeroIfNull(summary.getExpectedExpense()),
+                overdue,
+                horizonDays,
+                receivable,
+                payable,
+                resources.subtract(obligations),
+                calculateCoverage(resources, obligations));
+    }
+
+    private FinancialCoverageResponse calculateCoverage(
+            BigDecimal resources, BigDecimal obligations) {
+        if (obligations.signum() == 0) {
+            return new FinancialCoverageResponse(null, FinancialCoverageStatus.NO_OBLIGATIONS);
+        }
+
+        BigDecimal percentage =
+                resources
+                        .multiply(BigDecimal.valueOf(100))
+                        .divide(obligations, 2, RoundingMode.HALF_UP);
+        FinancialCoverageStatus status =
+                resources.compareTo(obligations) >= 0
+                        ? FinancialCoverageStatus.SUFFICIENT
+                        : FinancialCoverageStatus.INSUFFICIENT;
+        return new FinancialCoverageResponse(percentage, status);
     }
 
     @Transactional(readOnly = true)

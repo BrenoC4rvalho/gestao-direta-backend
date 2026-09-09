@@ -8,6 +8,7 @@ import br.com.gestaodireta.farm.repository.FarmRepository;
 import br.com.gestaodireta.farm.repository.FarmUserRepository;
 import br.com.gestaodireta.financial.dto.FinancialSummaryResponse;
 import br.com.gestaodireta.financial.entity.FinancialTransaction;
+import br.com.gestaodireta.financial.enumeration.FinancialCoverageStatus;
 import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
 import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
@@ -25,6 +26,8 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -124,33 +127,36 @@ class FinancialSummaryServiceTest extends PostgresIntegrationTest {
         saveTransaction(
                 otherFarm, user, TransactionType.INCOME, PaymentStatus.PAID, "9999.00", TODAY);
 
-        FinancialSummaryResponse response = financialSummaryService.summarize(farm.getId());
+        FinancialSummaryResponse response = financialSummaryService.summarize(farm.getId(), 30);
 
         assertThat(response.farmId()).isEqualTo(farm.getId());
         assertThat(response.currentBalance()).isEqualByComparingTo("700.00");
-        assertThat(response.expectedIncome()).isEqualByComparingTo("700.00");
-        assertThat(response.expectedExpense()).isEqualByComparingTo("1150.00");
-        assertThat(response.projectedBalance()).isEqualByComparingTo("250.00");
-        assertThat(response.payableNext30Days()).isEqualByComparingTo("150.00");
-        assertThat(response.overdueExpenses()).isEqualByComparingTo("100.00");
-        assertThat(response.receivableNext30Days()).isEqualByComparingTo("700.00");
-        assertThat(response.cashFlowNext30Days()).isEqualByComparingTo("450.00");
+        assertThat(response.totalReceivable()).isEqualByComparingTo("700.00");
+        assertThat(response.totalPayable()).isEqualByComparingTo("1150.00");
+        assertThat(response.projectedBalance()).isEqualByComparingTo("950.00");
+        assertThat(response.payableInHorizon()).isEqualByComparingTo("150.00");
+        assertThat(response.overduePayable()).isEqualByComparingTo("100.00");
+        assertThat(response.receivableInHorizon()).isEqualByComparingTo("500.00");
+        assertThat(response.financialCoverage().coveragePercentage())
+                .isEqualByComparingTo("480.00");
     }
 
     @Test
     void shouldReturnZeroValuesWhenFarmHasNoTransactions() {
         Farm farm = saveFarm("Farm");
 
-        FinancialSummaryResponse response = financialSummaryService.summarize(farm.getId());
+        FinancialSummaryResponse response = financialSummaryService.summarize(farm.getId(), 30);
 
         assertThat(response.currentBalance()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(response.expectedIncome()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(response.expectedExpense()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(response.totalReceivable()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(response.totalPayable()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(response.projectedBalance()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(response.payableNext30Days()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(response.overdueExpenses()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(response.receivableNext30Days()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(response.cashFlowNext30Days()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(response.payableInHorizon()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(response.overduePayable()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(response.receivableInHorizon()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(response.financialCoverage().coveragePercentage()).isNull();
+        assertThat(response.financialCoverage().status())
+                .isEqualTo(FinancialCoverageStatus.NO_OBLIGATIONS);
     }
 
     @Test
@@ -160,13 +166,139 @@ class FinancialSummaryServiceTest extends PostgresIntegrationTest {
         saveTransaction(farm, user, TransactionType.INCOME, PaymentStatus.PENDING, "500.00", null);
         saveTransaction(farm, user, TransactionType.EXPENSE, PaymentStatus.PENDING, "300.00", null);
 
-        FinancialSummaryResponse response = financialSummaryService.summarize(farm.getId());
+        FinancialSummaryResponse response = financialSummaryService.summarize(farm.getId(), 30);
 
-        assertThat(response.expectedIncome()).isEqualByComparingTo("500.00");
-        assertThat(response.expectedExpense()).isEqualByComparingTo("300.00");
-        assertThat(response.payableNext30Days()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(response.receivableNext30Days()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(response.cashFlowNext30Days()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(response.totalReceivable()).isEqualByComparingTo("500.00");
+        assertThat(response.totalPayable()).isEqualByComparingTo("300.00");
+        assertThat(response.payableInHorizon()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(response.receivableInHorizon()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(response.financialCoverage().coveragePercentage()).isNull();
+        assertThat(response.financialCoverage().status())
+                .isEqualTo(FinancialCoverageStatus.NO_OBLIGATIONS);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"30,100", "90,200", "180,300"})
+    void shouldSelectHorizonWithoutChangingCurrentPosition(int horizon, String expected) {
+        Farm farm = saveFarm("Horizon");
+        Farm otherFarm = saveFarm("Other");
+        User user = saveUser();
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                "1000",
+                TODAY.plusDays(200));
+        for (int day : new int[] {10, 50, 120, 200}) {
+            for (TransactionType type : TransactionType.values()) {
+                saveTransaction(
+                        farm, user, type, PaymentStatus.PENDING, "100", TODAY.plusDays(day));
+            }
+        }
+        saveTransaction(
+                otherFarm, user, TransactionType.EXPENSE, PaymentStatus.PENDING, "9999", TODAY);
+        FinancialSummaryResponse response =
+                financialSummaryService.summarize(farm.getId(), horizon);
+        assertThat(response.horizonDays()).isEqualTo(horizon);
+        assertThat(response.currentBalance()).isEqualByComparingTo("1000");
+        assertThat(response.totalReceivable()).isEqualByComparingTo("400");
+        assertThat(response.totalPayable()).isEqualByComparingTo("400");
+        assertThat(response.overduePayable()).isZero();
+        assertThat(response.receivableInHorizon()).isEqualByComparingTo(expected);
+        assertThat(response.payableInHorizon()).isEqualByComparingTo(expected);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"30", "90", "180"})
+    void shouldUseDisjointInclusiveDateWindowsEvenWhenStatusIsStale(int horizon) {
+        Farm farm = saveFarm("Boundaries");
+        User user = saveUser();
+        for (TransactionType type : TransactionType.values()) {
+            saveTransaction(farm, user, type, PaymentStatus.PENDING, "10", TODAY.minusDays(1));
+            saveTransaction(farm, user, type, PaymentStatus.OVERDUE, "20", TODAY);
+            saveTransaction(farm, user, type, PaymentStatus.PENDING, "30", TODAY.plusDays(horizon));
+            saveTransaction(
+                    farm, user, type, PaymentStatus.PENDING, "40", TODAY.plusDays(horizon + 1));
+        }
+        FinancialSummaryResponse response =
+                financialSummaryService.summarize(farm.getId(), horizon);
+        assertThat(response.overduePayable()).isEqualByComparingTo("10");
+        assertThat(response.receivableInHorizon()).isEqualByComparingTo("50");
+        assertThat(response.payableInHorizon()).isEqualByComparingTo("50");
+        assertThat(response.projectedBalance()).isEqualByComparingTo("-10");
+        assertThat(response.financialCoverage().status())
+                .isEqualTo(FinancialCoverageStatus.INSUFFICIENT);
+    }
+
+    @Test
+    void shouldCalculatePrudentCoverageWithoutOverdueReceivables() {
+        Farm farm = saveFarm("Coverage");
+        User user = saveUser();
+        saveTransaction(farm, user, TransactionType.INCOME, PaymentStatus.PAID, "100000", TODAY);
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PENDING,
+                "50000",
+                TODAY.plusDays(10));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.OVERDUE,
+                "90000",
+                TODAY.minusDays(1));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PENDING,
+                "80000",
+                TODAY.plusDays(10));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.OVERDUE,
+                "40000",
+                TODAY.minusDays(1));
+        FinancialSummaryResponse response = financialSummaryService.summarize(farm.getId(), 30);
+        assertThat(response.projectedBalance()).isEqualByComparingTo("30000");
+        assertThat(response.financialCoverage().coveragePercentage()).isEqualByComparingTo("125");
+        assertThat(response.financialCoverage().status())
+                .isEqualTo(FinancialCoverageStatus.SUFFICIENT);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "100,100,100.00,SUFFICIENT",
+        "999999,1000000,100.00,INSUFFICIENT",
+        "0,100,0.00,INSUFFICIENT",
+        "-100,100,-100.00,INSUFFICIENT",
+        "100,300,33.33,INSUFFICIENT"
+    })
+    void shouldCalculateCoverageStatusBeforeRounding(
+            String resources,
+            String obligations,
+            String percentage,
+            FinancialCoverageStatus status) {
+        Farm farm = saveFarm("Coverage status");
+        User user = saveUser();
+        BigDecimal amount = new BigDecimal(resources);
+        TransactionType type =
+                amount.signum() < 0 ? TransactionType.EXPENSE : TransactionType.INCOME;
+        if (amount.signum() != 0) {
+            saveTransaction(
+                    farm, user, type, PaymentStatus.PAID, amount.abs().toPlainString(), TODAY);
+        }
+        saveTransaction(
+                farm, user, TransactionType.EXPENSE, PaymentStatus.PENDING, obligations, TODAY);
+        FinancialSummaryResponse response = financialSummaryService.summarize(farm.getId(), 30);
+        assertThat(response.financialCoverage().coveragePercentage())
+                .isEqualByComparingTo(percentage);
+        assertThat(response.financialCoverage().status()).isEqualTo(status);
     }
 
     private Farm saveFarm(String name) {
