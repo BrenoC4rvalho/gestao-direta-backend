@@ -26,7 +26,6 @@ import br.com.gestaodireta.harvest.dto.HarvestSeasonComparisonDifferenceResponse
 import br.com.gestaodireta.harvest.dto.HarvestSeasonComparisonHarvestResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonComparisonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonDetailSummaryResponse;
-import br.com.gestaodireta.harvest.dto.HarvestSeasonFinancialSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonPerHectareComparisonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonResponse;
@@ -192,56 +191,6 @@ public class HarvestSeasonService {
                         paginationParams.toPageable());
 
         return PageResponse.from(seasons.map(this::toSummaryListResponse));
-    }
-
-    @Transactional(readOnly = true)
-    public HarvestSeasonFinancialSummaryResponse getFinancialSummary(
-            Long farmId,
-            List<HarvestSeasonStatus> statuses,
-            Long productionActivityId,
-            List<Long> productionActivityIds,
-            LocalDate periodStart,
-            LocalDate periodEnd,
-            String search) {
-        farmService.findEntityById(farmId);
-        validatePeriod(periodStart, periodEnd);
-        List<HarvestSeasonStatus> resolvedStatuses = resolveStatuses(statuses);
-        List<Long> activityIds =
-                resolveProductionActivityIds(productionActivityId, productionActivityIds);
-        validateProductionActivitiesBelongToFarm(activityIds, farmId);
-        List<HarvestSeason> seasons =
-                harvestSeasonRepository.findAllForFinancialSummary(
-                        farmId,
-                        !resolvedStatuses.isEmpty(),
-                        statusesForQuery(resolvedStatuses),
-                        !activityIds.isEmpty(),
-                        idsForQuery(activityIds),
-                        periodStart != null,
-                        periodStart,
-                        periodEnd != null,
-                        periodEnd,
-                        normalizeSearch(search));
-        HarvestPlanningSummaryResponse planning =
-                harvestFinancialSummaryCalculator.planning(
-                        plannedAmount(seasons, TransactionType.EXPENSE),
-                        plannedAmount(seasons, TransactionType.INCOME));
-        HarvestSeasonFinancialTotalsProjection totals =
-                financialTransactionRepository.summarizeHarvestSeasonFinancialTotals(
-                        farmId,
-                        seasons.stream().map(HarvestSeason::getId).toList(),
-                        LocalDate.now(clock));
-        HarvestRealizedSummaryResponse realized =
-                harvestFinancialSummaryCalculator.realized(totals);
-        HarvestProjectionSummaryResponse projection =
-                harvestFinancialSummaryCalculator.projection(realized, totals);
-        return new HarvestSeasonFinancialSummaryResponse(
-                farmId,
-                seasons.stream().filter(this::isActiveHarvestSeason).count(),
-                planning,
-                realized,
-                projection,
-                harvestFinancialSummaryCalculator.comparison(planning, projection),
-                harvestFinancialSummaryCalculator.openAmounts(totals));
     }
 
     @Transactional(readOnly = true)

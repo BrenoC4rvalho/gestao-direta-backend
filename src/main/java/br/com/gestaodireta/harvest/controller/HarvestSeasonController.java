@@ -9,7 +9,6 @@ import br.com.gestaodireta.harvest.dto.HarvestSeasonBudgetResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonComparisonExportFile;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonComparisonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonDetailSummaryResponse;
-import br.com.gestaodireta.harvest.dto.HarvestSeasonFinancialSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonStatusUpdateRequest;
@@ -113,28 +112,6 @@ public class HarvestSeasonController {
                 periodEnd,
                 search,
                 paginationParams);
-    }
-
-    @GetMapping("/summary")
-    @PreAuthorize("@harvestAccess.canViewSeasons(#farmId)")
-    public HarvestSeasonFinancialSummaryResponse getFinancialSummary(
-            @RequestParam Long farmId,
-            @RequestParam(required = false) List<HarvestSeasonStatus> statuses,
-            @RequestParam(required = false) Long productionActivityId,
-            @RequestParam(required = false) List<Long> productionActivityIds,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-                    LocalDate periodStart,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-                    LocalDate periodEnd,
-            @RequestParam(required = false) String search) {
-        return harvestSeasonService.getFinancialSummary(
-                farmId,
-                statuses,
-                productionActivityId,
-                productionActivityIds,
-                periodStart,
-                periodEnd,
-                search);
     }
 
     @GetMapping("/dashboard")

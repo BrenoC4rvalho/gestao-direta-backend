@@ -201,36 +201,6 @@ public interface HarvestSeasonRepository extends JpaRepository<HarvestSeason, Lo
             """
             select season
             from HarvestSeason season
-            join fetch season.productionActivity
-            where season.farm.id = :farmId
-              and (:filterStatuses = false or season.status in :statuses)
-              and (:filterStatuses = true
-                or season.status <> br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus.INACTIVE)
-              and (:filterProductionActivityIds = false
-                or season.productionActivity.id in :productionActivityIds)
-              and (:filterPeriodStart = false or season.endDate is null or season.endDate >= :periodStart)
-              and (:filterPeriodEnd = false or season.startDate <= :periodEnd)
-              and (:search is null
-                or lower(season.name) like concat('%', cast(:search as string), '%')
-                or lower(coalesce(season.description, ' ')) like concat('%', cast(:search as string), '%')
-                or lower(season.productionActivity.name) like concat('%', cast(:search as string), '%'))
-            """)
-    List<HarvestSeason> findAllForFinancialSummary(
-            @Param("farmId") Long farmId,
-            @Param("filterStatuses") boolean filterStatuses,
-            @Param("statuses") Collection<HarvestSeasonStatus> statuses,
-            @Param("filterProductionActivityIds") boolean filterProductionActivityIds,
-            @Param("productionActivityIds") Collection<Long> productionActivityIds,
-            @Param("filterPeriodStart") boolean filterPeriodStart,
-            @Param("periodStart") LocalDate periodStart,
-            @Param("filterPeriodEnd") boolean filterPeriodEnd,
-            @Param("periodEnd") LocalDate periodEnd,
-            @Param("search") String search);
-
-    @Query(
-            """
-            select season
-            from HarvestSeason season
             join fetch season.farm
             join fetch season.productionActivity productionActivity
             where season.farm.id = :farmId
