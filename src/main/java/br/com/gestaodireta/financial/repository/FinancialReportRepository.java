@@ -64,14 +64,24 @@ public class FinancialReportRepository {
         String sql =
                 FILTERED_TRANSACTIONS
                         + """
+                          , classified_transactions as (
+                            select *,
+                                   case
+                                     when status = 'PAID'
+                                       and coalesce(paid_at, transaction_date) <= :endDate
+                                       then 'REALIZED'
+                                     else 'PROJECTED'
+                                   end as financial_state
+                            from filtered_transactions
+                          )
                           select
                             coalesce(sum(case when type = 'INCOME' then amount else 0 end), 0) as total_income,
                             coalesce(sum(case when type = 'EXPENSE' then amount else 0 end), 0) as total_expense,
-                            coalesce(sum(case when type = 'INCOME' and status = 'PAID' then amount else 0 end), 0) as realized_income,
-                            coalesce(sum(case when type = 'EXPENSE' and status = 'PAID' then amount else 0 end), 0) as realized_expense,
-                            coalesce(sum(case when type = 'INCOME' and status in ('PENDING', 'OVERDUE') then amount else 0 end), 0) as projected_income,
-                            coalesce(sum(case when type = 'EXPENSE' and status in ('PENDING', 'OVERDUE') then amount else 0 end), 0) as projected_expense
-                          from filtered_transactions
+                            coalesce(sum(case when type = 'INCOME' and financial_state = 'REALIZED' then amount else 0 end), 0) as realized_income,
+                            coalesce(sum(case when type = 'EXPENSE' and financial_state = 'REALIZED' then amount else 0 end), 0) as realized_expense,
+                            coalesce(sum(case when type = 'INCOME' and financial_state = 'PROJECTED' then amount else 0 end), 0) as projected_income,
+                            coalesce(sum(case when type = 'EXPENSE' and financial_state = 'PROJECTED' then amount else 0 end), 0) as projected_expense
+                          from classified_transactions
                           where reference_date between :startDate and :endDate
                           """;
         return jdbcTemplate.queryForObject(
@@ -157,6 +167,52 @@ public class FinancialReportRepository {
                                 next30DaysAvailable
                                         ? decimal(resultSet.getBigDecimal("next30_days_payable"))
                                         : null));
+    }
+
+    public FinancialReportCommitmentsResponse summarizeFilteredCommitments(
+            FinancialReportFilter filter, LocalDate cutoffDate) {
+        String sql =
+                FILTERED_TRANSACTIONS
+                        + """
+                          , as_of_transactions as (
+                            select *,
+                                   (
+                                     status in ('PENDING', 'OVERDUE')
+                                     or (
+                                       status = 'PAID'
+                                       and coalesce(paid_at, transaction_date) > :cutoffDate
+                                     )
+                                   ) as open_at_cutoff
+                            from filtered_transactions
+                          )
+                          select
+                            coalesce(sum(case when type = 'INCOME' then amount else 0 end), 0) as accounts_receivable,
+                            coalesce(sum(case when type = 'EXPENSE' then amount else 0 end), 0) as accounts_payable,
+                            coalesce(sum(case when type = 'INCOME' and due_date < :cutoffDate then amount else 0 end), 0) as overdue_receivable_amount,
+                            count(case when type = 'INCOME' and due_date < :cutoffDate then 1 end) as overdue_receivable_count,
+                            coalesce(sum(case when type = 'EXPENSE' and due_date < :cutoffDate then amount else 0 end), 0) as overdue_payable_amount,
+                            count(case when type = 'EXPENSE' and due_date < :cutoffDate then 1 end) as overdue_payable_count
+                          from as_of_transactions
+                          where reference_date between :startDate and :cutoffDate
+                            and coalesce(due_date, transaction_date) <= :cutoffDate
+                            and open_at_cutoff
+                          """;
+        MapSqlParameterSource parameters = parameters(filter);
+        parameters.addValue("cutoffDate", cutoffDate);
+        return jdbcTemplate.queryForObject(
+                sql,
+                parameters,
+                (resultSet, rowNum) ->
+                        new FinancialReportCommitmentsResponse(
+                                decimal(resultSet.getBigDecimal("accounts_receivable")),
+                                decimal(resultSet.getBigDecimal("accounts_payable")),
+                                decimal(resultSet.getBigDecimal("overdue_receivable_amount")),
+                                resultSet.getLong("overdue_receivable_count"),
+                                decimal(resultSet.getBigDecimal("overdue_payable_amount")),
+                                resultSet.getLong("overdue_payable_count"),
+                                false,
+                                null,
+                                null));
     }
 
     public List<FinancialEvolutionPointResponse> findEvolution(

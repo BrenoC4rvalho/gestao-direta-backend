@@ -16,5 +16,6 @@ public record FinancialReportResponse(
         FinancialCashFlowResponse cashFlow,
         List<FinancialCategorySummaryGroupResponse> categories,
         List<FinancialHarvestSummaryResponse> harvests,
+        FinancialIndicatorsResponse financialIndicators,
         FinancialReportIndicatorsResponse indicators,
         FinancialReportUnallocatedResponse unallocated) {}

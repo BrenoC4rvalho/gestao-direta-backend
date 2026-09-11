@@ -8,8 +8,12 @@ import br.com.gestaodireta.financial.dto.FinancialCashFlowResponse;
 import br.com.gestaodireta.financial.dto.FinancialCategorySummaryGroupResponse;
 import br.com.gestaodireta.financial.dto.FinancialCategorySummaryResponse;
 import br.com.gestaodireta.financial.dto.FinancialCumulativeEvolutionPointResponse;
+import br.com.gestaodireta.financial.dto.FinancialEfficiencyIndicatorsResponse;
 import br.com.gestaodireta.financial.dto.FinancialEvolutionPointResponse;
 import br.com.gestaodireta.financial.dto.FinancialHarvestSummaryResponse;
+import br.com.gestaodireta.financial.dto.FinancialIndicatorsResponse;
+import br.com.gestaodireta.financial.dto.FinancialLiquidityIndicatorsResponse;
+import br.com.gestaodireta.financial.dto.FinancialPlanningIndicatorsResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportCategoryIndicatorResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportCommitmentsResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportFilter;
@@ -20,18 +24,24 @@ import br.com.gestaodireta.financial.dto.FinancialReportResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportSummaryResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportTransactionResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportUnallocatedResponse;
+import br.com.gestaodireta.financial.dto.FinancialResultIndicatorsResponse;
+import br.com.gestaodireta.financial.dto.FinancialRuralManagementIndicatorsResponse;
 import br.com.gestaodireta.financial.entity.FinancialCategory;
+import br.com.gestaodireta.financial.enumeration.FinancialPlanningAvailability;
 import br.com.gestaodireta.financial.enumeration.FinancialReportGranularity;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.FinancialReportRepository;
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
+import br.com.gestaodireta.harvest.entity.HarvestSeasonBudgetItem;
+import br.com.gestaodireta.harvest.repository.HarvestSeasonBudgetItemRepository;
 import br.com.gestaodireta.harvest.repository.HarvestSeasonRepository;
 import br.com.gestaodireta.shared.exception.BusinessException;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
 import br.com.gestaodireta.shared.exception.ValidationException;
 import br.com.gestaodireta.shared.response.PageResponse;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -50,6 +60,7 @@ public class FinancialReportService {
     private final FarmService farmService;
     private final FinancialCategoryRepository financialCategoryRepository;
     private final HarvestSeasonRepository harvestSeasonRepository;
+    private final HarvestSeasonBudgetItemRepository harvestSeasonBudgetItemRepository;
 
     private final Clock clock;
 
@@ -58,17 +69,20 @@ public class FinancialReportService {
             FarmService farmService,
             FinancialCategoryRepository financialCategoryRepository,
             HarvestSeasonRepository harvestSeasonRepository,
+            HarvestSeasonBudgetItemRepository harvestSeasonBudgetItemRepository,
             Clock clock) {
         this.financialReportRepository = financialReportRepository;
         this.farmService = farmService;
         this.financialCategoryRepository = financialCategoryRepository;
         this.harvestSeasonRepository = harvestSeasonRepository;
+        this.harvestSeasonBudgetItemRepository = harvestSeasonBudgetItemRepository;
         this.clock = clock;
     }
 
     @Transactional(readOnly = true)
     public FinancialReportResponse getReport(FinancialReportFilter filter) {
-        FinancialReportFilter normalizedFilter = validateAndNormalize(filter);
+        ValidatedFilter validatedFilter = validateAndNormalize(filter);
+        FinancialReportFilter normalizedFilter = validatedFilter.filter();
         FinancialReportSummaryResponse summary =
                 financialReportRepository.summarize(normalizedFilter);
         LocalDate today = LocalDate.now(clock);
@@ -79,6 +93,9 @@ public class FinancialReportService {
         FinancialReportCommitmentsResponse commitments =
                 financialReportRepository.summarizeCommitments(
                         normalizedFilter, cutoffDate, today, next30End, next30DaysAvailable);
+        FinancialReportCommitmentsResponse indicatorCommitments =
+                financialReportRepository.summarizeFilteredCommitments(
+                        normalizedFilter, cutoffDate);
         FinancialReportFilter monthlyFilter =
                 withGranularity(normalizedFilter, FinancialReportGranularity.MONTHLY);
         List<FinancialEvolutionPointResponse> monthlyEvolution =
@@ -127,6 +144,12 @@ public class FinancialReportService {
                 cashFlow,
                 categories,
                 harvests,
+                financialIndicators(
+                        summary,
+                        indicatorCommitments,
+                        validatedFilter.farm(),
+                        validatedFilter.harvestSeasons(),
+                        normalizedFilter),
                 indicators(performanceEvolution, categories, harvests),
                 unallocated);
     }
@@ -156,7 +179,7 @@ public class FinancialReportService {
     @Transactional(readOnly = true)
     public PageResponse<FinancialReportTransactionResponse> findTransactions(
             FinancialReportFilter filter, int page, int size, String sort, String direction) {
-        FinancialReportFilter normalizedFilter = validateAndNormalize(filter);
+        FinancialReportFilter normalizedFilter = validateAndNormalize(filter).filter();
         int normalizedPage = Math.max(page, 0);
         int normalizedSize = size <= 0 ? 20 : Math.min(size, 100);
         String normalizedDirection = "DESC".equalsIgnoreCase(direction) ? "DESC" : "ASC";
@@ -164,7 +187,7 @@ public class FinancialReportService {
                 normalizedFilter, normalizedPage, normalizedSize, sort, normalizedDirection);
     }
 
-    private FinancialReportFilter validateAndNormalize(FinancialReportFilter filter) {
+    private ValidatedFilter validateAndNormalize(FinancialReportFilter filter) {
         if (filter == null
                 || filter.farmId() == null
                 || filter.startDate() == null
@@ -175,22 +198,28 @@ public class FinancialReportService {
         if (filter.startDate().isAfter(filter.endDate())) {
             throw new ValidationException("Start date cannot be after end date");
         }
+        if (filter.endDate().isAfter(filter.startDate().plusMonths(12))) {
+            throw new ValidationException("Report period cannot exceed 12 months");
+        }
 
         Farm farm = farmService.findEntityById(filter.farmId());
         List<Long> categoryIds = normalizeIds(filter.categoryIds());
         List<Long> harvestSeasonIds = normalizeIds(filter.harvestSeasonIds());
         validateCategories(categoryIds, farm);
-        validateHarvestSeasons(harvestSeasonIds, farm);
-        return new FinancialReportFilter(
-                filter.farmId(),
-                filter.startDate(),
-                filter.endDate(),
-                filter.basis(),
-                harvestSeasonIds,
-                categoryIds,
-                filter.granularity() == null
-                        ? FinancialReportGranularity.MONTHLY
-                        : filter.granularity());
+        List<HarvestSeason> harvestSeasons = validateHarvestSeasons(harvestSeasonIds, farm);
+        return new ValidatedFilter(
+                new FinancialReportFilter(
+                        filter.farmId(),
+                        filter.startDate(),
+                        filter.endDate(),
+                        filter.basis(),
+                        harvestSeasonIds,
+                        categoryIds,
+                        filter.granularity() == null
+                                ? FinancialReportGranularity.MONTHLY
+                                : filter.granularity()),
+                farm,
+                harvestSeasons);
     }
 
     private List<Long> normalizeIds(List<Long> ids) {
@@ -215,9 +244,9 @@ public class FinancialReportService {
         }
     }
 
-    private void validateHarvestSeasons(List<Long> harvestSeasonIds, Farm farm) {
+    private List<HarvestSeason> validateHarvestSeasons(List<Long> harvestSeasonIds, Farm farm) {
         if (harvestSeasonIds == null) {
-            return;
+            return List.of();
         }
         List<HarvestSeason> seasons = harvestSeasonRepository.findAllById(harvestSeasonIds);
         if (seasons.size() != harvestSeasonIds.size()) {
@@ -226,6 +255,7 @@ public class FinancialReportService {
         if (seasons.stream().anyMatch(season -> !season.getFarm().getId().equals(farm.getId()))) {
             throw new BusinessException("Harvest season does not belong to farm");
         }
+        return seasons;
     }
 
     private FinancialReportFilter withGranularity(
@@ -410,6 +440,143 @@ public class FinancialReportService {
                 : label;
     }
 
+    private FinancialIndicatorsResponse financialIndicators(
+            FinancialReportSummaryResponse summary,
+            FinancialReportCommitmentsResponse commitments,
+            Farm farm,
+            List<HarvestSeason> harvestSeasons,
+            FinancialReportFilter filter) {
+        BigDecimal realizedResult = summary.realizedIncome().subtract(summary.realizedExpense());
+        BigDecimal projectedResult = summary.totalIncome().subtract(summary.totalExpense());
+        BigDecimal availableResources = realizedResult.add(commitments.accountsReceivable());
+        BigDecimal cashNeed = commitments.accountsPayable().subtract(availableResources);
+
+        FinancialResultIndicatorsResponse result =
+                new FinancialResultIndicatorsResponse(
+                        summary.totalIncome(),
+                        summary.totalExpense(),
+                        projectedResult,
+                        percentageOrNull(projectedResult, summary.totalIncome()),
+                        summary.realizedIncome(),
+                        summary.realizedExpense(),
+                        realizedResult);
+        FinancialLiquidityIndicatorsResponse liquidity =
+                new FinancialLiquidityIndicatorsResponse(
+                        commitments.accountsReceivable(),
+                        commitments.accountsPayable(),
+                        commitments.overdueReceivableAmount(),
+                        commitments.overduePayableAmount(),
+                        percentageOrNull(availableResources, commitments.accountsPayable()),
+                        cashNeed);
+        FinancialEfficiencyIndicatorsResponse efficiency =
+                new FinancialEfficiencyIndicatorsResponse(
+                        percentageOrNull(summary.totalExpense(), summary.totalIncome()),
+                        percentageOrNull(realizedResult, summary.realizedExpense()));
+
+        return new FinancialIndicatorsResponse(
+                result,
+                liquidity,
+                efficiency,
+                ruralManagementIndicators(summary, projectedResult, farm, harvestSeasons),
+                planningIndicators(summary, harvestSeasons, filter));
+    }
+
+    private FinancialRuralManagementIndicatorsResponse ruralManagementIndicators(
+            FinancialReportSummaryResponse summary,
+            BigDecimal projectedResult,
+            Farm farm,
+            List<HarvestSeason> harvestSeasons) {
+        BigDecimal area;
+        if (harvestSeasons.isEmpty()) {
+            area = farm.getTotalArea();
+        } else if (harvestSeasons.size() == 1) {
+            area = harvestSeasons.getFirst().getAreaHectares();
+        } else {
+            return null;
+        }
+
+        if (area == null || area.signum() <= 0) {
+            return null;
+        }
+
+        return new FinancialRuralManagementIndicatorsResponse(
+                area,
+                amountPerHectare(summary.totalIncome(), area),
+                amountPerHectare(summary.totalExpense(), area),
+                amountPerHectare(projectedResult, area));
+    }
+
+    private FinancialPlanningIndicatorsResponse planningIndicators(
+            FinancialReportSummaryResponse summary,
+            List<HarvestSeason> harvestSeasons,
+            FinancialReportFilter filter) {
+        if (harvestSeasons.size() != 1) {
+            return unavailablePlanning(FinancialPlanningAvailability.HARVEST_REQUIRED);
+        }
+
+        HarvestSeason harvestSeason = harvestSeasons.getFirst();
+        if (harvestSeason.getEndDate() == null
+                || filter.startDate().isAfter(harvestSeason.getStartDate())
+                || filter.endDate().isBefore(harvestSeason.getEndDate())) {
+            return unavailablePlanning(FinancialPlanningAvailability.PARTIAL_PERIOD);
+        }
+
+        List<HarvestSeasonBudgetItem> budgetItems =
+                harvestSeasonBudgetItemRepository.findAllByHarvestSeasonId(harvestSeason.getId());
+        if (filter.categoryIds() != null) {
+            budgetItems =
+                    budgetItems.stream()
+                            .filter(item -> item.getCategory() != null)
+                            .filter(
+                                    item ->
+                                            filter.categoryIds()
+                                                    .contains(item.getCategory().getId()))
+                            .toList();
+        }
+
+        BigDecimal plannedIncome = plannedAmount(budgetItems, TransactionType.INCOME);
+        BigDecimal plannedExpense = plannedAmount(budgetItems, TransactionType.EXPENSE);
+        if (plannedIncome.signum() == 0 && plannedExpense.signum() == 0) {
+            return unavailablePlanning(FinancialPlanningAvailability.MISSING_PLANNING);
+        }
+
+        return new FinancialPlanningIndicatorsResponse(
+                FinancialPlanningAvailability.AVAILABLE,
+                percentageOrNull(summary.realizedIncome(), plannedIncome),
+                percentageOrNull(summary.realizedExpense(), plannedExpense),
+                plannedIncome.signum() == 0
+                        ? null
+                        : summary.realizedIncome().subtract(plannedIncome),
+                plannedExpense.signum() == 0
+                        ? null
+                        : summary.realizedExpense().subtract(plannedExpense));
+    }
+
+    private FinancialPlanningIndicatorsResponse unavailablePlanning(
+            FinancialPlanningAvailability availability) {
+        return new FinancialPlanningIndicatorsResponse(availability, null, null, null, null);
+    }
+
+    private BigDecimal plannedAmount(
+            List<HarvestSeasonBudgetItem> budgetItems, TransactionType type) {
+        return budgetItems.stream()
+                .filter(item -> type.equals(item.getType()))
+                .map(HarvestSeasonBudgetItem::getPlannedAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal percentageOrNull(BigDecimal value, BigDecimal base) {
+        if (base.signum() == 0) {
+            return null;
+        }
+
+        return value.multiply(BigDecimal.valueOf(100)).divide(base, 2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal amountPerHectare(BigDecimal amount, BigDecimal area) {
+        return amount.divide(area, 2, RoundingMode.HALF_UP);
+    }
+
     private FinancialReportIndicatorsResponse indicators(
             List<FinancialEvolutionPointResponse> evolution,
             List<FinancialCategorySummaryGroupResponse> categories,
@@ -486,4 +653,7 @@ public class FinancialReportService {
             default -> throw new IllegalArgumentException("Invalid month");
         };
     }
+
+    private record ValidatedFilter(
+            FinancialReportFilter filter, Farm farm, List<HarvestSeason> harvestSeasons) {}
 }

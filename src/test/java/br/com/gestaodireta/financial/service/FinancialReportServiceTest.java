@@ -1,6 +1,7 @@
 package br.com.gestaodireta.financial.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import br.com.gestaodireta.farm.entity.Farm;
 import br.com.gestaodireta.farm.enumeration.FarmStatus;
@@ -11,6 +12,7 @@ import br.com.gestaodireta.financial.dto.FinancialReportTransactionResponse;
 import br.com.gestaodireta.financial.entity.FinancialCategory;
 import br.com.gestaodireta.financial.entity.FinancialTransaction;
 import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
+import br.com.gestaodireta.financial.enumeration.FinancialPlanningAvailability;
 import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
 import br.com.gestaodireta.financial.enumeration.FinancialReportBasis;
 import br.com.gestaodireta.financial.enumeration.FinancialReportGranularity;
@@ -19,11 +21,14 @@ import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
+import br.com.gestaodireta.harvest.entity.HarvestSeasonBudgetItem;
 import br.com.gestaodireta.harvest.entity.ProductionActivity;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
 import br.com.gestaodireta.harvest.enumeration.ProductionActivityStatus;
+import br.com.gestaodireta.harvest.repository.HarvestSeasonBudgetItemRepository;
 import br.com.gestaodireta.harvest.repository.HarvestSeasonRepository;
 import br.com.gestaodireta.harvest.repository.ProductionActivityRepository;
+import br.com.gestaodireta.shared.exception.ValidationException;
 import br.com.gestaodireta.shared.response.PageResponse;
 import br.com.gestaodireta.support.PostgresIntegrationTest;
 import br.com.gestaodireta.user.entity.User;
@@ -57,6 +62,8 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
 
     @Autowired private HarvestSeasonRepository harvestSeasonRepository;
 
+    @Autowired private HarvestSeasonBudgetItemRepository harvestSeasonBudgetItemRepository;
+
     @Autowired private ProductionActivityRepository productionActivityRepository;
 
     @Autowired private FarmRepository farmRepository;
@@ -68,11 +75,306 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
     @BeforeEach
     void setUp() {
         financialTransactionRepository.deleteAll();
+        harvestSeasonBudgetItemRepository.deleteAll();
         harvestSeasonRepository.deleteAll();
         productionActivityRepository.deleteAll();
         financialCategoryRepository.deleteAll();
         farmRepository.deleteAll();
         userRepository.deleteAll();
+    }
+
+    @Test
+    void shouldAllowExactlyTwelveCalendarMonths() {
+        Farm farm = saveFarm();
+
+        FinancialReportResponse report =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2025, 1, 1),
+                                LocalDate.of(2026, 1, 1),
+                                FinancialReportBasis.ACCRUAL,
+                                null,
+                                null));
+
+        assertThat(report.startDate()).isEqualTo(LocalDate.of(2025, 1, 1));
+        assertThat(report.endDate()).isEqualTo(LocalDate.of(2026, 1, 1));
+    }
+
+    @Test
+    void shouldRejectPeriodsLongerThanTwelveCalendarMonths() {
+        Farm farm = saveFarm();
+        FinancialReportFilter filter =
+                new FinancialReportFilter(
+                        farm.getId(),
+                        LocalDate.of(2025, 1, 1),
+                        LocalDate.of(2026, 1, 2),
+                        FinancialReportBasis.ACCRUAL,
+                        null,
+                        null);
+
+        assertThatThrownBy(() -> financialReportService.getReport(filter))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Report period cannot exceed 12 months");
+    }
+
+    @Test
+    void shouldRejectAnEndDateBeforeTheStartDate() {
+        Farm farm = saveFarm();
+        FinancialReportFilter filter =
+                new FinancialReportFilter(
+                        farm.getId(),
+                        LocalDate.of(2026, 2, 1),
+                        LocalDate.of(2026, 1, 31),
+                        FinancialReportBasis.ACCRUAL,
+                        null,
+                        null);
+
+        assertThatThrownBy(() -> financialReportService.getReport(filter))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Start date cannot be after end date");
+    }
+
+    @Test
+    void shouldCalculateFilteredFinancialIndicatorsInTheBackend() {
+        Farm farm = saveFarm();
+        farm.setTotalArea(new BigDecimal("10.00"));
+        farmRepository.save(farm);
+        User user = saveUser();
+        Farm otherFarm = saveFarm("Other farm");
+        saveTransaction(
+                otherFarm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                new BigDecimal("999.00"),
+                LocalDate.of(2026, 1, 10),
+                LocalDate.of(2026, 1, 10),
+                LocalDate.of(2026, 1, 10));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                new BigDecimal("100.00"),
+                LocalDate.of(2026, 1, 10),
+                LocalDate.of(2026, 1, 10),
+                LocalDate.of(2026, 1, 10));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                new BigDecimal("40.00"),
+                LocalDate.of(2026, 1, 11),
+                LocalDate.of(2026, 1, 11),
+                LocalDate.of(2026, 1, 11));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PENDING,
+                new BigDecimal("50.00"),
+                LocalDate.of(2026, 1, 12),
+                LocalDate.of(2026, 1, 20),
+                null);
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.OVERDUE,
+                new BigDecimal("30.00"),
+                LocalDate.of(2026, 1, 5),
+                LocalDate.of(2026, 1, 5),
+                null);
+
+        FinancialReportResponse report =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 1, 1),
+                                LocalDate.of(2026, 1, 31),
+                                FinancialReportBasis.ACCRUAL,
+                                null,
+                                null));
+
+        assertThat(report.financialIndicators().result().totalIncome())
+                .isEqualByComparingTo("150.00");
+        assertThat(report.financialIndicators().result().totalExpense())
+                .isEqualByComparingTo("70.00");
+        assertThat(report.financialIndicators().result().realizedResult())
+                .isEqualByComparingTo("60.00");
+        assertThat(report.financialIndicators().result().projectedResult())
+                .isEqualByComparingTo("80.00");
+        assertThat(report.financialIndicators().result().marginPercentage())
+                .isEqualByComparingTo("53.33");
+        assertThat(report.financialIndicators().liquidity().accountsReceivable())
+                .isEqualByComparingTo("50.00");
+        assertThat(report.financialIndicators().liquidity().accountsPayable())
+                .isEqualByComparingTo("30.00");
+        assertThat(report.financialIndicators().liquidity().overdueReceivable())
+                .isEqualByComparingTo("50.00");
+        assertThat(report.financialIndicators().liquidity().overduePayable())
+                .isEqualByComparingTo("30.00");
+        assertThat(report.financialIndicators().liquidity().coveragePercentage())
+                .isEqualByComparingTo("366.67");
+        assertThat(report.financialIndicators().liquidity().cashNeed())
+                .isEqualByComparingTo("-80.00");
+        assertThat(report.financialIndicators().efficiency().costToIncomePercentage())
+                .isEqualByComparingTo("46.67");
+        assertThat(report.financialIndicators().efficiency().returnOnCostsPercentage())
+                .isEqualByComparingTo("150.00");
+        assertThat(report.financialIndicators().ruralManagement().incomePerHectare())
+                .isEqualByComparingTo("15.00");
+        assertThat(report.financialIndicators().ruralManagement().costPerHectare())
+                .isEqualByComparingTo("7.00");
+        assertThat(report.financialIndicators().ruralManagement().resultPerHectare())
+                .isEqualByComparingTo("8.00");
+    }
+
+    @Test
+    void shouldReturnUnavailableRatiosWithoutAreaOrPlanning() {
+        Farm farm = saveFarm();
+
+        FinancialReportResponse report =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 1, 1),
+                                LocalDate.of(2026, 1, 31),
+                                FinancialReportBasis.ACCRUAL,
+                                null,
+                                null));
+
+        assertThat(report.financialIndicators().result().marginPercentage()).isNull();
+        assertThat(report.financialIndicators().liquidity().coveragePercentage()).isNull();
+        assertThat(report.financialIndicators().efficiency().costToIncomePercentage()).isNull();
+        assertThat(report.financialIndicators().efficiency().returnOnCostsPercentage()).isNull();
+        assertThat(report.financialIndicators().ruralManagement()).isNull();
+        assertThat(report.financialIndicators().planning().availability())
+                .isEqualTo(FinancialPlanningAvailability.HARVEST_REQUIRED);
+    }
+
+    @Test
+    void shouldCalculatePlanningForACompleteFilteredHarvestPeriod() {
+        Farm farm = saveFarm();
+        User user = saveUser();
+        FinancialCategory incomeCategory = saveCategory(farm, "Venda", TransactionType.INCOME);
+        FinancialCategory expenseCategory = saveCategory(farm, "Insumos", TransactionType.EXPENSE);
+        HarvestSeason harvest = saveHarvest(farm, "Soja");
+        harvest.setEndDate(LocalDate.of(2026, 12, 31));
+        harvest.setAreaHectares(new BigDecimal("20.00"));
+        harvestSeasonRepository.save(harvest);
+        saveBudgetItem(harvest, incomeCategory, TransactionType.INCOME, "200.00");
+        saveBudgetItem(harvest, expenseCategory, TransactionType.EXPENSE, "100.00");
+        saveTransaction(
+                farm,
+                user,
+                incomeCategory,
+                harvest,
+                TransactionType.INCOME,
+                new BigDecimal("120.00"));
+        saveTransaction(
+                farm,
+                user,
+                expenseCategory,
+                harvest,
+                TransactionType.EXPENSE,
+                new BigDecimal("80.00"));
+
+        FinancialReportResponse report =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 1, 1),
+                                LocalDate.of(2026, 12, 31),
+                                FinancialReportBasis.ACCRUAL,
+                                java.util.List.of(harvest.getId()),
+                                null));
+
+        assertThat(report.financialIndicators().planning().availability())
+                .isEqualTo(FinancialPlanningAvailability.AVAILABLE);
+        assertThat(report.financialIndicators().planning().incomeExecutionPercentage())
+                .isEqualByComparingTo("60.00");
+        assertThat(report.financialIndicators().planning().expenseExecutionPercentage())
+                .isEqualByComparingTo("80.00");
+        assertThat(report.financialIndicators().planning().incomeDeviation())
+                .isEqualByComparingTo("-80.00");
+        assertThat(report.financialIndicators().planning().expenseDeviation())
+                .isEqualByComparingTo("-20.00");
+        assertThat(report.financialIndicators().ruralManagement().areaHectares())
+                .isEqualByComparingTo("20.00");
+
+        FinancialReportResponse expenseCategoryReport =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 1, 1),
+                                LocalDate.of(2026, 12, 31),
+                                FinancialReportBasis.ACCRUAL,
+                                java.util.List.of(harvest.getId()),
+                                java.util.List.of(expenseCategory.getId())));
+
+        assertThat(
+                        expenseCategoryReport
+                                .financialIndicators()
+                                .planning()
+                                .incomeExecutionPercentage())
+                .isNull();
+        assertThat(
+                        expenseCategoryReport
+                                .financialIndicators()
+                                .planning()
+                                .expenseExecutionPercentage())
+                .isEqualByComparingTo("80.00");
+    }
+
+    @Test
+    void shouldNotComparePlanningAgainstAPartialHarvestPeriod() {
+        Farm farm = saveFarm();
+        HarvestSeason harvest = saveHarvest(farm, "Soja");
+        harvest.setEndDate(LocalDate.of(2026, 12, 31));
+        harvestSeasonRepository.save(harvest);
+        saveBudgetItem(harvest, null, TransactionType.EXPENSE, "100.00");
+
+        FinancialReportResponse report =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 2, 1),
+                                LocalDate.of(2026, 12, 31),
+                                FinancialReportBasis.ACCRUAL,
+                                java.util.List.of(harvest.getId()),
+                                null));
+
+        assertThat(report.financialIndicators().planning().availability())
+                .isEqualTo(FinancialPlanningAvailability.PARTIAL_PERIOD);
+        assertThat(report.financialIndicators().planning().expenseExecutionPercentage()).isNull();
+    }
+
+    @Test
+    void shouldNotAggregateAreaAcrossMultipleFilteredHarvests() {
+        Farm farm = saveFarm();
+        HarvestSeason soybean = saveHarvest(farm, "Soja");
+        soybean.setAreaHectares(new BigDecimal("20.00"));
+        harvestSeasonRepository.save(soybean);
+        HarvestSeason corn = saveHarvest(farm, "Milho");
+        corn.setAreaHectares(new BigDecimal("30.00"));
+        harvestSeasonRepository.save(corn);
+
+        FinancialReportResponse report =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 1, 1),
+                                LocalDate.of(2026, 1, 31),
+                                FinancialReportBasis.ACCRUAL,
+                                java.util.List.of(soybean.getId(), corn.getId()),
+                                null));
+
+        assertThat(report.financialIndicators().ruralManagement()).isNull();
+        assertThat(report.financialIndicators().planning().availability())
+                .isEqualTo(FinancialPlanningAvailability.HARVEST_REQUIRED);
     }
 
     @Test
@@ -796,6 +1098,10 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
         assertThat(harvestReport.categories().get(1).totalAmount())
                 .isEqualByComparingTo("211500.00");
         assertThat(harvestReport.categories().get(1).items()).hasSize(1);
+        assertThat(harvestReport.financialIndicators().result().totalExpense())
+                .isEqualByComparingTo("75050.00");
+        assertThat(harvestReport.financialIndicators().result().totalIncome())
+                .isEqualByComparingTo("211500.00");
 
         FinancialReportResponse categoryReport =
                 financialReportService.getReport(
@@ -814,6 +1120,9 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
                 .isEqualByComparingTo("100.00");
         assertThat(categoryReport.categories().get(1).totalAmount()).isZero();
         assertThat(categoryReport.categories().get(1).items()).isEmpty();
+        assertThat(categoryReport.financialIndicators().result().totalExpense())
+                .isEqualByComparingTo("40150.00");
+        assertThat(categoryReport.financialIndicators().result().totalIncome()).isZero();
     }
 
     private FinancialReportResponse reportForEndDate(Farm farm, LocalDate endDate) {
@@ -823,8 +1132,12 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
     }
 
     private Farm saveFarm() {
+        return saveFarm("Farm");
+    }
+
+    private Farm saveFarm(String name) {
         Farm farm = new Farm();
-        farm.setName("Farm");
+        farm.setName(name);
         farm.setStatus(FarmStatus.ACTIVE);
         return farmRepository.save(farm);
     }
@@ -861,6 +1174,20 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
         harvest.setStartDate(LocalDate.of(2026, 1, 1));
         harvest.setStatus(HarvestSeasonStatus.IN_PROGRESS);
         return harvestSeasonRepository.save(harvest);
+    }
+
+    private HarvestSeasonBudgetItem saveBudgetItem(
+            HarvestSeason harvest,
+            FinancialCategory category,
+            TransactionType type,
+            String amount) {
+        HarvestSeasonBudgetItem item = new HarvestSeasonBudgetItem();
+        item.setHarvestSeason(harvest);
+        item.setCategory(category);
+        item.setType(type);
+        item.setDescription("Planning");
+        item.setPlannedAmount(new BigDecimal(amount));
+        return harvestSeasonBudgetItemRepository.save(item);
     }
 
     private void saveTransaction(

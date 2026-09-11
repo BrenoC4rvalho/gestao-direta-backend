@@ -32,7 +32,7 @@ class FinancialReportExportServiceTest {
         Clock clock = Clock.fixed(Instant.parse("2026-08-30T22:30:00Z"), ZoneOffset.UTC);
         FinancialReportResponse report = report();
         FinancialReportService reportService =
-                new FinancialReportService(null, null, null, null, clock) {
+                new FinancialReportService(null, null, null, null, null, clock) {
                     @Override
                     public FinancialReportResponse getReport(FinancialReportFilter filter) {
                         return report;
@@ -129,6 +129,7 @@ class FinancialReportExportServiceTest {
                 new FinancialCashFlowResponse(BigDecimal.ZERO, BigDecimal.ZERO, List.of()),
                 List.of(),
                 List.of(),
+                null,
                 new FinancialReportIndicatorsResponse(1, null, null, null, null, null, null),
                 new FinancialReportUnallocatedResponse(BigDecimal.ZERO, BigDecimal.ZERO, 0L));
     }
