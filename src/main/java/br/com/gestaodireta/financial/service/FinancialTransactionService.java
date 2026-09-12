@@ -12,6 +12,7 @@ import br.com.gestaodireta.financial.entity.FinancialCategory;
 import br.com.gestaodireta.financial.entity.FinancialTransaction;
 import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
 import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
+import br.com.gestaodireta.financial.enumeration.FinancialReportBasis;
 import br.com.gestaodireta.financial.enumeration.PaymentMethod;
 import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
@@ -117,6 +118,7 @@ public class FinancialTransactionService {
                 financialTransactionRepository
                         .findAllFiltered(
                                 normalizedFilter.farmId(),
+                                normalizedFilter.basis(),
                                 startDateOrDefault(normalizedFilter.transactionDateStart()),
                                 endDateOrDefault(normalizedFilter.transactionDateEnd()),
                                 startDateOrDefault(normalizedFilter.paidAtStart()),
@@ -152,6 +154,7 @@ public class FinancialTransactionService {
         return financialTransactionRepository
                 .findAllFiltered(
                         normalizedFilter.farmId(),
+                        normalizedFilter.basis(),
                         startDateOrDefault(normalizedFilter.transactionDateStart()),
                         endDateOrDefault(normalizedFilter.transactionDateEnd()),
                         startDateOrDefault(normalizedFilter.paidAtStart()),
@@ -282,7 +285,10 @@ public class FinancialTransactionService {
                 normalizeNullableLowercaseText(filterRequest.description()),
                 filterRequest.createdByUserId(),
                 filterRequest.minAmount(),
-                filterRequest.maxAmount());
+                filterRequest.maxAmount(),
+                filterRequest.basis() == null
+                        ? FinancialReportBasis.ACCRUAL
+                        : filterRequest.basis());
     }
 
     private void validateFilter(FinancialTransactionFilterRequest filterRequest) {

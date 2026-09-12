@@ -2,6 +2,7 @@ package br.com.gestaodireta.financial.repository;
 
 import br.com.gestaodireta.financial.entity.FinancialTransaction;
 import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
+import br.com.gestaodireta.financial.enumeration.FinancialReportBasis;
 import br.com.gestaodireta.financial.enumeration.PaymentMethod;
 import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
@@ -27,8 +28,32 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
             from FinancialTransaction transaction
             where transaction.farm.id = :farmId
               and transaction.recordStatus = :recordStatus
-              and transaction.transactionDate >= :transactionDateStart
-              and transaction.transactionDate <= :transactionDateEnd
+              and (
+                (
+                  :basis = br.com.gestaodireta.financial.enumeration.FinancialReportBasis.ACCRUAL
+                  and transaction.transactionDate >= :transactionDateStart
+                  and transaction.transactionDate <= :transactionDateEnd
+                )
+                or (
+                  :basis = br.com.gestaodireta.financial.enumeration.FinancialReportBasis.CASH
+                  and (
+                    (
+                      transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PAID
+                      and coalesce(transaction.paidAt, transaction.transactionDate) >= :transactionDateStart
+                      and coalesce(transaction.paidAt, transaction.transactionDate) <= :transactionDateEnd
+                    )
+                    or (
+                      transaction.status in (
+                        br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING,
+                        br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                      )
+                      and transaction.dueDate is not null
+                      and transaction.dueDate >= :transactionDateStart
+                      and transaction.dueDate <= :transactionDateEnd
+                    )
+                  )
+                )
+              )
               and (:filterPaidAt = false
                 or (transaction.paidAt >= :paidAtStart and transaction.paidAt <= :paidAtEnd))
               and (:type is null or transaction.type = :type)
@@ -59,6 +84,7 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
     @Query(FILTERED_TRANSACTIONS_QUERY)
     Page<FinancialTransaction> findAllFiltered(
             @Param("farmId") Long farmId,
+            @Param("basis") FinancialReportBasis basis,
             @Param("transactionDateStart") LocalDate transactionDateStart,
             @Param("transactionDateEnd") LocalDate transactionDateEnd,
             @Param("paidAtStart") LocalDate paidAtStart,
@@ -90,6 +116,7 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
     @Query(FILTERED_TRANSACTIONS_QUERY)
     List<FinancialTransaction> findAllFiltered(
             @Param("farmId") Long farmId,
+            @Param("basis") FinancialReportBasis basis,
             @Param("transactionDateStart") LocalDate transactionDateStart,
             @Param("transactionDateEnd") LocalDate transactionDateEnd,
             @Param("paidAtStart") LocalDate paidAtStart,

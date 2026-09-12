@@ -1,6 +1,7 @@
 package br.com.gestaodireta.financial.dto;
 
 import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
+import br.com.gestaodireta.financial.enumeration.FinancialReportBasis;
 import br.com.gestaodireta.financial.enumeration.PaymentMethod;
 import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
@@ -26,7 +27,49 @@ public record FinancialTransactionFilterRequest(
         String description,
         Long createdByUserId,
         BigDecimal minAmount,
-        BigDecimal maxAmount) {
+        BigDecimal maxAmount,
+        FinancialReportBasis basis) {
+
+    public FinancialTransactionFilterRequest(
+            Long farmId,
+            LocalDate transactionDateStart,
+            LocalDate transactionDateEnd,
+            LocalDate paidAtStart,
+            LocalDate paidAtEnd,
+            TransactionType type,
+            Long categoryId,
+            List<Long> categoryIds,
+            Long harvestSeasonId,
+            PaymentStatus paymentStatus,
+            List<PaymentStatus> paymentStatuses,
+            PaymentMethod paymentMethod,
+            List<PaymentMethod> paymentMethods,
+            FinancialRecordStatus recordStatus,
+            String description,
+            Long createdByUserId,
+            BigDecimal minAmount,
+            BigDecimal maxAmount) {
+        this(
+                farmId,
+                transactionDateStart,
+                transactionDateEnd,
+                paidAtStart,
+                paidAtEnd,
+                type,
+                categoryId,
+                categoryIds,
+                harvestSeasonId,
+                paymentStatus,
+                paymentStatuses,
+                paymentMethod,
+                paymentMethods,
+                recordStatus,
+                description,
+                createdByUserId,
+                minAmount,
+                maxAmount,
+                FinancialReportBasis.ACCRUAL);
+    }
 
     public FinancialTransactionFilterRequest(
             Long farmId,
@@ -62,6 +105,7 @@ public record FinancialTransactionFilterRequest(
                 description,
                 createdByUserId,
                 minAmount,
-                maxAmount);
+                maxAmount,
+                FinancialReportBasis.ACCRUAL);
     }
 }

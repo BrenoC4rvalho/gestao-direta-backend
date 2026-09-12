@@ -1,6 +1,7 @@
 package br.com.gestaodireta.financial.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -177,6 +178,119 @@ class FinancialTransactionControllerTest extends PostgresIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(transaction.getId()))
                 .andExpect(jsonPath("$.content[0].recordStatus").value("ACTIVE"));
+    }
+
+    @Test
+    void shouldListTransactionsUsingTheRequestedFinancialBasis() throws Exception {
+        Farm farm = saveFarm(FarmStatus.ACTIVE);
+        Farm otherFarm = saveFarm(FarmStatus.ACTIVE);
+        User admin = saveUser("Admin", "basis-admin@example.com", UserType.ADMIN);
+
+        FinancialTransaction paidInAnotherMonth =
+                saveTransaction(
+                        farm,
+                        null,
+                        admin,
+                        "Paid in June",
+                        BigDecimal.TEN,
+                        TransactionType.INCOME,
+                        PaymentStatus.PAID,
+                        PaymentMethod.PIX,
+                        LocalDate.of(2026, 5, 31),
+                        LocalDate.of(2026, 6, 1));
+        FinancialTransaction paidWithTransactionDateFallback =
+                saveTransaction(
+                        farm,
+                        null,
+                        admin,
+                        "Paid fallback",
+                        BigDecimal.TEN,
+                        TransactionType.INCOME,
+                        PaymentStatus.PAID,
+                        PaymentMethod.PIX,
+                        LocalDate.of(2026, 6, 2),
+                        null);
+        FinancialTransaction pending =
+                saveTransaction(
+                        farm,
+                        null,
+                        admin,
+                        "Pending in June",
+                        BigDecimal.TEN,
+                        TransactionType.EXPENSE,
+                        PaymentStatus.PENDING,
+                        PaymentMethod.PIX,
+                        LocalDate.of(2026, 5, 10),
+                        null);
+        pending.setDueDate(LocalDate.of(2026, 6, 10));
+        financialTransactionRepository.saveAndFlush(pending);
+
+        FinancialTransaction overdue =
+                saveTransaction(
+                        farm,
+                        null,
+                        admin,
+                        "Overdue in June",
+                        BigDecimal.TEN,
+                        TransactionType.EXPENSE,
+                        PaymentStatus.OVERDUE,
+                        PaymentMethod.PIX,
+                        LocalDate.of(2026, 5, 11),
+                        null);
+        overdue.setDueDate(LocalDate.of(2026, 6, 11));
+        financialTransactionRepository.saveAndFlush(overdue);
+
+        FinancialTransaction canceled =
+                saveTransaction(
+                        farm,
+                        null,
+                        admin,
+                        "Canceled in June",
+                        BigDecimal.TEN,
+                        TransactionType.EXPENSE,
+                        PaymentStatus.CANCELED,
+                        PaymentMethod.PIX,
+                        LocalDate.of(2026, 6, 12),
+                        null);
+        saveTransaction(
+                otherFarm,
+                null,
+                admin,
+                "Other farm",
+                BigDecimal.TEN,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                PaymentMethod.PIX,
+                LocalDate.of(2026, 6, 12),
+                LocalDate.of(2026, 6, 12));
+
+        mockMvc.perform(
+                        get("/api/financial/transactions")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN"))
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("transactionDateStart", "2026-06-01")
+                                .param("transactionDateEnd", "2026-06-30"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].status", containsInAnyOrder("PAID", "CANCELED")));
+
+        mockMvc.perform(
+                        get("/api/financial/transactions")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN"))
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("transactionDateStart", "2026-06-01")
+                                .param("transactionDateEnd", "2026-06-30")
+                                .param("basis", "CASH"))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath(
+                                "$.content[*].id",
+                                containsInAnyOrder(
+                                        paidInAnotherMonth.getId().intValue(),
+                                        paidWithTransactionDateFallback.getId().intValue(),
+                                        pending.getId().intValue(),
+                                        overdue.getId().intValue())));
     }
 
     @Test

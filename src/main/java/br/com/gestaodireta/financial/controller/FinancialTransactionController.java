@@ -7,6 +7,7 @@ import br.com.gestaodireta.financial.dto.FinancialTransactionResponse;
 import br.com.gestaodireta.financial.dto.FinancialTransactionUpdateRequest;
 import br.com.gestaodireta.financial.dto.PayTransactionRequest;
 import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
+import br.com.gestaodireta.financial.enumeration.FinancialReportBasis;
 import br.com.gestaodireta.financial.enumeration.PaymentMethod;
 import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
@@ -78,6 +79,7 @@ public class FinancialTransactionController {
             @RequestParam(required = false) Long createdByUserId,
             @RequestParam(required = false) BigDecimal minAmount,
             @RequestParam(required = false) BigDecimal maxAmount,
+            @RequestParam(defaultValue = "ACCRUAL") FinancialReportBasis basis,
             @Valid @ModelAttribute PaginationParams paginationParams) {
         FinancialTransactionFilterRequest filterRequest =
                 new FinancialTransactionFilterRequest(
@@ -98,7 +100,8 @@ public class FinancialTransactionController {
                         description,
                         createdByUserId,
                         minAmount,
-                        maxAmount);
+                        maxAmount,
+                        basis);
 
         return financialTransactionService.findAll(filterRequest, paginationParams);
     }
