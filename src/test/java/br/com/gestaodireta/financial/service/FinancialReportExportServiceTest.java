@@ -15,6 +15,7 @@ import br.com.gestaodireta.financial.dto.FinancialReportSummaryResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportUnallocatedResponse;
 import br.com.gestaodireta.financial.enumeration.FinancialReportBasis;
 import br.com.gestaodireta.financial.enumeration.FinancialReportGranularity;
+import br.com.gestaodireta.harvest.service.HarvestFinancialSummaryCalculator;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -32,7 +33,14 @@ class FinancialReportExportServiceTest {
         Clock clock = Clock.fixed(Instant.parse("2026-08-30T22:30:00Z"), ZoneOffset.UTC);
         FinancialReportResponse report = report();
         FinancialReportService reportService =
-                new FinancialReportService(null, null, null, null, null, clock) {
+                new FinancialReportService(
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        new HarvestFinancialSummaryCalculator(),
+                        clock) {
                     @Override
                     public FinancialReportResponse getReport(FinancialReportFilter filter) {
                         return report;

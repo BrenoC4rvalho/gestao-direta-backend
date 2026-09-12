@@ -9,4 +9,5 @@ public record FinancialHarvestSummaryResponse(
         BigDecimal expense,
         BigDecimal profit,
         BigDecimal marginPercentage,
-        long transactionCount) {}
+        long transactionCount,
+        FinancialHarvestSummaryDetails details) {}

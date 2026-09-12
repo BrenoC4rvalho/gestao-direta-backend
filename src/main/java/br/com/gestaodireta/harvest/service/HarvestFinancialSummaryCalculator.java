@@ -163,7 +163,7 @@ public class HarvestFinancialSummaryCalculator {
                         PlanningComparisonDifferenceUnit.PERCENTAGE_POINTS));
     }
 
-    private PlanningComparisonMetricResponse comparisonMetric(
+    public PlanningComparisonMetricResponse comparisonMetric(
             BigDecimal planned,
             BigDecimal current,
             boolean lowerIsBetter,

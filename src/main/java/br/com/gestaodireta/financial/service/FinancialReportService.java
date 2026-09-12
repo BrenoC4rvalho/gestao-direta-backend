@@ -10,6 +10,8 @@ import br.com.gestaodireta.financial.dto.FinancialCategorySummaryResponse;
 import br.com.gestaodireta.financial.dto.FinancialCumulativeEvolutionPointResponse;
 import br.com.gestaodireta.financial.dto.FinancialEfficiencyIndicatorsResponse;
 import br.com.gestaodireta.financial.dto.FinancialEvolutionPointResponse;
+import br.com.gestaodireta.financial.dto.FinancialHarvestPlanningComparisonResponse;
+import br.com.gestaodireta.financial.dto.FinancialHarvestSummaryDetails;
 import br.com.gestaodireta.financial.dto.FinancialHarvestSummaryResponse;
 import br.com.gestaodireta.financial.dto.FinancialIndicatorsResponse;
 import br.com.gestaodireta.financial.dto.FinancialLiquidityIndicatorsResponse;
@@ -32,10 +34,13 @@ import br.com.gestaodireta.financial.enumeration.FinancialReportGranularity;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.repository.FinancialCategoryRepository;
 import br.com.gestaodireta.financial.repository.FinancialReportRepository;
+import br.com.gestaodireta.harvest.dto.PlanningComparisonMetricResponse;
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
 import br.com.gestaodireta.harvest.entity.HarvestSeasonBudgetItem;
+import br.com.gestaodireta.harvest.enumeration.PlanningComparisonDifferenceUnit;
 import br.com.gestaodireta.harvest.repository.HarvestSeasonBudgetItemRepository;
 import br.com.gestaodireta.harvest.repository.HarvestSeasonRepository;
+import br.com.gestaodireta.harvest.service.HarvestFinancialSummaryCalculator;
 import br.com.gestaodireta.shared.exception.BusinessException;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
 import br.com.gestaodireta.shared.exception.ValidationException;
@@ -48,6 +53,7 @@ import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import org.springframework.stereotype.Service;
@@ -61,6 +67,7 @@ public class FinancialReportService {
     private final FinancialCategoryRepository financialCategoryRepository;
     private final HarvestSeasonRepository harvestSeasonRepository;
     private final HarvestSeasonBudgetItemRepository harvestSeasonBudgetItemRepository;
+    private final HarvestFinancialSummaryCalculator harvestFinancialSummaryCalculator;
 
     private final Clock clock;
 
@@ -70,12 +77,14 @@ public class FinancialReportService {
             FinancialCategoryRepository financialCategoryRepository,
             HarvestSeasonRepository harvestSeasonRepository,
             HarvestSeasonBudgetItemRepository harvestSeasonBudgetItemRepository,
+            HarvestFinancialSummaryCalculator harvestFinancialSummaryCalculator,
             Clock clock) {
         this.financialReportRepository = financialReportRepository;
         this.farmService = farmService;
         this.financialCategoryRepository = financialCategoryRepository;
         this.harvestSeasonRepository = harvestSeasonRepository;
         this.harvestSeasonBudgetItemRepository = harvestSeasonBudgetItemRepository;
+        this.harvestFinancialSummaryCalculator = harvestFinancialSummaryCalculator;
         this.clock = clock;
     }
 
@@ -128,7 +137,10 @@ public class FinancialReportService {
         List<FinancialCategorySummaryGroupResponse> categories =
                 financialReportRepository.findCategories(normalizedFilter);
         List<FinancialHarvestSummaryResponse> harvests =
-                financialReportRepository.findHarvests(normalizedFilter);
+                enrichHarvests(
+                        financialReportRepository.findHarvests(normalizedFilter),
+                        normalizedFilter,
+                        summary.totalIncome());
         FinancialReportUnallocatedResponse unallocated =
                 financialReportRepository.findUnallocated(normalizedFilter);
 
@@ -506,6 +518,123 @@ public class FinancialReportService {
                 amountPerHectare(projectedResult, area));
     }
 
+    private List<FinancialHarvestSummaryResponse> enrichHarvests(
+            List<FinancialHarvestSummaryResponse> harvests,
+            FinancialReportFilter filter,
+            BigDecimal totalIncome) {
+        List<Long> harvestSeasonIds =
+                harvests.stream()
+                        .map(FinancialHarvestSummaryResponse::harvestSeasonId)
+                        .filter(Objects::nonNull)
+                        .toList();
+        if (harvestSeasonIds.isEmpty()) {
+            return harvests;
+        }
+
+        Map<Long, HarvestSeason> harvestsById =
+                harvestSeasonRepository.findAllById(harvestSeasonIds).stream()
+                        .collect(
+                                java.util.stream.Collectors.toMap(
+                                        HarvestSeason::getId, Function.identity()));
+        List<Long> comparableHarvestIds =
+                harvestsById.values().stream()
+                        .filter(harvest -> isPlanningComparable(harvest, filter))
+                        .map(HarvestSeason::getId)
+                        .toList();
+        Map<Long, List<HarvestSeasonBudgetItem>> budgetItemsByHarvest =
+                comparableHarvestIds.isEmpty()
+                        ? Map.of()
+                        : budgetItemsByHarvest(comparableHarvestIds, filter.categoryIds());
+
+        return harvests.stream()
+                .map(
+                        harvest ->
+                                enrichHarvest(
+                                        harvest,
+                                        harvestsById.get(harvest.harvestSeasonId()),
+                                        budgetItemsByHarvest.get(harvest.harvestSeasonId()),
+                                        totalIncome))
+                .toList();
+    }
+
+    private Map<Long, List<HarvestSeasonBudgetItem>> budgetItemsByHarvest(
+            List<Long> harvestSeasonIds, List<Long> categoryIds) {
+        return harvestSeasonBudgetItemRepository
+                .findAllByHarvestSeasonIdIn(harvestSeasonIds)
+                .stream()
+                .filter(
+                        item ->
+                                categoryIds == null
+                                        || (item.getCategory() != null
+                                                && categoryIds.contains(
+                                                        item.getCategory().getId())))
+                .collect(
+                        java.util.stream.Collectors.groupingBy(
+                                item -> item.getHarvestSeason().getId()));
+    }
+
+    private FinancialHarvestSummaryResponse enrichHarvest(
+            FinancialHarvestSummaryResponse harvest,
+            HarvestSeason harvestSeason,
+            List<HarvestSeasonBudgetItem> budgetItems,
+            BigDecimal totalIncome) {
+        if (harvestSeason == null) {
+            return harvest;
+        }
+
+        FinancialHarvestPlanningComparisonResponse incomeComparison = null;
+        FinancialHarvestPlanningComparisonResponse expenseComparison = null;
+        FinancialHarvestPlanningComparisonResponse resultComparison = null;
+        if (budgetItems != null && !budgetItems.isEmpty()) {
+            BigDecimal plannedIncome = plannedAmount(budgetItems, TransactionType.INCOME);
+            BigDecimal plannedExpense = plannedAmount(budgetItems, TransactionType.EXPENSE);
+            incomeComparison = planningComparison(plannedIncome, harvest.income(), false);
+            expenseComparison = planningComparison(plannedExpense, harvest.expense(), true);
+            resultComparison =
+                    planningComparison(
+                            plannedIncome.subtract(plannedExpense), harvest.profit(), false);
+        }
+
+        BigDecimal area = harvestSeason.getAreaHectares();
+        BigDecimal resultPerHectare =
+                area == null || area.signum() <= 0
+                        ? null
+                        : amountPerHectare(harvest.profit(), area);
+        BigDecimal revenueShare = percentageOrZero(harvest.income(), totalIncome);
+        return new FinancialHarvestSummaryResponse(
+                harvest.harvestSeasonId(),
+                harvest.harvestSeasonName(),
+                harvest.income(),
+                harvest.expense(),
+                harvest.profit(),
+                harvest.marginPercentage(),
+                harvest.transactionCount(),
+                new FinancialHarvestSummaryDetails(
+                        resultPerHectare,
+                        revenueShare,
+                        incomeComparison,
+                        expenseComparison,
+                        resultComparison));
+    }
+
+    private FinancialHarvestPlanningComparisonResponse planningComparison(
+            BigDecimal planned, BigDecimal current, boolean lowerIsBetter) {
+        PlanningComparisonMetricResponse comparison =
+                harvestFinancialSummaryCalculator.comparisonMetric(
+                        planned, current, lowerIsBetter, PlanningComparisonDifferenceUnit.AMOUNT);
+        return new FinancialHarvestPlanningComparisonResponse(
+                comparison.planned(),
+                comparison.difference(),
+                comparison.percentageDifference(),
+                comparison.semantic());
+    }
+
+    private boolean isPlanningComparable(HarvestSeason harvest, FinancialReportFilter filter) {
+        return harvest.getEndDate() != null
+                && !filter.startDate().isAfter(harvest.getStartDate())
+                && !filter.endDate().isBefore(harvest.getEndDate());
+    }
+
     private FinancialPlanningIndicatorsResponse planningIndicators(
             FinancialReportSummaryResponse summary,
             List<HarvestSeason> harvestSeasons,
@@ -571,6 +700,11 @@ public class FinancialReportService {
         }
 
         return value.multiply(BigDecimal.valueOf(100)).divide(base, 2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal percentageOrZero(BigDecimal value, BigDecimal base) {
+        BigDecimal percentage = percentageOrNull(value, base);
+        return percentage == null ? BigDecimal.ZERO : percentage;
     }
 
     private BigDecimal amountPerHectare(BigDecimal amount, BigDecimal area) {

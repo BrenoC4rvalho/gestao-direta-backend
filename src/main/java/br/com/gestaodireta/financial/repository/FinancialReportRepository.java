@@ -480,7 +480,8 @@ public class FinancialReportRepository {
                             expense,
                             profit,
                             percentage(profit, income),
-                            resultSet.getLong("transaction_count"));
+                            resultSet.getLong("transaction_count"),
+                            null);
                 });
     }
 

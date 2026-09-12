@@ -36,6 +36,8 @@ public interface HarvestSeasonBudgetItemRepository
             """
             select item
             from HarvestSeasonBudgetItem item
+            left join fetch item.category
+            join fetch item.harvestSeason
             where item.harvestSeason.id in :seasonIds
             """)
     List<HarvestSeasonBudgetItem> findAllByHarvestSeasonIdIn(

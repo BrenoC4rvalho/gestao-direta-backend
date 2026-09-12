@@ -23,6 +23,7 @@ import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
 import br.com.gestaodireta.harvest.entity.HarvestSeasonBudgetItem;
 import br.com.gestaodireta.harvest.entity.ProductionActivity;
+import br.com.gestaodireta.harvest.enumeration.ComparisonSemantic;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
 import br.com.gestaodireta.harvest.enumeration.ProductionActivityStatus;
 import br.com.gestaodireta.harvest.repository.HarvestSeasonBudgetItemRepository;
@@ -99,6 +100,152 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
 
         assertThat(report.startDate()).isEqualTo(LocalDate.of(2025, 1, 1));
         assertThat(report.endDate()).isEqualTo(LocalDate.of(2026, 1, 1));
+    }
+
+    @Test
+    void shouldEnrichHarvestSummariesWithComparablePlanningAndPeriodMetrics() {
+        Farm farm = saveFarm();
+        User user = saveUser();
+        FinancialCategory incomeCategory = saveCategory(farm, "Venda", TransactionType.INCOME);
+        FinancialCategory expenseCategory = saveCategory(farm, "Insumos", TransactionType.EXPENSE);
+        HarvestSeason soybean = saveHarvest(farm, "Soja");
+        soybean.setEndDate(LocalDate.of(2026, 1, 31));
+        soybean.setAreaHectares(new BigDecimal("20.00"));
+        harvestSeasonRepository.save(soybean);
+        HarvestSeason corn = saveHarvest(farm, "Milho");
+        corn.setEndDate(LocalDate.of(2026, 1, 31));
+        harvestSeasonRepository.save(corn);
+        saveBudgetItem(soybean, incomeCategory, TransactionType.INCOME, "1000.00");
+        saveBudgetItem(soybean, expenseCategory, TransactionType.EXPENSE, "400.00");
+        saveTransaction(
+                farm,
+                user,
+                incomeCategory,
+                soybean,
+                TransactionType.INCOME,
+                new BigDecimal("1100.00"),
+                LocalDate.of(2026, 1, 20));
+        saveTransaction(
+                farm,
+                user,
+                expenseCategory,
+                soybean,
+                TransactionType.EXPENSE,
+                new BigDecimal("300.00"),
+                LocalDate.of(2026, 1, 20));
+        saveTransaction(
+                farm,
+                user,
+                incomeCategory,
+                corn,
+                TransactionType.INCOME,
+                new BigDecimal("900.00"),
+                LocalDate.of(2026, 1, 20));
+
+        FinancialReportResponse report =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 1, 1),
+                                LocalDate.of(2026, 1, 31),
+                                FinancialReportBasis.ACCRUAL,
+                                null,
+                                null));
+
+        var soybeanSummary =
+                report.harvests().stream()
+                        .filter(harvest -> harvest.harvestSeasonId().equals(soybean.getId()))
+                        .findFirst()
+                        .orElseThrow();
+        assertThat(soybeanSummary.details().resultPerHectare()).isEqualByComparingTo("40.00");
+        assertThat(soybeanSummary.details().periodRevenueShare()).isEqualByComparingTo("55.00");
+        assertThat(soybeanSummary.details().incomeComparison().planned())
+                .isEqualByComparingTo("1000.00");
+        assertThat(soybeanSummary.details().incomeComparison().percentageDifference())
+                .isEqualByComparingTo("10.00");
+        assertThat(soybeanSummary.details().incomeComparison().semantic())
+                .isEqualTo(ComparisonSemantic.BETTER);
+        assertThat(soybeanSummary.details().expenseComparison().percentageDifference())
+                .isEqualByComparingTo("-25.00");
+        assertThat(soybeanSummary.details().expenseComparison().semantic())
+                .isEqualTo(ComparisonSemantic.BETTER);
+        assertThat(soybeanSummary.details().resultComparison().percentageDifference())
+                .isEqualByComparingTo("33.33");
+        assertThat(soybeanSummary.details().resultComparison().semantic())
+                .isEqualTo(ComparisonSemantic.BETTER);
+
+        var cornSummary =
+                report.harvests().stream()
+                        .filter(harvest -> harvest.harvestSeasonId().equals(corn.getId()))
+                        .findFirst()
+                        .orElseThrow();
+        assertThat(cornSummary.details().resultPerHectare()).isNull();
+        assertThat(cornSummary.details().incomeComparison()).isNull();
+    }
+
+    @Test
+    void shouldOmitHarvestPlanningComparisonForAPartialHarvestPeriod() {
+        Farm farm = saveFarm();
+        User user = saveUser();
+        FinancialCategory incomeCategory = saveCategory(farm, "Venda", TransactionType.INCOME);
+        HarvestSeason soybean = saveHarvest(farm, "Soja");
+        soybean.setEndDate(LocalDate.of(2026, 1, 31));
+        harvestSeasonRepository.save(soybean);
+        saveBudgetItem(soybean, incomeCategory, TransactionType.INCOME, "1000.00");
+        saveTransaction(
+                farm,
+                user,
+                incomeCategory,
+                soybean,
+                TransactionType.INCOME,
+                new BigDecimal("500.00"),
+                LocalDate.of(2026, 1, 20));
+
+        FinancialReportResponse report =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 1, 15),
+                                LocalDate.of(2026, 1, 31),
+                                FinancialReportBasis.ACCRUAL,
+                                null,
+                                null));
+
+        assertThat(report.harvests().getFirst().details().incomeComparison()).isNull();
+        assertThat(report.harvests().getFirst().details().expenseComparison()).isNull();
+        assertThat(report.harvests().getFirst().details().resultComparison()).isNull();
+    }
+
+    @Test
+    void shouldKeepUnassignedTransactionsWithoutHarvestSpecificMetrics() {
+        Farm farm = saveFarm();
+        User user = saveUser();
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                new BigDecimal("3650.00"),
+                LocalDate.of(2026, 1, 20),
+                LocalDate.of(2026, 1, 20),
+                LocalDate.of(2026, 1, 20));
+
+        FinancialReportResponse report =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 1, 1),
+                                LocalDate.of(2026, 1, 31),
+                                FinancialReportBasis.ACCRUAL,
+                                null,
+                                null));
+
+        var unassigned = report.harvests().getFirst();
+        assertThat(unassigned.harvestSeasonId()).isNull();
+        assertThat(unassigned.harvestSeasonName()).isEqualTo("Sem safra");
+        assertThat(unassigned.income()).isZero();
+        assertThat(unassigned.expense()).isEqualByComparingTo("3650.00");
+        assertThat(unassigned.details()).isNull();
     }
 
     @Test
