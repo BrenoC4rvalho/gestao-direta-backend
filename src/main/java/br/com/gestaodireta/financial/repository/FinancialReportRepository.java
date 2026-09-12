@@ -8,6 +8,7 @@ import br.com.gestaodireta.financial.dto.FinancialHarvestSummaryResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportCommitmentsResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportFilter;
 import br.com.gestaodireta.financial.dto.FinancialReportSummaryResponse;
+import br.com.gestaodireta.financial.dto.FinancialReportSummaryWithComparison;
 import br.com.gestaodireta.financial.dto.FinancialReportTransactionResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportUnallocatedResponse;
 import br.com.gestaodireta.financial.enumeration.FinancialReportGranularity;
@@ -60,7 +61,8 @@ public class FinancialReportRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public FinancialReportSummaryResponse summarize(FinancialReportFilter filter) {
+    public FinancialReportSummaryWithComparison summarize(
+            FinancialReportFilter filter, LocalDate previousStartDate, LocalDate previousEndDate) {
         String sql =
                 FILTERED_TRANSACTIONS
                         + """
@@ -75,31 +77,61 @@ public class FinancialReportRepository {
                             from filtered_transactions
                           )
                           select
-                            coalesce(sum(case when type = 'INCOME' then amount else 0 end), 0) as total_income,
-                            coalesce(sum(case when type = 'EXPENSE' then amount else 0 end), 0) as total_expense,
-                            coalesce(sum(case when type = 'INCOME' and financial_state = 'REALIZED' then amount else 0 end), 0) as realized_income,
-                            coalesce(sum(case when type = 'EXPENSE' and financial_state = 'REALIZED' then amount else 0 end), 0) as realized_expense,
-                            coalesce(sum(case when type = 'INCOME' and financial_state = 'PROJECTED' then amount else 0 end), 0) as projected_income,
-                            coalesce(sum(case when type = 'EXPENSE' and financial_state = 'PROJECTED' then amount else 0 end), 0) as projected_expense
+                            coalesce(sum(case when type = 'INCOME'
+                              and reference_date between :startDate and :endDate then amount else 0 end), 0) as total_income,
+                            coalesce(sum(case when type = 'EXPENSE'
+                              and reference_date between :startDate and :endDate then amount else 0 end), 0) as total_expense,
+                            coalesce(sum(case when type = 'INCOME' and financial_state = 'REALIZED'
+                              and reference_date between :startDate and :endDate then amount else 0 end), 0) as realized_income,
+                            coalesce(sum(case when type = 'EXPENSE' and financial_state = 'REALIZED'
+                              and reference_date between :startDate and :endDate then amount else 0 end), 0) as realized_expense,
+                            coalesce(sum(case when type = 'INCOME' and financial_state = 'PROJECTED'
+                              and reference_date between :startDate and :endDate then amount else 0 end), 0) as projected_income,
+                            coalesce(sum(case when type = 'EXPENSE' and financial_state = 'PROJECTED'
+                              and reference_date between :startDate and :endDate then amount else 0 end), 0) as projected_expense,
+                            coalesce(sum(case
+                              when type = 'INCOME'
+                                and status = 'PAID'
+                                and coalesce(paid_at, transaction_date) <= :previousEndDate
+                                and reference_date between :previousStartDate and :previousEndDate
+                                then amount else 0 end), 0) as previous_realized_income,
+                            coalesce(sum(case
+                              when type = 'EXPENSE'
+                                and status = 'PAID'
+                                and coalesce(paid_at, transaction_date) <= :previousEndDate
+                                and reference_date between :previousStartDate and :previousEndDate
+                                then amount else 0 end), 0) as previous_realized_expense,
+                            count(case
+                              when status = 'PAID'
+                                and coalesce(paid_at, transaction_date) <= :previousEndDate
+                                and reference_date between :previousStartDate and :previousEndDate
+                                then 1 end) as previous_realized_transaction_count
                           from classified_transactions
-                          where reference_date between :startDate and :endDate
+                          where reference_date between :previousStartDate and :endDate
                           """;
+        MapSqlParameterSource parameters = parameters(filter);
+        parameters.addValue("previousStartDate", previousStartDate);
+        parameters.addValue("previousEndDate", previousEndDate);
         return jdbcTemplate.queryForObject(
                 sql,
-                parameters(filter),
+                parameters,
                 (resultSet, rowNum) -> {
                     BigDecimal income = decimal(resultSet.getBigDecimal("total_income"));
                     BigDecimal expense = decimal(resultSet.getBigDecimal("total_expense"));
                     BigDecimal balance = income.subtract(expense);
-                    return new FinancialReportSummaryResponse(
-                            income,
-                            expense,
-                            balance,
-                            percentage(balance, income),
-                            decimal(resultSet.getBigDecimal("realized_income")),
-                            decimal(resultSet.getBigDecimal("realized_expense")),
-                            decimal(resultSet.getBigDecimal("projected_income")),
-                            decimal(resultSet.getBigDecimal("projected_expense")));
+                    return new FinancialReportSummaryWithComparison(
+                            new FinancialReportSummaryResponse(
+                                    income,
+                                    expense,
+                                    balance,
+                                    percentage(balance, income),
+                                    decimal(resultSet.getBigDecimal("realized_income")),
+                                    decimal(resultSet.getBigDecimal("realized_expense")),
+                                    decimal(resultSet.getBigDecimal("projected_income")),
+                                    decimal(resultSet.getBigDecimal("projected_expense"))),
+                            decimal(resultSet.getBigDecimal("previous_realized_income")),
+                            decimal(resultSet.getBigDecimal("previous_realized_expense")),
+                            resultSet.getLong("previous_realized_transaction_count"));
                 });
     }
 

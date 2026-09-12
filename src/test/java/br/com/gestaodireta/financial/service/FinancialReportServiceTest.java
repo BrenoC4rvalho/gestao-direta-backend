@@ -1278,6 +1278,214 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
                         farm.getId(), TODAY, endDate, FinancialReportBasis.ACCRUAL, null, null));
     }
 
+    @Test
+    void shouldCompareRealizedMetricsUsingThePreviousInclusivePeriod() {
+        Farm farm = saveFarm();
+        User user = saveUser();
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                new BigDecimal("80.00"),
+                LocalDate.of(2024, 2, 23),
+                LocalDate.of(2024, 2, 23),
+                LocalDate.of(2024, 2, 23));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                new BigDecimal("50.00"),
+                LocalDate.of(2024, 2, 29),
+                LocalDate.of(2024, 2, 29),
+                LocalDate.of(2024, 2, 29));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                new BigDecimal("100.00"),
+                LocalDate.of(2024, 3, 1),
+                LocalDate.of(2024, 3, 1),
+                LocalDate.of(2024, 3, 1));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                new BigDecimal("30.00"),
+                LocalDate.of(2024, 3, 7),
+                LocalDate.of(2024, 3, 7),
+                LocalDate.of(2024, 3, 7));
+
+        FinancialReportResponse report =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2024, 3, 1),
+                                LocalDate.of(2024, 3, 7),
+                                FinancialReportBasis.ACCRUAL,
+                                null,
+                                null));
+
+        assertThat(report.comparison().previousStartDate()).isEqualTo(LocalDate.of(2024, 2, 23));
+        assertThat(report.comparison().previousEndDate()).isEqualTo(LocalDate.of(2024, 2, 29));
+        assertThat(report.comparison().previousDataAvailable()).isTrue();
+        assertThat(report.comparison().realizedIncome().difference()).isEqualByComparingTo("20.00");
+        assertThat(report.comparison().realizedIncome().percentageDifference())
+                .isEqualByComparingTo("25.00");
+        assertThat(report.comparison().realizedIncome().semantic())
+                .isEqualTo(ComparisonSemantic.BETTER);
+        assertThat(report.comparison().realizedExpense().difference())
+                .isEqualByComparingTo("-20.00");
+        assertThat(report.comparison().realizedExpense().semantic())
+                .isEqualTo(ComparisonSemantic.BETTER);
+        assertThat(report.comparison().realizedResult().difference()).isEqualByComparingTo("40.00");
+    }
+
+    @Test
+    void shouldKeepComparisonAvailableWithoutAPercentageWhenPreviousValueIsZero() {
+        Farm farm = saveFarm();
+        User user = saveUser();
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                new BigDecimal("50.00"),
+                LocalDate.of(2026, 1, 31),
+                LocalDate.of(2026, 1, 31),
+                LocalDate.of(2026, 1, 31));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                new BigDecimal("50.00"),
+                LocalDate.of(2026, 1, 31),
+                LocalDate.of(2026, 1, 31),
+                LocalDate.of(2026, 1, 31));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                new BigDecimal("60.00"),
+                LocalDate.of(2026, 2, 1),
+                LocalDate.of(2026, 2, 1),
+                LocalDate.of(2026, 2, 1));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                new BigDecimal("20.00"),
+                LocalDate.of(2026, 2, 1),
+                LocalDate.of(2026, 2, 1),
+                LocalDate.of(2026, 2, 1));
+
+        FinancialReportResponse report =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 2, 1),
+                                LocalDate.of(2026, 2, 1),
+                                FinancialReportBasis.ACCRUAL,
+                                null,
+                                null));
+
+        assertThat(report.comparison().previousStartDate()).isEqualTo(LocalDate.of(2026, 1, 31));
+        assertThat(report.comparison().realizedResult().previousValue()).isZero();
+        assertThat(report.comparison().realizedResult().percentageDifference()).isNull();
+        assertThat(report.comparison().realizedResult().semantic())
+                .isEqualTo(ComparisonSemantic.BETTER);
+    }
+
+    @Test
+    void shouldReturnAnUnavailableComparisonWhenThePreviousPeriodHasNoRealizedTransactions() {
+        Farm farm = saveFarm();
+        User user = saveUser();
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                new BigDecimal("100.00"),
+                LocalDate.of(2026, 2, 1),
+                LocalDate.of(2026, 2, 1),
+                LocalDate.of(2026, 2, 1));
+
+        FinancialReportResponse report =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 2, 1),
+                                LocalDate.of(2026, 2, 1),
+                                FinancialReportBasis.ACCRUAL,
+                                null,
+                                null));
+
+        assertThat(report.comparison().previousDataAvailable()).isFalse();
+        assertThat(report.comparison().realizedIncome().currentValue())
+                .isEqualByComparingTo("100.00");
+        assertThat(report.comparison().realizedIncome().previousValue()).isNull();
+        assertThat(report.comparison().realizedIncome().percentageDifference()).isNull();
+        assertThat(report.comparison().realizedIncome().semantic())
+                .isEqualTo(ComparisonSemantic.NEUTRAL);
+    }
+
+    @Test
+    void shouldTreatALessNegativeRealizedResultAsBetter() {
+        Farm farm = saveFarm();
+        User user = saveUser();
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                new BigDecimal("100.00"),
+                LocalDate.of(2026, 2, 1),
+                LocalDate.of(2026, 2, 1),
+                LocalDate.of(2026, 2, 1));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                new BigDecimal("60.00"),
+                LocalDate.of(2026, 2, 2),
+                LocalDate.of(2026, 2, 2),
+                LocalDate.of(2026, 2, 2));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                new BigDecimal("100.00"),
+                LocalDate.of(2026, 2, 2),
+                LocalDate.of(2026, 2, 2),
+                LocalDate.of(2026, 2, 2));
+
+        FinancialReportResponse report =
+                financialReportService.getReport(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 2, 2),
+                                LocalDate.of(2026, 2, 2),
+                                FinancialReportBasis.ACCRUAL,
+                                null,
+                                null));
+
+        assertThat(report.comparison().realizedResult().previousValue())
+                .isEqualByComparingTo("-100.00");
+        assertThat(report.comparison().realizedResult().currentValue())
+                .isEqualByComparingTo("-40.00");
+        assertThat(report.comparison().realizedResult().difference()).isEqualByComparingTo("60.00");
+        assertThat(report.comparison().realizedResult().semantic())
+                .isEqualTo(ComparisonSemantic.BETTER);
+    }
+
     private Farm saveFarm() {
         return saveFarm("Farm");
     }

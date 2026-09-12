@@ -18,12 +18,15 @@ import br.com.gestaodireta.financial.dto.FinancialLiquidityIndicatorsResponse;
 import br.com.gestaodireta.financial.dto.FinancialPlanningIndicatorsResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportCategoryIndicatorResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportCommitmentsResponse;
+import br.com.gestaodireta.financial.dto.FinancialReportComparisonMetricResponse;
+import br.com.gestaodireta.financial.dto.FinancialReportComparisonResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportFilter;
 import br.com.gestaodireta.financial.dto.FinancialReportHarvestIndicatorResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportIndicatorsResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportPeriodIndicatorResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportSummaryResponse;
+import br.com.gestaodireta.financial.dto.FinancialReportSummaryWithComparison;
 import br.com.gestaodireta.financial.dto.FinancialReportTransactionResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportUnallocatedResponse;
 import br.com.gestaodireta.financial.dto.FinancialResultIndicatorsResponse;
@@ -37,6 +40,7 @@ import br.com.gestaodireta.financial.repository.FinancialReportRepository;
 import br.com.gestaodireta.harvest.dto.PlanningComparisonMetricResponse;
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
 import br.com.gestaodireta.harvest.entity.HarvestSeasonBudgetItem;
+import br.com.gestaodireta.harvest.enumeration.ComparisonSemantic;
 import br.com.gestaodireta.harvest.enumeration.PlanningComparisonDifferenceUnit;
 import br.com.gestaodireta.harvest.repository.HarvestSeasonBudgetItemRepository;
 import br.com.gestaodireta.harvest.repository.HarvestSeasonRepository;
@@ -50,6 +54,7 @@ import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -92,8 +97,15 @@ public class FinancialReportService {
     public FinancialReportResponse getReport(FinancialReportFilter filter) {
         ValidatedFilter validatedFilter = validateAndNormalize(filter);
         FinancialReportFilter normalizedFilter = validatedFilter.filter();
-        FinancialReportSummaryResponse summary =
-                financialReportRepository.summarize(normalizedFilter);
+        LocalDate previousEndDate = normalizedFilter.startDate().minusDays(1);
+        long periodDays =
+                ChronoUnit.DAYS.between(normalizedFilter.startDate(), normalizedFilter.endDate())
+                        + 1;
+        LocalDate previousStartDate = previousEndDate.minusDays(periodDays - 1);
+        FinancialReportSummaryWithComparison summaryWithComparison =
+                financialReportRepository.summarize(
+                        normalizedFilter, previousStartDate, previousEndDate);
+        FinancialReportSummaryResponse summary = summaryWithComparison.summary();
         LocalDate today = LocalDate.now(clock);
         LocalDate cutoffDate = normalizedFilter.endDate();
         LocalDate referenceDate = cutoffDate.isBefore(today) ? cutoffDate : today;
@@ -150,6 +162,11 @@ public class FinancialReportService {
                 normalizedFilter.endDate(),
                 normalizedFilter.basis(),
                 summary,
+                comparison(
+                        normalizedFilter,
+                        previousStartDate,
+                        previousEndDate,
+                        summaryWithComparison),
                 commitments,
                 evolution,
                 realizedCumulativeEvolution,
@@ -164,6 +181,63 @@ public class FinancialReportService {
                         normalizedFilter),
                 indicators(performanceEvolution, categories, harvests),
                 unallocated);
+    }
+
+    private FinancialReportComparisonResponse comparison(
+            FinancialReportFilter filter,
+            LocalDate previousStartDate,
+            LocalDate previousEndDate,
+            FinancialReportSummaryWithComparison summaryWithComparison) {
+        boolean previousDataAvailable =
+                summaryWithComparison.previousRealizedTransactionCount() > 0;
+        FinancialReportSummaryResponse summary = summaryWithComparison.summary();
+        BigDecimal previousResult =
+                summaryWithComparison
+                        .previousRealizedIncome()
+                        .subtract(summaryWithComparison.previousRealizedExpense());
+
+        return new FinancialReportComparisonResponse(
+                filter.startDate(),
+                filter.endDate(),
+                previousStartDate,
+                previousEndDate,
+                previousDataAvailable,
+                comparisonMetric(
+                        summary.realizedIncome(),
+                        summaryWithComparison.previousRealizedIncome(),
+                        previousDataAvailable,
+                        false),
+                comparisonMetric(
+                        summary.realizedExpense(),
+                        summaryWithComparison.previousRealizedExpense(),
+                        previousDataAvailable,
+                        true),
+                comparisonMetric(
+                        summary.realizedIncome().subtract(summary.realizedExpense()),
+                        previousResult,
+                        previousDataAvailable,
+                        false));
+    }
+
+    private FinancialReportComparisonMetricResponse comparisonMetric(
+            BigDecimal current,
+            BigDecimal previous,
+            boolean previousDataAvailable,
+            boolean lowerIsBetter) {
+        if (!previousDataAvailable) {
+            return new FinancialReportComparisonMetricResponse(
+                    current, null, null, null, ComparisonSemantic.NEUTRAL);
+        }
+
+        PlanningComparisonMetricResponse comparison =
+                harvestFinancialSummaryCalculator.comparisonMetric(
+                        previous, current, lowerIsBetter, PlanningComparisonDifferenceUnit.AMOUNT);
+        return new FinancialReportComparisonMetricResponse(
+                current,
+                previous,
+                comparison.difference(),
+                comparison.percentageDifference(),
+                comparison.semantic());
     }
 
     static List<FinancialCumulativeEvolutionPointResponse> realizedCumulativeEvolution(

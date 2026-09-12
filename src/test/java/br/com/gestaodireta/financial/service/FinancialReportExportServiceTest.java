@@ -131,6 +131,7 @@ class FinancialReportExportServiceTest {
                 LocalDate.of(2026, 1, 31),
                 FinancialReportBasis.CASH,
                 summary,
+                null,
                 commitments,
                 List.of(evolution),
                 List.of(),
