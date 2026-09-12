@@ -117,6 +117,12 @@ public interface HarvestSeasonRepository extends JpaRepository<HarvestSeason, Lo
                         then transaction.amount
                         else 0
                       end), 0) as pendingRevenue,
+                      coalesce(sum(case
+                        when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME
+                          and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE
+                        then transaction.amount
+                        else 0
+                      end), 0) as overdueRevenue,
                       count(transaction) as transactionCount,
                       coalesce(sum(case
                         when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME

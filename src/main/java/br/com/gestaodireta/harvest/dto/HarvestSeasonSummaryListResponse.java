@@ -30,4 +30,14 @@ public record HarvestSeasonSummaryListResponse(
         Long incomeCount,
         Long expenseCount,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt) {}
+        LocalDateTime updatedAt,
+        HarvestPlanningSummaryResponse planning,
+        HarvestProjectionSummaryResponse projection,
+        HarvestRealizedSummaryResponse realized,
+        HarvestPlanningComparisonResponse planningComparison,
+        HarvestSeasonPerHectareSummaryResponse plannedPerHectare,
+        HarvestSeasonPerHectareSummaryResponse realizedPerHectare,
+        HarvestSeasonPeriodProgressResponse periodProgress,
+        HarvestSeasonBudgetExecutionResponse budgetExecution,
+        HarvestSeasonCommitmentsResponse commitments,
+        HarvestSeasonStatusContextResponse statusContext) {}

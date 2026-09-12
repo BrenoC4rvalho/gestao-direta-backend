@@ -43,6 +43,8 @@ public interface HarvestSeasonSummaryListProjection {
 
     BigDecimal getPendingRevenue();
 
+    BigDecimal getOverdueRevenue();
+
     Long getTransactionCount();
 
     Long getIncomeCount();

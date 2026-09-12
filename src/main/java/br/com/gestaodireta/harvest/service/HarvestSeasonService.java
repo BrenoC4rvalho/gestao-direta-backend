@@ -18,17 +18,23 @@ import br.com.gestaodireta.harvest.dto.HarvestCategoryComparisonBreakdownRespons
 import br.com.gestaodireta.harvest.dto.HarvestCategoryComparisonCategoryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestCategoryComparisonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestCategoryMovementsResponse;
+import br.com.gestaodireta.harvest.dto.HarvestPlanningComparisonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestPlanningSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestProjectionSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestRealizedSummaryResponse;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonBudgetExecutionResponse;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonCommitmentsResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonComparisonBestResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonComparisonDifferenceResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonComparisonHarvestResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonComparisonResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonDetailSummaryResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonPerHectareComparisonResponse;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonPerHectareSummaryResponse;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonPeriodProgressResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonResponse;
+import br.com.gestaodireta.harvest.dto.HarvestSeasonStatusContextResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonStatusUpdateRequest;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonSummaryListResponse;
 import br.com.gestaodireta.harvest.dto.HarvestSeasonUpdateRequest;
@@ -52,6 +58,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -1125,6 +1132,31 @@ public class HarvestSeasonService {
         BigDecimal expectedRevenue = zeroIfNull(projection.getExpectedRevenue());
         BigDecimal realizedCost = zeroIfNull(projection.getRealizedCost());
         BigDecimal realizedRevenue = zeroIfNull(projection.getRealizedRevenue());
+        BigDecimal pendingExpenses = zeroIfNull(projection.getPendingExpenses());
+        BigDecimal overdueExpenses = zeroIfNull(projection.getOverdueExpenses());
+        BigDecimal pendingRevenue = zeroIfNull(projection.getPendingRevenue());
+        BigDecimal overdueRevenue = zeroIfNull(projection.getOverdueRevenue());
+        HarvestPlanningSummaryResponse planning =
+                harvestFinancialSummaryCalculator.planning(expectedCost, expectedRevenue);
+        HarvestRealizedSummaryResponse realized =
+                harvestFinancialSummaryCalculator.realized(realizedCost, realizedRevenue);
+        HarvestProjectionSummaryResponse projectionSummary =
+                harvestFinancialSummaryCalculator.projection(
+                        realized,
+                        pendingExpenses.add(overdueExpenses),
+                        pendingRevenue.add(overdueRevenue));
+        boolean hasPlanning = expectedCost.signum() != 0 || expectedRevenue.signum() != 0;
+        boolean hasCurrentData = zeroIfNull(projection.getTransactionCount()) > 0;
+        HarvestPlanningComparisonResponse planningComparison =
+                harvestFinancialSummaryCalculator.planningComparison(
+                        hasPlanning,
+                        hasCurrentData,
+                        projection.getStatus() == HarvestSeasonStatus.PLANNED,
+                        projection.getStatus() == HarvestSeasonStatus.IN_PROGRESS,
+                        planning,
+                        realized,
+                        projectionSummary);
+        LocalDate today = LocalDate.now(clock);
 
         return new HarvestSeasonSummaryListResponse(
                 projection.getId(),
@@ -1138,20 +1170,119 @@ public class HarvestSeasonService {
                 projection.getEndDate(),
                 expectedCost,
                 expectedRevenue,
-                expectedRevenue.subtract(expectedCost),
+                planning.plannedProfit(),
                 projection.getAreaHectares(),
                 projection.getStatus(),
                 realizedCost,
                 realizedRevenue,
-                realizedRevenue.subtract(realizedCost),
-                zeroIfNull(projection.getPendingExpenses()),
-                zeroIfNull(projection.getOverdueExpenses()),
-                zeroIfNull(projection.getPendingRevenue()),
+                realized.realizedProfit(),
+                pendingExpenses,
+                overdueExpenses,
+                pendingRevenue,
                 zeroIfNull(projection.getTransactionCount()),
                 zeroIfNull(projection.getIncomeCount()),
                 zeroIfNull(projection.getExpenseCount()),
                 projection.getCreatedAt(),
-                projection.getUpdatedAt());
+                projection.getUpdatedAt(),
+                planning,
+                projectionSummary,
+                realized,
+                planningComparison,
+                perHectare(
+                        planning.plannedCost(),
+                        planning.plannedRevenue(),
+                        planning.plannedProfit(),
+                        projection.getAreaHectares()),
+                perHectare(
+                        realized.realizedCost(),
+                        realized.realizedRevenue(),
+                        realized.realizedProfit(),
+                        projection.getAreaHectares()),
+                periodProgress(projection, today),
+                budgetExecution(realized.realizedCost(), planning.plannedCost()),
+                new HarvestSeasonCommitmentsResponse(
+                        pendingRevenue.add(overdueRevenue),
+                        pendingExpenses.add(overdueExpenses),
+                        overdueExpenses),
+                statusContext(projection, today));
+    }
+
+    private HarvestSeasonPerHectareSummaryResponse perHectare(
+            BigDecimal cost, BigDecimal revenue, BigDecimal result, BigDecimal areaHectares) {
+        if (areaHectares == null || areaHectares.compareTo(BigDecimal.ZERO) <= 0) {
+            return new HarvestSeasonPerHectareSummaryResponse(null, null, null);
+        }
+
+        return new HarvestSeasonPerHectareSummaryResponse(
+                cost.divide(areaHectares, 2, RoundingMode.HALF_UP),
+                revenue.divide(areaHectares, 2, RoundingMode.HALF_UP),
+                result.divide(areaHectares, 2, RoundingMode.HALF_UP));
+    }
+
+    private HarvestSeasonPeriodProgressResponse periodProgress(
+            HarvestSeasonSummaryListProjection projection, LocalDate today) {
+        if (projection.getStatus() != HarvestSeasonStatus.IN_PROGRESS
+                || projection.getStartDate() == null
+                || projection.getEndDate() == null) {
+            return null;
+        }
+
+        long totalDays =
+                ChronoUnit.DAYS.between(projection.getStartDate(), projection.getEndDate()) + 1;
+        if (totalDays <= 0) {
+            return null;
+        }
+
+        long elapsedDays =
+                Math.max(
+                        0,
+                        Math.min(
+                                totalDays,
+                                ChronoUnit.DAYS.between(projection.getStartDate(), today) + 1));
+        long remainingDays = Math.max(0, ChronoUnit.DAYS.between(today, projection.getEndDate()));
+        int percentage =
+                BigDecimal.valueOf(elapsedDays)
+                        .multiply(BigDecimal.valueOf(100))
+                        .divide(BigDecimal.valueOf(totalDays), 0, RoundingMode.HALF_UP)
+                        .intValue();
+
+        return new HarvestSeasonPeriodProgressResponse(
+                Math.max(0, Math.min(100, percentage)), elapsedDays, totalDays, remainingDays);
+    }
+
+    private HarvestSeasonBudgetExecutionResponse budgetExecution(
+            BigDecimal executedCost, BigDecimal plannedCost) {
+        BigDecimal percentage = null;
+        if (plannedCost.compareTo(BigDecimal.ZERO) > 0) {
+            percentage =
+                    executedCost
+                            .multiply(BigDecimal.valueOf(100))
+                            .divide(plannedCost, 2, RoundingMode.HALF_UP);
+        }
+
+        return new HarvestSeasonBudgetExecutionResponse(executedCost, plannedCost, percentage);
+    }
+
+    private HarvestSeasonStatusContextResponse statusContext(
+            HarvestSeasonSummaryListProjection projection, LocalDate today) {
+        Long daysUntilStart = null;
+        boolean startDatePassed = false;
+        Long daysSinceEnd = null;
+
+        if (projection.getStatus() == HarvestSeasonStatus.PLANNED) {
+            long difference = ChronoUnit.DAYS.between(today, projection.getStartDate());
+            daysUntilStart = Math.max(0, difference);
+            startDatePassed = difference < 0;
+        }
+
+        if (projection.getStatus() == HarvestSeasonStatus.FINISHED
+                && projection.getEndDate() != null
+                && !projection.getEndDate().isAfter(today)) {
+            daysSinceEnd = ChronoUnit.DAYS.between(projection.getEndDate(), today);
+        }
+
+        return new HarvestSeasonStatusContextResponse(
+                daysUntilStart, startDatePassed, daysSinceEnd);
     }
 
     List<HarvestSeasonStatus> resolveStatuses(List<HarvestSeasonStatus> statuses) {
