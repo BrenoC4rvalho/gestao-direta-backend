@@ -21,10 +21,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface FinancialTransactionRepository extends JpaRepository<FinancialTransaction, Long> {
 
-    String FILTERED_TRANSACTIONS_QUERY =
+    String FILTERED_TRANSACTIONS_PREDICATE =
             """
-            select transaction
-            from FinancialTransaction transaction
             where transaction.farm.id = :farmId
               and transaction.recordStatus = :recordStatus
               and (
@@ -68,6 +66,28 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
               and transaction.amount >= :minAmount
               and transaction.amount <= :maxAmount
             """;
+
+    String FILTERED_TRANSACTIONS_QUERY =
+            "select transaction from FinancialTransaction transaction "
+                    + FILTERED_TRANSACTIONS_PREDICATE;
+
+    String MONTHLY_SUMMARY_QUERY =
+            """
+            select
+              coalesce(sum(case
+                when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME
+                then transaction.amount
+                else 0
+              end), 0) as income,
+              coalesce(sum(case
+                when transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+                then transaction.amount
+                else 0
+              end), 0) as expense
+            from FinancialTransaction transaction
+            """
+                    + FILTERED_TRANSACTIONS_PREDICATE
+                    + " and transaction.status <> br.com.gestaodireta.financial.enumeration.PaymentStatus.CANCELED";
 
     Page<FinancialTransaction> findByFarmIdAndRecordStatus(
             Long farmId, FinancialRecordStatus recordStatus, Pageable pageable);
@@ -135,6 +155,29 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
             @Param("minAmount") BigDecimal minAmount,
             @Param("maxAmount") BigDecimal maxAmount,
             org.springframework.data.domain.Sort sort);
+
+    @Query(MONTHLY_SUMMARY_QUERY)
+    MonthlyFinancialSummaryProjection summarizeMonthly(
+            @Param("farmId") Long farmId,
+            @Param("cashBasis") boolean cashBasis,
+            @Param("transactionDateStart") LocalDate transactionDateStart,
+            @Param("transactionDateEnd") LocalDate transactionDateEnd,
+            @Param("paidAtStart") LocalDate paidAtStart,
+            @Param("paidAtEnd") LocalDate paidAtEnd,
+            @Param("filterPaidAt") boolean filterPaidAt,
+            @Param("type") TransactionType type,
+            @Param("filterCategoryIds") boolean filterCategoryIds,
+            @Param("categoryIds") Collection<Long> categoryIds,
+            @Param("harvestSeasonId") Long harvestSeasonId,
+            @Param("filterPaymentStatuses") boolean filterPaymentStatuses,
+            @Param("paymentStatuses") Collection<PaymentStatus> paymentStatuses,
+            @Param("filterPaymentMethods") boolean filterPaymentMethods,
+            @Param("paymentMethods") Collection<PaymentMethod> paymentMethods,
+            @Param("recordStatus") FinancialRecordStatus recordStatus,
+            @Param("description") String description,
+            @Param("createdByUserId") Long createdByUserId,
+            @Param("minAmount") BigDecimal minAmount,
+            @Param("maxAmount") BigDecimal maxAmount);
 
     @Query(
             """

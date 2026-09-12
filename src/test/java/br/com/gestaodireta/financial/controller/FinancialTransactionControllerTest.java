@@ -294,6 +294,140 @@ class FinancialTransactionControllerTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldSummarizeMonthlyTransactionsUsingTheRequestedBasis() throws Exception {
+        Farm farm = saveFarm(FarmStatus.ACTIVE);
+        Farm otherFarm = saveFarm(FarmStatus.ACTIVE);
+        User admin = saveUser("Admin", "monthly-summary@example.com", UserType.ADMIN);
+
+        saveTransaction(
+                farm,
+                null,
+                admin,
+                "Accrual income",
+                new BigDecimal("100.00"),
+                TransactionType.INCOME,
+                PaymentStatus.PENDING,
+                null,
+                LocalDate.of(2026, 6, 5),
+                null);
+        saveTransaction(
+                farm,
+                null,
+                admin,
+                "Negative balance expense",
+                new BigDecimal("150.00"),
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                PaymentMethod.PIX,
+                LocalDate.of(2026, 6, 10),
+                LocalDate.of(2026, 7, 2));
+        saveTransaction(
+                farm,
+                null,
+                admin,
+                "Canceled",
+                new BigDecimal("50.00"),
+                TransactionType.INCOME,
+                PaymentStatus.CANCELED,
+                null,
+                LocalDate.of(2026, 6, 12),
+                null);
+
+        FinancialTransaction paidWithFallback =
+                saveTransaction(
+                        farm,
+                        null,
+                        admin,
+                        "Paid fallback",
+                        new BigDecimal("30.00"),
+                        TransactionType.INCOME,
+                        PaymentStatus.PAID,
+                        PaymentMethod.PIX,
+                        LocalDate.of(2026, 6, 15),
+                        null);
+        FinancialTransaction pendingByDueDate =
+                saveTransaction(
+                        farm,
+                        null,
+                        admin,
+                        "Pending by due date",
+                        new BigDecimal("20.00"),
+                        TransactionType.EXPENSE,
+                        PaymentStatus.PENDING,
+                        null,
+                        LocalDate.of(2026, 5, 15),
+                        null);
+        pendingByDueDate.setDueDate(LocalDate.of(2026, 6, 20));
+        financialTransactionRepository.saveAndFlush(pendingByDueDate);
+
+        saveTransaction(
+                otherFarm,
+                null,
+                admin,
+                "Other farm",
+                new BigDecimal("999.00"),
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                PaymentMethod.PIX,
+                LocalDate.of(2026, 6, 1),
+                LocalDate.of(2026, 6, 1));
+        saveTransaction(
+                farm,
+                null,
+                admin,
+                "Another year",
+                new BigDecimal("999.00"),
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                PaymentMethod.PIX,
+                LocalDate.of(2025, 6, 1),
+                LocalDate.of(2025, 6, 1));
+
+        mockMvc.perform(
+                        get("/api/financial/transactions/monthly-summary")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN"))
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("transactionDateStart", "2026-06-01")
+                                .param("transactionDateEnd", "2026-06-30"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.income").value(130))
+                .andExpect(jsonPath("$.expense").value(150))
+                .andExpect(jsonPath("$.balance").value(-20));
+
+        mockMvc.perform(
+                        get("/api/financial/transactions/monthly-summary")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN"))
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("transactionDateStart", "2026-06-01")
+                                .param("transactionDateEnd", "2026-06-30")
+                                .param("basis", "CASH"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.income").value(30))
+                .andExpect(jsonPath("$.expense").value(20))
+                .andExpect(jsonPath("$.balance").value(10));
+    }
+
+    @Test
+    void shouldReturnZeroForAnEmptyMonthlySummary() throws Exception {
+        Farm farm = saveFarm(FarmStatus.ACTIVE);
+        User admin = saveUser("Admin", "empty-monthly-summary@example.com", UserType.ADMIN);
+
+        mockMvc.perform(
+                        get("/api/financial/transactions/monthly-summary")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN"))
+                                .param("farmId", String.valueOf(farm.getId()))
+                                .param("transactionDateStart", "2026-06-01")
+                                .param("transactionDateEnd", "2026-06-30"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.income").value(0))
+                .andExpect(jsonPath("$.expense").value(0))
+                .andExpect(jsonPath("$.balance").value(0));
+    }
+
+    @Test
     void shouldListTransactionsWithAllFilters() throws Exception {
         Farm farm = saveFarm(FarmStatus.ACTIVE);
         User admin = saveUser("Admin", "all-filters-admin@example.com", UserType.ADMIN);

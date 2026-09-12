@@ -7,6 +7,7 @@ import br.com.gestaodireta.financial.dto.FinancialTransactionFilterRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionResponse;
 import br.com.gestaodireta.financial.dto.FinancialTransactionUpdateRequest;
+import br.com.gestaodireta.financial.dto.MonthlyFinancialSummaryResponse;
 import br.com.gestaodireta.financial.dto.PayTransactionRequest;
 import br.com.gestaodireta.financial.entity.FinancialCategory;
 import br.com.gestaodireta.financial.entity.FinancialTransaction;
@@ -18,6 +19,7 @@ import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import br.com.gestaodireta.financial.mapper.FinancialTransactionMapper;
 import br.com.gestaodireta.financial.repository.FinancialTransactionRepository;
+import br.com.gestaodireta.financial.repository.MonthlyFinancialSummaryProjection;
 import br.com.gestaodireta.harvest.entity.HarvestSeason;
 import br.com.gestaodireta.harvest.enumeration.HarvestSeasonStatus;
 import br.com.gestaodireta.harvest.repository.HarvestSeasonRepository;
@@ -177,6 +179,41 @@ public class FinancialTransactionService {
                 .stream()
                 .map(financialTransactionMapper::toResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public MonthlyFinancialSummaryResponse summarizeMonthly(
+            FinancialTransactionFilterRequest filterRequest) {
+        FinancialTransactionFilterRequest normalizedFilter = normalizeFilter(filterRequest);
+        validateFilter(normalizedFilter);
+
+        MonthlyFinancialSummaryProjection summary =
+                financialTransactionRepository.summarizeMonthly(
+                        normalizedFilter.farmId(),
+                        isCashBasis(normalizedFilter),
+                        startDateOrDefault(normalizedFilter.transactionDateStart()),
+                        endDateOrDefault(normalizedFilter.transactionDateEnd()),
+                        startDateOrDefault(normalizedFilter.paidAtStart()),
+                        endDateOrDefault(normalizedFilter.paidAtEnd()),
+                        shouldFilterPaidAt(normalizedFilter),
+                        normalizedFilter.type(),
+                        hasCategoryIds(normalizedFilter),
+                        categoryIdsOrPlaceholder(normalizedFilter),
+                        normalizedFilter.harvestSeasonId(),
+                        hasPaymentStatuses(normalizedFilter),
+                        paymentStatusesOrPlaceholder(normalizedFilter),
+                        hasPaymentMethods(normalizedFilter),
+                        paymentMethodsOrPlaceholder(normalizedFilter),
+                        normalizedFilter.recordStatus(),
+                        normalizedFilter.description(),
+                        normalizedFilter.createdByUserId(),
+                        minAmountOrDefault(normalizedFilter.minAmount()),
+                        maxAmountOrDefault(normalizedFilter.maxAmount()));
+
+        BigDecimal income = summary.getIncome();
+        BigDecimal expense = summary.getExpense();
+
+        return new MonthlyFinancialSummaryResponse(income, expense, income.subtract(expense));
     }
 
     @Transactional(readOnly = true)

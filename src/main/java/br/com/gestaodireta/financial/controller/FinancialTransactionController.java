@@ -5,6 +5,7 @@ import br.com.gestaodireta.financial.dto.FinancialTransactionFilterRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionResponse;
 import br.com.gestaodireta.financial.dto.FinancialTransactionUpdateRequest;
+import br.com.gestaodireta.financial.dto.MonthlyFinancialSummaryResponse;
 import br.com.gestaodireta.financial.dto.PayTransactionRequest;
 import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
 import br.com.gestaodireta.financial.enumeration.FinancialReportBasis;
@@ -104,6 +105,36 @@ public class FinancialTransactionController {
                         basis);
 
         return financialTransactionService.findAll(filterRequest, paginationParams);
+    }
+
+    @GetMapping("/monthly-summary")
+    @PreAuthorize("@financialAccess.canViewFinancialData(#farmId)")
+    public MonthlyFinancialSummaryResponse summarizeMonthly(
+            @RequestParam Long farmId,
+            @RequestParam LocalDate transactionDateStart,
+            @RequestParam LocalDate transactionDateEnd,
+            @RequestParam(defaultValue = "ACCRUAL") FinancialReportBasis basis) {
+        return financialTransactionService.summarizeMonthly(
+                new FinancialTransactionFilterRequest(
+                        farmId,
+                        transactionDateStart,
+                        transactionDateEnd,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        FinancialRecordStatus.ACTIVE,
+                        null,
+                        null,
+                        null,
+                        null,
+                        basis));
     }
 
     @GetMapping("/export/xlsx")
