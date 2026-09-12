@@ -2,7 +2,6 @@ package br.com.gestaodireta.financial.repository;
 
 import br.com.gestaodireta.financial.entity.FinancialTransaction;
 import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
-import br.com.gestaodireta.financial.enumeration.FinancialReportBasis;
 import br.com.gestaodireta.financial.enumeration.PaymentMethod;
 import br.com.gestaodireta.financial.enumeration.PaymentStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
@@ -30,12 +29,12 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
               and transaction.recordStatus = :recordStatus
               and (
                 (
-                  :basis = br.com.gestaodireta.financial.enumeration.FinancialReportBasis.ACCRUAL
+                  :cashBasis = false
                   and transaction.transactionDate >= :transactionDateStart
                   and transaction.transactionDate <= :transactionDateEnd
                 )
                 or (
-                  :basis = br.com.gestaodireta.financial.enumeration.FinancialReportBasis.CASH
+                  :cashBasis = true
                   and (
                     (
                       transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PAID
@@ -84,7 +83,7 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
     @Query(FILTERED_TRANSACTIONS_QUERY)
     Page<FinancialTransaction> findAllFiltered(
             @Param("farmId") Long farmId,
-            @Param("basis") FinancialReportBasis basis,
+            @Param("cashBasis") boolean cashBasis,
             @Param("transactionDateStart") LocalDate transactionDateStart,
             @Param("transactionDateEnd") LocalDate transactionDateEnd,
             @Param("paidAtStart") LocalDate paidAtStart,
@@ -116,7 +115,7 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
     @Query(FILTERED_TRANSACTIONS_QUERY)
     List<FinancialTransaction> findAllFiltered(
             @Param("farmId") Long farmId,
-            @Param("basis") FinancialReportBasis basis,
+            @Param("cashBasis") boolean cashBasis,
             @Param("transactionDateStart") LocalDate transactionDateStart,
             @Param("transactionDateEnd") LocalDate transactionDateEnd,
             @Param("paidAtStart") LocalDate paidAtStart,

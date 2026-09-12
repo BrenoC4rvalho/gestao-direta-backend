@@ -118,7 +118,7 @@ public class FinancialTransactionService {
                 financialTransactionRepository
                         .findAllFiltered(
                                 normalizedFilter.farmId(),
-                                normalizedFilter.basis(),
+                                isCashBasis(normalizedFilter),
                                 startDateOrDefault(normalizedFilter.transactionDateStart()),
                                 endDateOrDefault(normalizedFilter.transactionDateEnd()),
                                 startDateOrDefault(normalizedFilter.paidAtStart()),
@@ -154,7 +154,7 @@ public class FinancialTransactionService {
         return financialTransactionRepository
                 .findAllFiltered(
                         normalizedFilter.farmId(),
-                        normalizedFilter.basis(),
+                        isCashBasis(normalizedFilter),
                         startDateOrDefault(normalizedFilter.transactionDateStart()),
                         endDateOrDefault(normalizedFilter.transactionDateEnd()),
                         startDateOrDefault(normalizedFilter.paidAtStart()),
@@ -413,6 +413,10 @@ public class FinancialTransactionService {
 
     private boolean shouldFilterPaidAt(FinancialTransactionFilterRequest filterRequest) {
         return filterRequest.paidAtStart() != null || filterRequest.paidAtEnd() != null;
+    }
+
+    private boolean isCashBasis(FinancialTransactionFilterRequest filterRequest) {
+        return FinancialReportBasis.CASH.equals(filterRequest.basis());
     }
 
     private BigDecimal minAmountOrDefault(BigDecimal amount) {
