@@ -13,12 +13,22 @@ import java.util.stream.Collectors;
 final class AiBenchmarkReportWriter {
     private static final Path OUTPUT = Path.of("target", "ai-benchmark");
 
-    private final ObjectMapper objectMapper =
-            new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+    private final Path output;
+
+    private final ObjectMapper objectMapper;
+
+    AiBenchmarkReportWriter() {
+        this(OUTPUT, configuredObjectMapper());
+    }
+
+    AiBenchmarkReportWriter(Path output, ObjectMapper objectMapper) {
+        this.output = output;
+        this.objectMapper = objectMapper;
+    }
 
     void write(List<AiBenchmarkCaseResult> results) {
         try {
-            Files.createDirectories(OUTPUT);
+            Files.createDirectories(output);
             Map<String, AiBenchmarkMetrics> metrics =
                     results.stream()
                             .collect(
@@ -30,11 +40,11 @@ final class AiBenchmarkReportWriter {
                                                             AiBenchmarkMetrics.from(
                                                                     values.getFirst().provider(),
                                                                     values))));
-            objectMapper.writeValue(OUTPUT.resolve("summary.json").toFile(), metrics);
+            objectMapper.writeValue(output.resolve("summary.json").toFile(), metrics);
             writeJsonLines(results);
             writeCsv(results);
             Files.writeString(
-                    OUTPUT.resolve("report.html"), html(metrics, results), StandardCharsets.UTF_8);
+                    output.resolve("report.html"), html(metrics, results), StandardCharsets.UTF_8);
         } catch (IOException exception) {
             throw new IllegalStateException("Could not write AI benchmark report", exception);
         }
@@ -45,7 +55,7 @@ final class AiBenchmarkReportWriter {
         for (AiBenchmarkCaseResult result : results) {
             content.append(objectMapper.writeValueAsString(result)).append('\n');
         }
-        Files.writeString(OUTPUT.resolve("results.jsonl"), content, StandardCharsets.UTF_8);
+        Files.writeString(output.resolve("results.jsonl"), content, StandardCharsets.UTF_8);
     }
 
     private void writeCsv(List<AiBenchmarkCaseResult> results) throws IOException {
@@ -88,7 +98,7 @@ final class AiBenchmarkReportWriter {
                     .append(csv(result.failureReason()))
                     .append('\n');
         }
-        Files.writeString(OUTPUT.resolve("results.csv"), content, StandardCharsets.UTF_8);
+        Files.writeString(output.resolve("results.csv"), content, StandardCharsets.UTF_8);
     }
 
     private String html(
@@ -169,5 +179,12 @@ final class AiBenchmarkReportWriter {
         return value == null
                 ? ""
                 : value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    private static ObjectMapper configuredObjectMapper() {
+        return new ObjectMapper()
+                .findAndRegisterModules()
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .enable(SerializationFeature.INDENT_OUTPUT);
     }
 }

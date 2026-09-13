@@ -1,3 +1,5 @@
+spring.config.import: "optional:file:.env[.properties]"
+
 spring:
   docker:
     compose:
@@ -50,7 +52,7 @@ app:
       format: json
       temperature: 0
     gemini:
-      api-key: test-gemini-key
+      api-key: ${APP_AI_GEMINI_API_KEY:}
       model: gemini-3.1-flash-lite
     health:
       enabled: true
