@@ -1,0 +1,14 @@
+package br.com.gestaodireta.ai.benchmark;
+
+enum AiBenchmarkResultType {
+    CORRECT_CREATED,
+    CORRECT_BLOCKED_INCOMPLETE,
+    CORRECT_REJECTED_INVALID,
+    WRONG_TYPE,
+    WRONG_AMOUNT,
+    WRONG_FIELDS,
+    HALLUCINATED_DATA,
+    SHOULD_HAVE_BLOCKED,
+    SHOULD_HAVE_CREATED,
+    TECHNICAL_ERROR
+}
