@@ -381,11 +381,25 @@ O CORS permite credenciais e é configurado por `APP_CORS_ALLOWED_ORIGINS`; não
 
 ## Testes e qualidade de código
 
-Os testes usam o profile `test`, IA fake e PostgreSQL provisionado por Testcontainers para cenários de integração. Execute:
+Os testes usam o profile `test`, IA fake e PostgreSQL provisionado por Testcontainers
+para cenários de integração. Eles exigem Java 21 e Docker em execução, com acesso ao
+daemon pelo usuário atual. O Maven configura automaticamente o agente do Mockito;
+nenhum caminho local ou configuração manual de Byte Buddy é necessário.
+
+Execute:
 
 ```bash
 ./mvnw test
 ```
+
+Para validar o Docker antes de iniciar a suíte, execute:
+
+```bash
+./scripts/test-backend.sh
+```
+
+Se Docker estiver indisponível, verifique `docker info`, as permissões de
+`/var/run/docker.sock` e a associação do usuário ao grupo `docker`.
 
 Para gerar o artefato e executar a suíte de testes:
 
