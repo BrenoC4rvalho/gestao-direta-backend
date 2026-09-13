@@ -941,9 +941,9 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
         HarvestCategoryComparisonResponse response =
                 harvestSeasonService.getCategoryComparison(season.getId());
 
-        assertThat(response.expenses().plannedTotal()).isEqualByComparingTo("42000.00");
+        assertThat(response.expenses().plannedTotal()).isEqualByComparingTo("57000.00");
         assertThat(response.expenses().realizedTotal()).isEqualByComparingTo("37000.00");
-        assertThat(response.expenses().difference()).isEqualByComparingTo("-5000.00");
+        assertThat(response.expenses().difference()).isEqualByComparingTo("-20000.00");
         assertThat(response.expenses().categories())
                 .extracting(category -> category.categoryName())
                 .containsExactly("Sementes", "Combustível", "Sem categoria", "Fertilizantes");
@@ -974,9 +974,20 @@ class HarvestSeasonServiceTest extends PostgresIntegrationTest {
                         HarvestCategoryComparisonStatus.UNPLANNED,
                         ComparisonSemantic.WORSE);
         assertThat(response.expenses().categories().get(2))
-                .extracting(category -> category.status(), category -> category.semantic())
+                .extracting(
+                        category -> category.plannedAmount(),
+                        category -> category.realizedAmount(),
+                        category -> category.difference(),
+                        category -> category.percentageDifference(),
+                        category -> category.status(),
+                        category -> category.semantic())
                 .containsExactly(
-                        HarvestCategoryComparisonStatus.BELOW_PLAN, ComparisonSemantic.BETTER);
+                        new BigDecimal("15000.00"),
+                        new BigDecimal("3000.00"),
+                        new BigDecimal("-12000.00"),
+                        new BigDecimal("-80.00"),
+                        HarvestCategoryComparisonStatus.BELOW_PLAN,
+                        ComparisonSemantic.BETTER);
         assertThat(response.expenses().categories().getLast())
                 .extracting(
                         category -> category.realizedAmount(),
