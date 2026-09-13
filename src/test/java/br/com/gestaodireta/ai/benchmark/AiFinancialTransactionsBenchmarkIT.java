@@ -7,16 +7,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
-import br.com.gestaodireta.ai.config.AiHealthProperties;
-import br.com.gestaodireta.ai.config.AiProviderConfiguration;
-import br.com.gestaodireta.ai.config.AiProviderProperties;
+import br.com.gestaodireta.ApiApplication;
 import br.com.gestaodireta.ai.config.FinancialExtractionProperties;
 import br.com.gestaodireta.ai.infrastructure.gemini.GeminiAiProperties;
-import br.com.gestaodireta.ai.infrastructure.ollama.OllamaAiProperties;
-import br.com.gestaodireta.ai.service.FinancialExtractionResponseSchema;
 import br.com.gestaodireta.ai.service.FinancialTransactionExtractionService;
 import br.com.gestaodireta.ai.service.dto.FinancialTransactionExtractionResult;
-import br.com.gestaodireta.ai.service.provider.AiGenerationRequest;
 import br.com.gestaodireta.ai.service.provider.AiTextGenerationClient;
 import br.com.gestaodireta.farm.entity.Farm;
 import br.com.gestaodireta.farm.enumeration.FarmUserRole;
@@ -43,22 +38,34 @@ import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.entity.UserContact;
 import br.com.gestaodireta.user.enumeration.UserContactStatus;
 import br.com.gestaodireta.user.enumeration.UserStatus;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.web.client.RestClient;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
+@Testcontainers
 class AiFinancialTransactionsBenchmarkIT {
-    private static final Clock CLOCK =
-            Clock.fixed(Instant.parse("2026-08-24T12:00:00Z"), ZoneId.of("America/Sao_Paulo"));
+    private static final Logger LOGGER =
+            LoggerFactory.getLogger(AiFinancialTransactionsBenchmarkIT.class);
+
+    @Container
+    static final PostgreSQLContainer<?> POSTGRES =
+            new PostgreSQLContainer<>("postgres:16-alpine")
+                    .withDatabaseName("gestaodireta_benchmark")
+                    .withUsername("gestaodireta")
+                    .withPassword("benchmark");
 
     @Test
     void shouldRunConfiguredAiBenchmark() {
@@ -74,26 +81,9 @@ class AiFinancialTransactionsBenchmarkIT {
     }
 
     private List<AiBenchmarkCaseResult> run(String provider, List<AiBenchmarkCase> cases) {
-        try {
-            BenchmarkFixture fixture = new BenchmarkFixture(provider);
+        try (ConfigurableApplicationContext context = benchmarkContext(provider)) {
+            BenchmarkFixture fixture = new BenchmarkFixture(provider, context);
             return cases.stream().map(fixture::run).toList();
-        } catch (RuntimeException exception) {
-            return cases.stream()
-                    .map(
-                            item ->
-                                    new AiBenchmarkScorer()
-                                            .score(
-                                                    item,
-                                                    provider,
-                                                    "unavailable",
-                                                    new AiBenchmarkActual(
-                                                            null,
-                                                            false,
-                                                            null,
-                                                            sanitize(exception),
-                                                            0,
-                                                            null)))
-                    .toList();
         }
     }
 
@@ -114,6 +104,20 @@ class AiFinancialTransactionsBenchmarkIT {
         return value == null || value.isBlank() ? defaultValue : Integer.parseInt(value);
     }
 
+    private ConfigurableApplicationContext benchmarkContext(String provider) {
+        return new SpringApplicationBuilder(ApiApplication.class)
+                .profiles("test")
+                .web(WebApplicationType.SERVLET)
+                .run(
+                        "--app.ai.provider=" + provider,
+                        "--app.ai.financial-extraction.enabled=true",
+                        "--app.ai.audio-transcription.enabled=false",
+                        "--server.port=0",
+                        "--spring.datasource.url=" + POSTGRES.getJdbcUrl(),
+                        "--spring.datasource.username=" + POSTGRES.getUsername(),
+                        "--spring.datasource.password=" + POSTGRES.getPassword());
+    }
+
     private static String sanitize(Throwable exception) {
         String message = exception.getMessage();
         return exception.getClass().getSimpleName()
@@ -131,19 +135,18 @@ class AiFinancialTransactionsBenchmarkIT {
         private final MessagingAccount account = account();
         private final MessagingConversation conversation = conversation();
 
-        BenchmarkFixture(String provider) {
+        BenchmarkFixture(String provider, ConfigurableApplicationContext context) {
             this.provider = provider;
-            FinancialExtractionProperties extractionProperties = extractionProperties();
-            AiTextGenerationClient client = capturingClient(provider, extractionProperties);
-            this.model = client.modelName();
+            FinancialExtractionProperties extractionProperties =
+                    context.getBean(FinancialExtractionProperties.class);
+            FinancialTransactionExtractionService applicationExtractionService =
+                    context.getBean(FinancialTransactionExtractionService.class);
+            AiTextGenerationClient client = context.getBean(AiTextGenerationClient.class);
+            GeminiAiProperties geminiProperties = context.getBean(GeminiAiProperties.class);
+            this.model = applicationExtractionService.model();
+            logConfiguration(context, provider, client, geminiProperties, model);
             FinancialTransactionExtractionService extractionService =
-                    spy(
-                            new FinancialTransactionExtractionService(
-                                    client,
-                                    extractionProperties,
-                                    new ObjectMapper(),
-                                    CLOCK,
-                                    new FinancialExtractionResponseSchema()));
+                    spy(applicationExtractionService);
             doAnswer(
                             invocation -> {
                                 FinancialTransactionExtractionResult result =
@@ -182,7 +185,7 @@ class AiFinancialTransactionsBenchmarkIT {
                             new TelegramFinancialMessageEligibilityValidator(evidence),
                             new FinancialTransactionExtractionResultValidator(
                                     extractionProperties, evidence),
-                            CLOCK);
+                            context.getBean(Clock.class));
         }
 
         AiBenchmarkCaseResult run(AiBenchmarkCase benchmarkCase) {
@@ -208,40 +211,6 @@ class AiFinancialTransactionsBenchmarkIT {
             return new AiBenchmarkScorer().score(benchmarkCase, provider, model, actual);
         }
 
-        private AiTextGenerationClient capturingClient(
-                String configuredProvider, FinancialExtractionProperties extractionProperties) {
-            AiProviderProperties providerProperties = new AiProviderProperties();
-            providerProperties.setProvider(configuredProvider);
-            AiTextGenerationClient delegate =
-                    new AiProviderConfiguration()
-                            .aiTextGenerationClient(
-                                    providerProperties,
-                                    ollamaProperties(),
-                                    geminiProperties(),
-                                    extractionProperties,
-                                    healthProperties(),
-                                    RestClient.builder());
-            return new AiTextGenerationClient() {
-                @Override
-                public String generate(AiGenerationRequest request) {
-                    String response = delegate.generate(request);
-                    rawResponse.set(
-                            response.length() > 10_000 ? response.substring(0, 10_000) : response);
-                    return response;
-                }
-
-                @Override
-                public String providerName() {
-                    return delegate.providerName();
-                }
-
-                @Override
-                public String modelName() {
-                    return delegate.modelName();
-                }
-            };
-        }
-
         private String blockedReason(FinancialTransactionExtractionResult result) {
             return result == null
                     ? "Ineligible message or provider/parser failure"
@@ -249,48 +218,16 @@ class AiFinancialTransactionsBenchmarkIT {
         }
     }
 
-    private static FinancialExtractionProperties extractionProperties() {
-        FinancialExtractionProperties properties = new FinancialExtractionProperties();
-        properties.setEnabled(true);
-        properties.setTimeoutSeconds(integerEnv("AI_FINANCIAL_EXTRACTION_TIMEOUT_SECONDS", 20));
-        properties.setMinimumConfidence(
-                doubleEnv("AI_FINANCIAL_EXTRACTION_MINIMUM_CONFIDENCE", 0.60));
-        return properties;
-    }
-
-    private static AiHealthProperties healthProperties() {
-        AiHealthProperties properties = new AiHealthProperties();
-        properties.setTimeoutSeconds(integerEnv("AI_HEALTH_CHECK_TIMEOUT_SECONDS", 5));
-        return properties;
-    }
-
-    private static GeminiAiProperties geminiProperties() {
-        GeminiAiProperties properties = new GeminiAiProperties();
-        properties.setApiKey(System.getenv("APP_AI_GEMINI_API_KEY"));
-        properties.setModel(env("APP_AI_GEMINI_MODEL", "gemini-3.1-flash-lite"));
-        return properties;
-    }
-
-    private static OllamaAiProperties ollamaProperties() {
-        OllamaAiProperties properties = new OllamaAiProperties();
-        properties.setBaseUrl(env("APP_AI_OLLAMA_BASE_URL", "http://localhost:11434"));
-        properties.setModel(env("APP_AI_OLLAMA_MODEL", "llama3.2:3b"));
-        properties.setFormat(env("APP_AI_OLLAMA_FORMAT", "json"));
-        properties.setTemperature(doubleEnv("APP_AI_OLLAMA_TEMPERATURE", 0));
-        return properties;
-    }
-
-    private static String env(String name, String defaultValue) {
-        String value = System.getenv(name);
-        return value == null || value.isBlank() ? defaultValue : value;
-    }
-
-    private static int integerEnv(String name, int defaultValue) {
-        return Integer.parseInt(env(name, String.valueOf(defaultValue)));
-    }
-
-    private static double doubleEnv(String name, double defaultValue) {
-        return Double.parseDouble(env(name, String.valueOf(defaultValue)));
+    private static void logConfiguration(
+            ConfigurableApplicationContext context,
+            String provider,
+            AiTextGenerationClient client,
+            GeminiAiProperties geminiProperties,
+            String model) {
+        LOGGER.info(
+                "{}",
+                AiBenchmarkConfigurationDiagnostic.describe(
+                        provider, client, geminiProperties, model, context.getEnvironment()));
     }
 
     private static List<FinancialCategory> categories(Farm farm) {

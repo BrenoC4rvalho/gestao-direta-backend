@@ -51,9 +51,6 @@ app:
       model: llama3.1:8b
       format: json
       temperature: 0
-    gemini:
-      api-key: ${APP_AI_GEMINI_API_KEY:}
-      model: gemini-3.1-flash-lite
     health:
       enabled: true
       timeout-seconds: 5
