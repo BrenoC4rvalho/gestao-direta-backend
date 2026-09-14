@@ -401,6 +401,49 @@ Para validar o Docker antes de iniciar a suíte, execute:
 Se Docker estiver indisponível, verifique `docker info`, as permissões de
 `/var/run/docker.sock` e a associação do usuário ao grupo `docker`.
 
+### Benchmark de extração financeira por IA
+
+O benchmark executa o conjunto de mensagens financeiras contra o provider real
+configurado e avalia a criação de pendências, extração de campos, bloqueio de
+mensagens incompletas e rejeição de mensagens inválidas. Ele usa PostgreSQL
+temporário via Testcontainers, portanto exige Docker em execução.
+
+Antes de executá-lo, exporte as variáveis de `.env`. Para Gemini, preencha
+`APP_AI_GEMINI_API_KEY`; para Ollama, inicie o serviço e baixe o modelo
+configurado. Evite usar chaves ou tokens diretamente na linha de comando.
+
+```bash
+set -a
+source .env
+set +a
+./mvnw test -Pai-benchmark -Dai.benchmark.provider=gemini
+```
+
+Substitua `gemini` por `ollama` para avaliar somente o provider local, ou use
+`both` para comparar os dois. Por padrão, `both` é usado e todo o dataset é
+executado. Para uma validação rápida com os primeiros casos:
+
+```bash
+set -a
+source .env
+set +a
+./mvnw test -Pai-benchmark -Dai.benchmark.provider=ollama -Dai.benchmark.limit=10
+```
+
+Os resultados são gerados em `target/ai-benchmark/`: `report.html` para leitura
+visual, `summary.json` com métricas por provider, `results.csv` e
+`results.jsonl` com o resultado de cada caso. Opcionalmente, limites podem
+fazer o comando falhar, por exemplo:
+
+```bash
+./mvnw test -Pai-benchmark \
+  -Dai.benchmark.provider=gemini \
+  -Dai.benchmark.threshold.complete-accuracy=90 \
+  -Dai.benchmark.threshold.invalid-rejection=90 \
+  -Dai.benchmark.threshold.incomplete-blocking=90 \
+  -Dai.benchmark.threshold.max-hallucination-rate=5
+```
+
 Para gerar o artefato e executar a suíte de testes:
 
 ```bash
