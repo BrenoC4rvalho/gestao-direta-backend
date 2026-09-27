@@ -2,6 +2,7 @@ package br.com.gestaodireta.messaging.service;
 
 import br.com.gestaodireta.ai.config.FinancialExtractionProperties;
 import br.com.gestaodireta.ai.service.dto.FinancialTransactionExtractionResult;
+import br.com.gestaodireta.ai.service.dto.FinancialTransactionExtractionStatus;
 import br.com.gestaodireta.financial.enumeration.TransactionType;
 import java.math.BigDecimal;
 import java.util.List;
@@ -24,7 +25,10 @@ public class FinancialTransactionExtractionResultValidator {
         LOW_CONFIDENCE,
         AMOUNT_NOT_SUPPORTED_BY_SOURCE,
         TYPE_NOT_SUPPORTED_BY_SOURCE,
-        DESCRIPTION_NOT_SUPPORTED_BY_SOURCE
+        DESCRIPTION_NOT_SUPPORTED_BY_SOURCE,
+        MULTIPLE_TRANSACTIONS,
+        INVALID_STATUS,
+        FIELD_TOO_LONG
     }
 
     public record ValidationResult(boolean valid, RejectionReason reason) {}
@@ -87,6 +91,17 @@ public class FinancialTransactionExtractionResultValidator {
             String originalText, FinancialTransactionExtractionResult result) {
         if (result == null || !result.isFinancialTransaction()) {
             return rejected(RejectionReason.NOT_FINANCIAL);
+        }
+        if (result.status() == FinancialTransactionExtractionStatus.MULTIPLE_TRANSACTIONS
+                || evidence.monetaryOperationCount(originalText) > 1) {
+            return rejected(RejectionReason.MULTIPLE_TRANSACTIONS);
+        }
+        if (result.status() != FinancialTransactionExtractionStatus.VALID) {
+            return rejected(RejectionReason.INVALID_STATUS);
+        }
+        if (result.description() != null && result.description().length() > 160
+                || result.categoryName() != null && result.categoryName().length() > 100) {
+            return rejected(RejectionReason.FIELD_TOO_LONG);
         }
         if (invalidDescription(result.description()) || hasMissingRequiredField(result)) {
             return rejected(RejectionReason.MISSING_REQUIRED_FIELD);

@@ -110,7 +110,7 @@ final class AiBenchmarkReportWriter {
                 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Benchmark IA</title>
                 <style>body{font:14px system-ui;margin:2rem;color:#1f2937}table{border-collapse:collapse;width:100%%}th,td{padding:.5rem;border:1px solid #d1d5db;text-align:left}th{background:#f3f4f6}.critical{background:#fee2e2}.filters button{margin-right:.5rem}</style>
                 </head><body><h1>BENCHMARK IA — MOVIMENTAÇÕES</h1>%s<h2>COMPARAÇÃO</h2><table><thead><tr><th>Provider</th><th>Completas</th><th>Incompletas</th><th>Inválidas</th><th>Hallucinations</th></tr></thead><tbody>%s</tbody></table>
-                <h2>Casos</h2><div class="filters"><button onclick="filter('')">Todos</button><button onclick="filter('ENTRY')">ENTRY</button><button onclick="filter('EXIT')">EXIT</button><button onclick="filter('INVALID')">INVALID</button><button onclick="filter('INCOMPLETE')">INCOMPLETE</button><button onclick="filter('CRITICAL')">Críticos</button></div>
+                <h2>Casos</h2><div class="filters"><button onclick="filter('')">Todos</button><button onclick="filter('ENTRY')">ENTRY</button><button onclick="filter('EXIT')">EXIT</button><button onclick="filter('INVALID')">INVALID</button><button onclick="filter('INCOMPLETE')">INCOMPLETE</button><button onclick="filter('SECURITY')">SECURITY</button><button onclick="filter('CRITICAL')">Críticos</button></div>
                 <table><thead><tr><th>ID</th><th>Provider</th><th>Grupo</th><th>Texto</th><th>Resultado</th><th>Tempo</th><th>Motivo</th></tr></thead><tbody id="cases">%s</tbody></table>
                 <script>function filter(value){for(const row of document.querySelectorAll('#cases tr'))row.hidden=value&& !row.dataset.filter.includes(value)}</script></body></html>
                 """
@@ -119,7 +119,7 @@ final class AiBenchmarkReportWriter {
 
     private String summary(AiBenchmarkMetrics metric) {
         return """
-                <section><h2>%s</h2><p>Completas: %d/%d (%.1f%%)<br>Entradas: %d/%d<br>Saídas: %d/%d<br>Incompletas corretamente bloqueadas: %d/%d<br>Inválidas corretamente rejeitadas: %d/%d<br>Hallucinations: %d<br>Erros técnicos: %d<br>Latência média: %.0f ms; p50: %d ms; p95: %d ms</p></section>
+                <section><h2>%s</h2><p>Completas: %d/%d (%.1f%%)<br>Entradas: %d/%d<br>Saídas: %d/%d<br>Incompletas corretamente bloqueadas: %d/%d<br>Inválidas corretamente rejeitadas: %d/%d<br>Segurança corretamente bloqueada: %d/%d (%.1f%%)<br>Hallucinations: %d<br>Erros técnicos: %d<br>Latência média: %.0f ms; p50: %d ms; p95: %d ms</p></section>
                 """
                 .formatted(
                         escape(metric.provider()),
@@ -134,6 +134,9 @@ final class AiBenchmarkReportWriter {
                         metric.incompleteTotal(),
                         metric.invalidCorrect(),
                         metric.invalidTotal(),
+                        metric.securityCorrect(),
+                        metric.securityTotal(),
+                        metric.securityBlockingAccuracy(),
                         metric.hallucinations(),
                         metric.technicalErrors(),
                         metric.averageLatencyMillis(),

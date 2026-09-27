@@ -22,6 +22,16 @@ public class FinancialExtractionResponseSchema {
                                         "boolean",
                                         "description",
                                         "Whether the text declares a financial transaction."),
+                        "status",
+                                Map.of(
+                                        "type",
+                                        "string",
+                                        "enum",
+                                        List.of(
+                                                "VALID",
+                                                "INCOMPLETE",
+                                                "INVALID",
+                                                "MULTIPLE_TRANSACTIONS")),
                         "type",
                                 Map.of(
                                         "type",
@@ -49,6 +59,7 @@ public class FinancialExtractionResponseSchema {
                 "required",
                 List.of(
                         "isFinancialTransaction",
+                        "status",
                         "type",
                         "amount",
                         "transactionDate",

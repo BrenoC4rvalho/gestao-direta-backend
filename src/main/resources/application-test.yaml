@@ -43,6 +43,8 @@ app:
       enabled: false
       model: ""
       timeout-seconds: 20
+      message-max-length: 500
+      max-output-tokens: 512
       minimum-confidence: 0.60
       diagnostic-only: false
     provider: fake

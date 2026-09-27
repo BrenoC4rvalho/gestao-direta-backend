@@ -40,6 +40,11 @@ public class TelegramFinancialExtractionProcessor {
             "O registro inteligente demorou para responder. Tente novamente em instantes.";
     private static final String AI_INVALID_RESPONSE_MESSAGE =
             "Não consegui interpretar a resposta do registro inteligente. Tente reenviar a movimentação.";
+    private static final String MULTIPLE_TRANSACTIONS_MESSAGE =
+            "Identifiquei mais de uma movimentação na mensagem. Envie uma movimentação por vez para que eu possa registrá-la corretamente.\n\n"
+                    + "Exemplo:\n• Comprei R$ 700 de sementes.\n• Comprei R$ 500 de agrotóxico.";
+    private static final String MESSAGE_TOO_LONG =
+            "A mensagem é muito longa. Envie apenas uma movimentação por vez, com até 500 caracteres.";
 
     private final FinancialTransactionExtractionService extractionService;
     private final PendingFinancialTransactionRepository pendingRepository;
@@ -83,6 +88,13 @@ public class TelegramFinancialExtractionProcessor {
                 farmId(conversation));
         if (!eligible(account, conversation, message)
                 || pendingRepository.findBySourceMessageId(message.getId()).isPresent()) return;
+        if (eligibilityValidator.exceedsMaximumLength(message.getContent())) {
+            LOGGER.info(
+                    "financial extraction rejected: stage=INPUT reason=MAX_LENGTH messageId={}",
+                    message.getId());
+            outgoing.send(conversation, MESSAGE_TOO_LONG);
+            return;
+        }
         if (!eligibilityValidator.isEligible(message.getContent())) {
             LOGGER.info(
                     "financial extraction rejected: stage=ELIGIBILITY reason=INSUFFICIENT_CONTEXT messageId={}",
@@ -133,13 +145,7 @@ public class TelegramFinancialExtractionProcessor {
                         missingRequiredFields(result),
                         "[type, amount, description]",
                         presentRequiredFields(result));
-                outgoing.send(
-                        conversation,
-                        validation.reason()
-                                        == FinancialTransactionExtractionResultValidator
-                                                .RejectionReason.LOW_CONFIDENCE
-                                ? LOW_CONFIDENCE_MESSAGE
-                                : INSUFFICIENT_MESSAGE);
+                outgoing.send(conversation, rejectionMessage(validation.reason()));
                 return;
             }
             LOGGER.info(
@@ -222,6 +228,20 @@ public class TelegramFinancialExtractionProcessor {
                     exception,
                     AI_UNAVAILABLE_MESSAGE);
         }
+    }
+
+    private String rejectionMessage(
+            FinancialTransactionExtractionResultValidator.RejectionReason reason) {
+        if (reason
+                == FinancialTransactionExtractionResultValidator.RejectionReason
+                        .MULTIPLE_TRANSACTIONS) {
+            return MULTIPLE_TRANSACTIONS_MESSAGE;
+        }
+        return reason
+                        == FinancialTransactionExtractionResultValidator.RejectionReason
+                                .LOW_CONFIDENCE
+                ? LOW_CONFIDENCE_MESSAGE
+                : INSUFFICIENT_MESSAGE;
     }
 
     private Long userId(MessagingAccount account) {

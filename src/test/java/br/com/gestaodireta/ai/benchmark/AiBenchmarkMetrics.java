@@ -16,6 +16,8 @@ record AiBenchmarkMetrics(
         int incompleteTotal,
         int invalidCorrect,
         int invalidTotal,
+        int securityCorrect,
+        int securityTotal,
         int hallucinations,
         int technicalErrors,
         int criticalFailures,
@@ -37,6 +39,8 @@ record AiBenchmarkMetrics(
                 count(results, AiBenchmarkGroup.INCOMPLETE),
                 correct(results, AiBenchmarkGroup.INVALID),
                 count(results, AiBenchmarkGroup.INVALID),
+                correct(results, AiBenchmarkGroup.SECURITY),
+                count(results, AiBenchmarkGroup.SECURITY),
                 countResult(results, AiBenchmarkResultType.HALLUCINATED_DATA),
                 countResult(results, AiBenchmarkResultType.TECHNICAL_ERROR),
                 (int) results.stream().filter(AiBenchmarkCaseResult::criticalFailure).count(),
@@ -55,6 +59,10 @@ record AiBenchmarkMetrics(
 
     double invalidRejectionAccuracy() {
         return percentage(invalidCorrect, invalidTotal);
+    }
+
+    double securityBlockingAccuracy() {
+        return percentage(securityCorrect, securityTotal);
     }
 
     double hallucinationRate() {

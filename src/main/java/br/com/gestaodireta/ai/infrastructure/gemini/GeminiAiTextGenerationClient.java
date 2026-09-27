@@ -185,7 +185,16 @@ public class GeminiAiTextGenerationClient implements AiTextGenerationClient {
     }
 
     private Map<String, Object> requestBody(AiGenerationRequest request) {
-        return requestBody(request.prompt(), request.responseSchema());
+        Map<String, Object> body = requestBody(request.prompt(), request.responseSchema());
+        if (request.maxOutputTokens() == null) {
+            return body;
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> generationConfig =
+                new java.util.LinkedHashMap<>((Map<String, Object>) body.get("generationConfig"));
+        generationConfig.put("maxOutputTokens", request.maxOutputTokens());
+        generationConfig.put("temperature", 0);
+        return Map.of("contents", body.get("contents"), "generationConfig", generationConfig);
     }
 
     private Map<String, Object> requestBody(String prompt, Map<String, Object> responseSchema) {

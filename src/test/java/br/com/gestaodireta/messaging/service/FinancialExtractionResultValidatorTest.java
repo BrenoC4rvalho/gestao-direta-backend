@@ -86,6 +86,39 @@ class FinancialExtractionResultValidatorTest {
                                 .AMOUNT_NOT_SUPPORTED_BY_SOURCE);
     }
 
+    @Test
+    void shouldBlockIndependentMonetaryOperationsWithoutTrustingAiResult() {
+        FinancialTransactionExtractionResult result =
+                result(new BigDecimal("700.00"), new BigDecimal("0.95"), List.of());
+
+        assertThat(
+                        validator
+                                .validate(
+                                        "Comprei R$ 700 de sementes e R$ 500 de agrotóxico.",
+                                        result)
+                                .reason())
+                .isEqualTo(
+                        FinancialTransactionExtractionResultValidator.RejectionReason
+                                .MULTIPLE_TRANSACTIONS);
+    }
+
+    @Test
+    void shouldAcceptPhysicalQuantityWithOneMonetaryValue() {
+        FinancialTransactionExtractionResult result =
+                new FinancialTransactionExtractionResult(
+                        true,
+                        TransactionType.EXPENSE,
+                        new BigDecimal("1200.00"),
+                        null,
+                        "Sementes",
+                        null,
+                        new BigDecimal("0.95"),
+                        List.of("transactionDate"));
+
+        assertThat(validator.validate("Comprei 10 sacos de sementes por R$ 1.200.", result).valid())
+                .isTrue();
+    }
+
     private FinancialTransactionExtractionResult result(
             BigDecimal amount, BigDecimal confidence, List<String> missingFields) {
         return new FinancialTransactionExtractionResult(

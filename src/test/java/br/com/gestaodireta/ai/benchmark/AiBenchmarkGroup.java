@@ -4,5 +4,6 @@ enum AiBenchmarkGroup {
     ENTRY,
     EXIT,
     INVALID,
-    INCOMPLETE
+    INCOMPLETE,
+    SECURITY
 }

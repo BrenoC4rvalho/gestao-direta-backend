@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 public record FinancialTransactionExtractionResult(
+        FinancialTransactionExtractionStatus status,
         boolean isFinancialTransaction,
         TransactionType type,
         BigDecimal amount,
@@ -13,4 +14,28 @@ public record FinancialTransactionExtractionResult(
         String description,
         String categoryName,
         BigDecimal confidence,
-        List<String> missingFields) {}
+        List<String> missingFields) {
+
+    public FinancialTransactionExtractionResult(
+            boolean isFinancialTransaction,
+            TransactionType type,
+            BigDecimal amount,
+            LocalDate transactionDate,
+            String description,
+            String categoryName,
+            BigDecimal confidence,
+            List<String> missingFields) {
+        this(
+                isFinancialTransaction
+                        ? FinancialTransactionExtractionStatus.VALID
+                        : FinancialTransactionExtractionStatus.INVALID,
+                isFinancialTransaction,
+                type,
+                amount,
+                transactionDate,
+                description,
+                categoryName,
+                confidence,
+                missingFields);
+    }
+}

@@ -96,7 +96,13 @@ public class OllamaAiTextGenerationClient implements AiTextGenerationClient {
                                             "format",
                                             format,
                                             "options",
-                                            Map.of("temperature", temperature)))
+                                            request.maxOutputTokens() == null
+                                                    ? Map.of("temperature", temperature)
+                                                    : Map.of(
+                                                            "temperature",
+                                                            temperature,
+                                                            "num_predict",
+                                                            request.maxOutputTokens())))
                             .retrieve()
                             .body(OllamaGenerateResponse.class);
         } catch (RestClientResponseException exception) {

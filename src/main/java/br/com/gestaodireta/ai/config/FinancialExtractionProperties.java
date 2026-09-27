@@ -9,6 +9,8 @@ public class FinancialExtractionProperties {
     private boolean enabled;
     private String model;
     private int timeoutSeconds = 20;
+    private int messageMaxLength = 500;
+    private int maxOutputTokens = 512;
     private double minimumConfidence = 0.60;
     private boolean diagnosticOnly;
 
@@ -34,6 +36,22 @@ public class FinancialExtractionProperties {
 
     public void setTimeoutSeconds(int value) {
         timeoutSeconds = value;
+    }
+
+    public int getMessageMaxLength() {
+        return messageMaxLength;
+    }
+
+    public void setMessageMaxLength(int value) {
+        messageMaxLength = value;
+    }
+
+    public int getMaxOutputTokens() {
+        return maxOutputTokens;
+    }
+
+    public void setMaxOutputTokens(int value) {
+        maxOutputTokens = value;
     }
 
     public double getMinimumConfidence() {

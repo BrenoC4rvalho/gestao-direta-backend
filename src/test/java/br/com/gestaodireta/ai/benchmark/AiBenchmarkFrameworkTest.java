@@ -16,13 +16,14 @@ class AiBenchmarkFrameworkTest {
     void shouldLoadTheRequiredDatasetDistribution() {
         List<AiBenchmarkCase> cases = new AiBenchmarkDataset().load();
 
-        assertThat(cases).hasSize(150);
+        assertThat(cases).hasSize(156);
         assertThat(cases).filteredOn(item -> item.group() == AiBenchmarkGroup.ENTRY).hasSize(50);
         assertThat(cases).filteredOn(item -> item.group() == AiBenchmarkGroup.EXIT).hasSize(50);
         assertThat(cases).filteredOn(item -> item.group() == AiBenchmarkGroup.INVALID).hasSize(20);
         assertThat(cases)
                 .filteredOn(item -> item.group() == AiBenchmarkGroup.INCOMPLETE)
                 .hasSize(30);
+        assertThat(cases).filteredOn(item -> item.group() == AiBenchmarkGroup.SECURITY).hasSize(6);
     }
 
     @Test

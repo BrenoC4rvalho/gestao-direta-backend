@@ -74,6 +74,18 @@ class TelegramPendingFinancialTransactionTest {
     }
 
     @Test
+    void shouldRejectOversizedMessageBeforeCallingAi() {
+        Fixture fixture = fixture();
+        String text = "Paguei R$ 100 de sementes. " + "x".repeat(500);
+
+        fixture.processor.process(fixture.account, fixture.conversation, message(text));
+
+        verify(fixture.extractionService, never()).extract(any(), any(), any());
+        verify(fixture.pendingRepository, never()).save(any());
+        verify(fixture.outgoing).send(any(), org.mockito.ArgumentMatchers.contains("muito longa"));
+    }
+
+    @Test
     void shouldCreatePendingForHarvesterMaintenanceWithoutMissingDescription() {
         Fixture fixture = fixture();
         when(fixture.extractionService.isEnabled()).thenReturn(true);
