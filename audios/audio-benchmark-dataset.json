@@ -1,0 +1,1252 @@
+[
+  {
+    "id": "ENTRY-001",
+    "file": "entry/entry-001.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi mil e duzentos reais pela venda de milho.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 1200
+  },
+  {
+    "id": "ENTRY-002",
+    "file": "entry/entry-002.wav",
+    "category": "ENTRY",
+    "originalText": "Entrou dois mil e quinhentos reais da venda de soja.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 2500
+  },
+  {
+    "id": "ENTRY-003",
+    "file": "entry/entry-003.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi três mil reais pela venda de café.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 3000
+  },
+  {
+    "id": "ENTRY-004",
+    "file": "entry/entry-004.wav",
+    "category": "ENTRY",
+    "originalText": "Caiu na conta quatro mil e oitocentos reais da venda de gado.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 4800
+  },
+  {
+    "id": "ENTRY-005",
+    "file": "entry/entry-005.wav",
+    "category": "ENTRY",
+    "originalText": "Vendi feijão e recebi mil setecentos e cinquenta reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 1750
+  },
+  {
+    "id": "ENTRY-006",
+    "file": "entry/entry-006.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi novecentos reais pela venda de leite.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 900
+  },
+  {
+    "id": "ENTRY-007",
+    "file": "entry/entry-007.wav",
+    "category": "ENTRY",
+    "originalText": "Entrou mil e quinhentos reais da venda de mandioca.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 1500
+  },
+  {
+    "id": "ENTRY-008",
+    "file": "entry/entry-008.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi dois mil duzentos e cinquenta reais pela venda de arroz.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 2250
+  },
+  {
+    "id": "ENTRY-009",
+    "file": "entry/entry-009.wav",
+    "category": "ENTRY",
+    "originalText": "Vendi parte da produção de soja por cinco mil reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 5000
+  },
+  {
+    "id": "ENTRY-010",
+    "file": "entry/entry-010.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi seis mil e trezentos reais pela venda de milho.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 6300
+  },
+  {
+    "id": "ENTRY-011",
+    "file": "entry/entry-011.wav",
+    "category": "ENTRY",
+    "originalText": "Hoje recebi mil oitocentos e quarenta reais pela venda de café.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 1840
+  },
+  {
+    "id": "ENTRY-012",
+    "file": "entry/entry-012.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi setecentos e cinquenta reais pela venda de ovos.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 750
+  },
+  {
+    "id": "ENTRY-013",
+    "file": "entry/entry-013.wav",
+    "category": "ENTRY",
+    "originalText": "Entrou três mil quatrocentos e vinte reais da venda de soja.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 3420
+  },
+  {
+    "id": "ENTRY-014",
+    "file": "entry/entry-014.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi quatrocentos e cinquenta reais pela venda de hortaliças.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 450
+  },
+  {
+    "id": "ENTRY-015",
+    "file": "entry/entry-015.wav",
+    "category": "ENTRY",
+    "originalText": "Vendi milho por dois mil novecentos e noventa reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 2990
+  },
+  {
+    "id": "ENTRY-016",
+    "file": "entry/entry-016.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi sete mil e quinhentos reais pela venda de gado.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 7500
+  },
+  {
+    "id": "ENTRY-017",
+    "file": "entry/entry-017.wav",
+    "category": "ENTRY",
+    "originalText": "Entrou oitocentos e vinte reais da venda de leite.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 820
+  },
+  {
+    "id": "ENTRY-018",
+    "file": "entry/entry-018.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi mil novecentos e cinquenta reais pela venda de feijão.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 1950
+  },
+  {
+    "id": "ENTRY-019",
+    "file": "entry/entry-019.wav",
+    "category": "ENTRY",
+    "originalText": "Vendi café e recebi quatro mil e cem reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 4100
+  },
+  {
+    "id": "ENTRY-020",
+    "file": "entry/entry-020.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi dois mil seiscentos e setenta reais pela venda de soja.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 2670
+  },
+  {
+    "id": "ENTRY-021",
+    "file": "entry/entry-021.wav",
+    "category": "ENTRY",
+    "originalText": "Caiu um PIX de mil trezentos e cinquenta reais referente à venda de milho.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 1350
+  },
+  {
+    "id": "ENTRY-022",
+    "file": "entry/entry-022.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi por transferência três mil e oitocentos reais da venda de café.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 3800
+  },
+  {
+    "id": "ENTRY-023",
+    "file": "entry/entry-023.wav",
+    "category": "ENTRY",
+    "originalText": "Entrou na conta dois mil e cem reais pela venda de leite.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 2100
+  },
+  {
+    "id": "ENTRY-024",
+    "file": "entry/entry-024.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi em dinheiro seiscentos e cinquenta reais pela venda de hortaliças.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 650
+  },
+  {
+    "id": "ENTRY-025",
+    "file": "entry/entry-025.wav",
+    "category": "ENTRY",
+    "originalText": "Me pagaram cinco mil quatrocentos e cinquenta reais pela soja.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 5450
+  },
+  {
+    "id": "ENTRY-026",
+    "file": "entry/entry-026.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi mil cento e vinte reais pela venda de mandioca.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 1120
+  },
+  {
+    "id": "ENTRY-027",
+    "file": "entry/entry-027.wav",
+    "category": "ENTRY",
+    "originalText": "Entrou quatro mil setecentos e cinquenta reais da comercialização do milho.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 4750
+  },
+  {
+    "id": "ENTRY-028",
+    "file": "entry/entry-028.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi dois mil trezentos e vinte reais pela venda de feijão.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 2320
+  },
+  {
+    "id": "ENTRY-029",
+    "file": "entry/entry-029.wav",
+    "category": "ENTRY",
+    "originalText": "Vendi café por oito mil reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 8000
+  },
+  {
+    "id": "ENTRY-030",
+    "file": "entry/entry-030.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi três mil seiscentos e noventa reais da venda de soja.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 3690
+  },
+  {
+    "id": "ENTRY-031",
+    "file": "entry/entry-031.wav",
+    "category": "ENTRY",
+    "originalText": "Hoje entrou mil quatrocentos e cinquenta reais da venda de milho.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 1450
+  },
+  {
+    "id": "ENTRY-032",
+    "file": "entry/entry-032.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi quinhentos e oitenta reais pela venda de ovos.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 580
+  },
+  {
+    "id": "ENTRY-033",
+    "file": "entry/entry-033.wav",
+    "category": "ENTRY",
+    "originalText": "Caiu na conta nove mil e duzentos reais da venda de gado.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 9200
+  },
+  {
+    "id": "ENTRY-034",
+    "file": "entry/entry-034.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi mil seiscentos e dez reais pela venda de leite.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 1610
+  },
+  {
+    "id": "ENTRY-035",
+    "file": "entry/entry-035.wav",
+    "category": "ENTRY",
+    "originalText": "Vendi arroz e recebi dois mil setecentos e cinquenta reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 2750
+  },
+  {
+    "id": "ENTRY-036",
+    "file": "entry/entry-036.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi quatro mil novecentos e noventa reais pela venda de café.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 4990
+  },
+  {
+    "id": "ENTRY-037",
+    "file": "entry/entry-037.wav",
+    "category": "ENTRY",
+    "originalText": "Entrou três mil cento e cinquenta reais da venda de soja.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 3150
+  },
+  {
+    "id": "ENTRY-038",
+    "file": "entry/entry-038.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi setecentos e vinte reais pela venda de hortaliças.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 720
+  },
+  {
+    "id": "ENTRY-039",
+    "file": "entry/entry-039.wav",
+    "category": "ENTRY",
+    "originalText": "Me pagaram dois mil oitocentos e cinquenta reais pelo milho.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 2850
+  },
+  {
+    "id": "ENTRY-040",
+    "file": "entry/entry-040.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi seis mil seiscentos e sessenta reais pela venda de gado.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 6660
+  },
+  {
+    "id": "ENTRY-041",
+    "file": "entry/entry-041.wav",
+    "category": "ENTRY",
+    "originalText": "Entrou mil novecentos e noventa reais referente à venda de feijão.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 1990
+  },
+  {
+    "id": "ENTRY-042",
+    "file": "entry/entry-042.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi três mil trezentos e trinta reais pela venda de café.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 3330
+  },
+  {
+    "id": "ENTRY-043",
+    "file": "entry/entry-043.wav",
+    "category": "ENTRY",
+    "originalText": "Vendi soja e entrou sete mil e cem reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 7100
+  },
+  {
+    "id": "ENTRY-044",
+    "file": "entry/entry-044.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi oitocentos e noventa reais pela venda de mandioca.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 890
+  },
+  {
+    "id": "ENTRY-045",
+    "file": "entry/entry-045.wav",
+    "category": "ENTRY",
+    "originalText": "Caiu um PIX de dois mil quatrocentos e cinquenta reais da venda de milho.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 2450
+  },
+  {
+    "id": "ENTRY-046",
+    "file": "entry/entry-046.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi cinco mil oitocentos e vinte reais pela venda de soja.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 5820
+  },
+  {
+    "id": "ENTRY-047",
+    "file": "entry/entry-047.wav",
+    "category": "ENTRY",
+    "originalText": "Entrou mil duzentos e trinta reais da venda de leite.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 1230
+  },
+  {
+    "id": "ENTRY-048",
+    "file": "entry/entry-048.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi quatro mil e quinhentos reais pela comercialização de café.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 4500
+  },
+  {
+    "id": "ENTRY-049",
+    "file": "entry/entry-049.wav",
+    "category": "ENTRY",
+    "originalText": "Vendi feijão por mil setecentos e oitenta reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 1780
+  },
+  {
+    "id": "ENTRY-050",
+    "file": "entry/entry-050.wav",
+    "category": "ENTRY",
+    "originalText": "Recebi dez mil reais pela venda de gado.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "INCOME",
+    "expectedAmount": 10000
+  },
+  {
+    "id": "EXPENSE-001",
+    "file": "expense/expense-001.wav",
+    "category": "EXPENSE",
+    "originalText": "Paguei mil e duzentos reais em sementes de soja.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 1200
+  },
+  {
+    "id": "EXPENSE-002",
+    "file": "expense/expense-002.wav",
+    "category": "EXPENSE",
+    "originalText": "Comprei adubo por dois mil e quinhentos reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 2500
+  },
+  {
+    "id": "EXPENSE-003",
+    "file": "expense/expense-003.wav",
+    "category": "EXPENSE",
+    "originalText": "Gastei oitocentos reais com diesel para o trator.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 800
+  },
+  {
+    "id": "EXPENSE-004",
+    "file": "expense/expense-004.wav",
+    "category": "EXPENSE",
+    "originalText": "Paguei três mil e quatrocentos reais em fertilizantes.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 3400
+  },
+  {
+    "id": "EXPENSE-005",
+    "file": "expense/expense-005.wav",
+    "category": "EXPENSE",
+    "originalText": "Comprei defensivo agrícola por mil setecentos e cinquenta reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 1750
+  },
+  {
+    "id": "EXPENSE-006",
+    "file": "expense/expense-006.wav",
+    "category": "EXPENSE",
+    "originalText": "Gastei quinhentos e cinquenta reais com manutenção do trator.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 550
+  },
+  {
+    "id": "EXPENSE-007",
+    "file": "expense/expense-007.wav",
+    "category": "EXPENSE",
+    "originalText": "Paguei novecentos reais pelo frete da produção.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 900
+  },
+  {
+    "id": "EXPENSE-008",
+    "file": "expense/expense-008.wav",
+    "category": "EXPENSE",
+    "originalText": "Comprei sementes de milho por mil trezentos e vinte reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 1320
+  },
+  {
+    "id": "EXPENSE-009",
+    "file": "expense/expense-009.wav",
+    "category": "EXPENSE",
+    "originalText": "Paguei dois mil e cem reais de mão de obra.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 2100
+  },
+  {
+    "id": "EXPENSE-010",
+    "file": "expense/expense-010.wav",
+    "category": "EXPENSE",
+    "originalText": "Gastei seiscentos e oitenta reais com combustível.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 680
+  },
+  {
+    "id": "EXPENSE-011",
+    "file": "expense/expense-011.wav",
+    "category": "EXPENSE",
+    "originalText": "Hoje paguei mil oitocentos e cinquenta reais em adubo.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 1850
+  },
+  {
+    "id": "EXPENSE-012",
+    "file": "expense/expense-012.wav",
+    "category": "EXPENSE",
+    "originalText": "Comprei herbicida por setecentos e noventa reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 790
+  },
+  {
+    "id": "EXPENSE-013",
+    "file": "expense/expense-013.wav",
+    "category": "EXPENSE",
+    "originalText": "Paguei quatro mil e quinhentos reais pelo aluguel de uma máquina.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 4500
+  },
+  {
+    "id": "EXPENSE-014",
+    "file": "expense/expense-014.wav",
+    "category": "EXPENSE",
+    "originalText": "Gastei trezentos e cinquenta reais na manutenção da cerca.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 350
+  },
+  {
+    "id": "EXPENSE-015",
+    "file": "expense/expense-015.wav",
+    "category": "EXPENSE",
+    "originalText": "Comprei sementes e defensivos por dois mil novecentos e cinquenta reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 2950
+  },
+  {
+    "id": "EXPENSE-016",
+    "file": "expense/expense-016.wav",
+    "category": "EXPENSE",
+    "originalText": "Paguei mil quatrocentos e oitenta reais em fertilizante.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 1480
+  },
+  {
+    "id": "EXPENSE-017",
+    "file": "expense/expense-017.wav",
+    "category": "EXPENSE",
+    "originalText": "Gastei novecentos e vinte reais com diesel.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 920
+  },
+  {
+    "id": "EXPENSE-018",
+    "file": "expense/expense-018.wav",
+    "category": "EXPENSE",
+    "originalText": "Comprei ração por mil cento e cinquenta reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 1150
+  },
+  {
+    "id": "EXPENSE-019",
+    "file": "expense/expense-019.wav",
+    "category": "EXPENSE",
+    "originalText": "Paguei dois mil setecentos e cinquenta reais pelo serviço de colheita.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 2750
+  },
+  {
+    "id": "EXPENSE-020",
+    "file": "expense/expense-020.wav",
+    "category": "EXPENSE",
+    "originalText": "Gastei seiscentos reais com peças para o trator.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 600
+  },
+  {
+    "id": "EXPENSE-021",
+    "file": "expense/expense-021.wav",
+    "category": "EXPENSE",
+    "originalText": "Fiz um PIX de mil trezentos e cinquenta reais para pagar as sementes.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 1350
+  },
+  {
+    "id": "EXPENSE-022",
+    "file": "expense/expense-022.wav",
+    "category": "EXPENSE",
+    "originalText": "Paguei um boleto de dois mil quatrocentos e oitenta reais do fertilizante.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 2480
+  },
+  {
+    "id": "EXPENSE-023",
+    "file": "expense/expense-023.wav",
+    "category": "EXPENSE",
+    "originalText": "Saiu da conta oitocentos e quarenta reais para pagar combustível.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 840
+  },
+  {
+    "id": "EXPENSE-024",
+    "file": "expense/expense-024.wav",
+    "category": "EXPENSE",
+    "originalText": "Paguei em dinheiro quinhentos e vinte reais pela manutenção.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 520
+  },
+  {
+    "id": "EXPENSE-025",
+    "file": "expense/expense-025.wav",
+    "category": "EXPENSE",
+    "originalText": "Comprei adubo por três mil seiscentos e cinquenta reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 3650
+  },
+  {
+    "id": "EXPENSE-026",
+    "file": "expense/expense-026.wav",
+    "category": "EXPENSE",
+    "originalText": "Gastei mil e noventa reais com defensivo agrícola.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 1090
+  },
+  {
+    "id": "EXPENSE-027",
+    "file": "expense/expense-027.wav",
+    "category": "EXPENSE",
+    "originalText": "Paguei setecentos e trinta reais de frete.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 730
+  },
+  {
+    "id": "EXPENSE-028",
+    "file": "expense/expense-028.wav",
+    "category": "EXPENSE",
+    "originalText": "Comprei sementes por dois mil duzentos e vinte reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 2220
+  },
+  {
+    "id": "EXPENSE-029",
+    "file": "expense/expense-029.wav",
+    "category": "EXPENSE",
+    "originalText": "Paguei cinco mil reais pelo arrendamento.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 5000
+  },
+  {
+    "id": "EXPENSE-030",
+    "file": "expense/expense-030.wav",
+    "category": "EXPENSE",
+    "originalText": "Gastei mil seiscentos e cinquenta reais com mão de obra.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 1650
+  },
+  {
+    "id": "EXPENSE-031",
+    "file": "expense/expense-031.wav",
+    "category": "EXPENSE",
+    "originalText": "Hoje saiu novecentos e noventa reais para abastecer as máquinas.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 990
+  },
+  {
+    "id": "EXPENSE-032",
+    "file": "expense/expense-032.wav",
+    "category": "EXPENSE",
+    "originalText": "Comprei peças para o pulverizador por seiscentos e quarenta reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 640
+  },
+  {
+    "id": "EXPENSE-033",
+    "file": "expense/expense-033.wav",
+    "category": "EXPENSE",
+    "originalText": "Paguei três mil cento e cinquenta reais em fertilizantes.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 3150
+  },
+  {
+    "id": "EXPENSE-034",
+    "file": "expense/expense-034.wav",
+    "category": "EXPENSE",
+    "originalText": "Gastei quatrocentos e oitenta reais com manutenção.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 480
+  },
+  {
+    "id": "EXPENSE-035",
+    "file": "expense/expense-035.wav",
+    "category": "EXPENSE",
+    "originalText": "Comprei ração por mil oitocentos e noventa reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 1890
+  },
+  {
+    "id": "EXPENSE-036",
+    "file": "expense/expense-036.wav",
+    "category": "EXPENSE",
+    "originalText": "Paguei dois mil quinhentos e cinquenta reais pelo serviço de plantio.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 2550
+  },
+  {
+    "id": "EXPENSE-037",
+    "file": "expense/expense-037.wav",
+    "category": "EXPENSE",
+    "originalText": "Gastei setecentos e sessenta reais com combustível.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 760
+  },
+  {
+    "id": "EXPENSE-038",
+    "file": "expense/expense-038.wav",
+    "category": "EXPENSE",
+    "originalText": "Comprei herbicida por mil duzentos e quarenta reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 1240
+  },
+  {
+    "id": "EXPENSE-039",
+    "file": "expense/expense-039.wav",
+    "category": "EXPENSE",
+    "originalText": "Paguei oitocentos e cinquenta reais pelo transporte da produção.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 850
+  },
+  {
+    "id": "EXPENSE-040",
+    "file": "expense/expense-040.wav",
+    "category": "EXPENSE",
+    "originalText": "Gastei dois mil novecentos e noventa reais com adubo.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 2990
+  },
+  {
+    "id": "EXPENSE-041",
+    "file": "expense/expense-041.wav",
+    "category": "EXPENSE",
+    "originalText": "Comprei sementes de soja por mil quinhentos e oitenta reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 1580
+  },
+  {
+    "id": "EXPENSE-042",
+    "file": "expense/expense-042.wav",
+    "category": "EXPENSE",
+    "originalText": "Paguei seiscentos e noventa reais pela manutenção do trator.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 690
+  },
+  {
+    "id": "EXPENSE-043",
+    "file": "expense/expense-043.wav",
+    "category": "EXPENSE",
+    "originalText": "Gastei mil trezentos e setenta reais com defensivos.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 1370
+  },
+  {
+    "id": "EXPENSE-044",
+    "file": "expense/expense-044.wav",
+    "category": "EXPENSE",
+    "originalText": "Comprei fertilizante por quatro mil e duzentos reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 4200
+  },
+  {
+    "id": "EXPENSE-045",
+    "file": "expense/expense-045.wav",
+    "category": "EXPENSE",
+    "originalText": "Paguei quinhentos e noventa reais de combustível.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 590
+  },
+  {
+    "id": "EXPENSE-046",
+    "file": "expense/expense-046.wav",
+    "category": "EXPENSE",
+    "originalText": "Gastei três mil setecentos e cinquenta reais com mão de obra.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 3750
+  },
+  {
+    "id": "EXPENSE-047",
+    "file": "expense/expense-047.wav",
+    "category": "EXPENSE",
+    "originalText": "Comprei sementes e adubo por dois mil seiscentos e oitenta reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 2680
+  },
+  {
+    "id": "EXPENSE-048",
+    "file": "expense/expense-048.wav",
+    "category": "EXPENSE",
+    "originalText": "Paguei mil novecentos e vinte reais pelo aluguel do equipamento.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 1920
+  },
+  {
+    "id": "EXPENSE-049",
+    "file": "expense/expense-049.wav",
+    "category": "EXPENSE",
+    "originalText": "Gastei oitocentos e dez reais com peças para a colheitadeira.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 810
+  },
+  {
+    "id": "EXPENSE-050",
+    "file": "expense/expense-050.wav",
+    "category": "EXPENSE",
+    "originalText": "Comprei defensivos agrícolas por cinco mil e quinhentos reais.",
+    "expectedOutcome": "VALID",
+    "expectedTransactionType": "EXPENSE",
+    "expectedAmount": 5500
+  },
+  {
+    "id": "INVALID-001",
+    "file": "invalid/invalid-001.wav",
+    "category": "INVALID",
+    "originalText": "Hoje o tempo está muito bonito aqui na fazenda.",
+    "expectedOutcome": "INVALID"
+  },
+  {
+    "id": "INVALID-002",
+    "file": "invalid/invalid-002.wav",
+    "category": "INVALID",
+    "originalText": "Acho que vai chover amanhã.",
+    "expectedOutcome": "INVALID"
+  },
+  {
+    "id": "INVALID-003",
+    "file": "invalid/invalid-003.wav",
+    "category": "INVALID",
+    "originalText": "O trator está perto do galpão.",
+    "expectedOutcome": "INVALID"
+  },
+  {
+    "id": "INVALID-004",
+    "file": "invalid/invalid-004.wav",
+    "category": "INVALID",
+    "originalText": "Preciso verificar a plantação de milho.",
+    "expectedOutcome": "INVALID"
+  },
+  {
+    "id": "INVALID-005",
+    "file": "invalid/invalid-005.wav",
+    "category": "INVALID",
+    "originalText": "A soja está crescendo bem este ano.",
+    "expectedOutcome": "INVALID"
+  },
+  {
+    "id": "INVALID-006",
+    "file": "invalid/invalid-006.wav",
+    "category": "INVALID",
+    "originalText": "Vou olhar a cerca depois do almoço.",
+    "expectedOutcome": "INVALID"
+  },
+  {
+    "id": "INVALID-007",
+    "file": "invalid/invalid-007.wav",
+    "category": "INVALID",
+    "originalText": "O pasto está bem verde.",
+    "expectedOutcome": "INVALID"
+  },
+  {
+    "id": "INVALID-008",
+    "file": "invalid/invalid-008.wav",
+    "category": "INVALID",
+    "originalText": "Precisamos organizar o galpão.",
+    "expectedOutcome": "INVALID"
+  },
+  {
+    "id": "INVALID-009",
+    "file": "invalid/invalid-009.wav",
+    "category": "INVALID",
+    "originalText": "Hoje comecei o trabalho mais cedo.",
+    "expectedOutcome": "INVALID"
+  },
+  {
+    "id": "INVALID-010",
+    "file": "invalid/invalid-010.wav",
+    "category": "INVALID",
+    "originalText": "O café já está quase pronto para colher.",
+    "expectedOutcome": "INVALID"
+  },
+  {
+    "id": "INVALID-011",
+    "file": "invalid/invalid-011.wav",
+    "category": "INVALID",
+    "originalText": "Vou conversar com o agrônomo amanhã.",
+    "expectedOutcome": "INVALID"
+  },
+  {
+    "id": "INVALID-012",
+    "file": "invalid/invalid-012.wav",
+    "category": "INVALID",
+    "originalText": "A máquina está funcionando normalmente.",
+    "expectedOutcome": "INVALID"
+  },
+  {
+    "id": "INVALID-013",
+    "file": "invalid/invalid-013.wav",
+    "category": "INVALID",
+    "originalText": "Precisamos verificar o nível de água.",
+    "expectedOutcome": "INVALID"
+  },
+  {
+    "id": "INVALID-014",
+    "file": "invalid/invalid-014.wav",
+    "category": "INVALID",
+    "originalText": "A colheita deve começar na próxima semana.",
+    "expectedOutcome": "INVALID"
+  },
+  {
+    "id": "INVALID-015",
+    "file": "invalid/invalid-015.wav",
+    "category": "INVALID",
+    "originalText": "Tem algumas plantas precisando de atenção.",
+    "expectedOutcome": "INVALID"
+  },
+  {
+    "id": "INVALID-016",
+    "file": "invalid/invalid-016.wav",
+    "category": "INVALID",
+    "originalText": "Vou levar o trator para o outro talhão.",
+    "expectedOutcome": "INVALID"
+  },
+  {
+    "id": "INVALID-017",
+    "file": "invalid/invalid-017.wav",
+    "category": "INVALID",
+    "originalText": "O milho desse lado da propriedade está maior.",
+    "expectedOutcome": "INVALID"
+  },
+  {
+    "id": "INVALID-018",
+    "file": "invalid/invalid-018.wav",
+    "category": "INVALID",
+    "originalText": "Precisamos limpar o depósito.",
+    "expectedOutcome": "INVALID"
+  },
+  {
+    "id": "INVALID-019",
+    "file": "invalid/invalid-019.wav",
+    "category": "INVALID",
+    "originalText": "Hoje terminei o serviço no campo mais cedo.",
+    "expectedOutcome": "INVALID"
+  },
+  {
+    "id": "INVALID-020",
+    "file": "invalid/invalid-020.wav",
+    "category": "INVALID",
+    "originalText": "A previsão é de chuva para o fim de semana.",
+    "expectedOutcome": "INVALID"
+  },
+  {
+    "id": "INCOMPLETE-001",
+    "file": "incomplete/incomplete-001.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Comprei sementes de soja.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-002",
+    "file": "incomplete/incomplete-002.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Paguei o adubo.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-003",
+    "file": "incomplete/incomplete-003.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Recebi pela venda do milho.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-004",
+    "file": "incomplete/incomplete-004.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Gastei com combustível.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-005",
+    "file": "incomplete/incomplete-005.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Vendi parte da produção de café.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-006",
+    "file": "incomplete/incomplete-006.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Comprei defensivo agrícola.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-007",
+    "file": "incomplete/incomplete-007.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Paguei a manutenção do trator.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-008",
+    "file": "incomplete/incomplete-008.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Recebi o pagamento da soja.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-009",
+    "file": "incomplete/incomplete-009.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Comprei fertilizante hoje.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-010",
+    "file": "incomplete/incomplete-010.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Paguei o frete da produção.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-011",
+    "file": "incomplete/incomplete-011.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Recebi pela venda de leite.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-012",
+    "file": "incomplete/incomplete-012.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Gastei com peças para o trator.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-013",
+    "file": "incomplete/incomplete-013.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Comprei sementes de milho.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-014",
+    "file": "incomplete/incomplete-014.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Paguei a mão de obra.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-015",
+    "file": "incomplete/incomplete-015.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Recebi da venda de feijão.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-016",
+    "file": "incomplete/incomplete-016.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Comprei ração para o gado.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-017",
+    "file": "incomplete/incomplete-017.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Gastei com manutenção da cerca.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-018",
+    "file": "incomplete/incomplete-018.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Recebi o dinheiro do café.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-019",
+    "file": "incomplete/incomplete-019.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Paguei pelo serviço de plantio.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-020",
+    "file": "incomplete/incomplete-020.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Comprei herbicida.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-021",
+    "file": "incomplete/incomplete-021.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Recebi pela comercialização da soja.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-022",
+    "file": "incomplete/incomplete-022.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Paguei o aluguel da máquina.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-023",
+    "file": "incomplete/incomplete-023.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Gastei com diesel hoje.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-024",
+    "file": "incomplete/incomplete-024.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Vendi algumas sacas de milho.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-025",
+    "file": "incomplete/incomplete-025.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Comprei adubo e sementes.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-026",
+    "file": "incomplete/incomplete-026.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Paguei o transporte da produção.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-027",
+    "file": "incomplete/incomplete-027.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Recebi um PIX referente à venda de café.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-028",
+    "file": "incomplete/incomplete-028.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Gastei com defensivos.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-029",
+    "file": "incomplete/incomplete-029.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Comprei peças para a colheitadeira.",
+    "expectedOutcome": "INCOMPLETE"
+  },
+  {
+    "id": "INCOMPLETE-030",
+    "file": "incomplete/incomplete-030.wav",
+    "category": "INCOMPLETE",
+    "originalText": "Recebi pela venda de gado.",
+    "expectedOutcome": "INCOMPLETE"
+  }
+]

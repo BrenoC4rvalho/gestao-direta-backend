@@ -1,0 +1,1059 @@
+{
+  "count": 150,
+  "minSeconds": 0.964,
+  "maxSeconds": 4.238,
+  "meanSeconds": 2.663,
+  "totalSeconds": 399.502,
+  "files": [
+    {
+      "id": "ENTRY-001",
+      "file": "entry/entry-001.wav",
+      "durationSeconds": 2.415,
+      "sampleRateHz": 22050,
+      "sha256": "9d39027f4e6cb1e51d6c6461d8ed6a4ee83c05608991b14749ff3acb6b1bb834"
+    },
+    {
+      "id": "ENTRY-002",
+      "file": "entry/entry-002.wav",
+      "durationSeconds": 2.601,
+      "sampleRateHz": 22050,
+      "sha256": "c2e97fb4ac5b2073c36ba73ad904c1ba033dffc6a4500cf2d0b11832195dbd68"
+    },
+    {
+      "id": "ENTRY-003",
+      "file": "entry/entry-003.wav",
+      "durationSeconds": 2.299,
+      "sampleRateHz": 22050,
+      "sha256": "4f7382cec867f399d4831e8c8ccc0015b6e4622c8fb864a8e2e39f582f9cbaa6"
+    },
+    {
+      "id": "ENTRY-004",
+      "file": "entry/entry-004.wav",
+      "durationSeconds": 3.448,
+      "sampleRateHz": 22050,
+      "sha256": "beaf8573214409e49eb50c24621130de05e24021ef21865727e101c1ff0c84f9"
+    },
+    {
+      "id": "ENTRY-005",
+      "file": "entry/entry-005.wav",
+      "durationSeconds": 3.344,
+      "sampleRateHz": 22050,
+      "sha256": "ff7c1598e364918991099632b480301b837a1a24351de9128854fe452afb6b0c"
+    },
+    {
+      "id": "ENTRY-006",
+      "file": "entry/entry-006.wav",
+      "durationSeconds": 2.461,
+      "sampleRateHz": 22050,
+      "sha256": "055a27e68a742363fe93bea698c4363b467618d4e0a19ff315040dd0ec74401f"
+    },
+    {
+      "id": "ENTRY-007",
+      "file": "entry/entry-007.wav",
+      "durationSeconds": 2.81,
+      "sampleRateHz": 22050,
+      "sha256": "b30223499e498d66e5c7a7ecf33eab9441def2605a672606b30fb76ff51b0709"
+    },
+    {
+      "id": "ENTRY-008",
+      "file": "entry/entry-008.wav",
+      "durationSeconds": 3.39,
+      "sampleRateHz": 22050,
+      "sha256": "6a540c3a189c4d7247847cfa6250cf913a32bccd8c0b9f428713084d70794e84"
+    },
+    {
+      "id": "ENTRY-009",
+      "file": "entry/entry-009.wav",
+      "durationSeconds": 2.868,
+      "sampleRateHz": 22050,
+      "sha256": "58760e7f880bad57309610668e903b251ead5d382d7772dc3fcea435875f8013"
+    },
+    {
+      "id": "ENTRY-010",
+      "file": "entry/entry-010.wav",
+      "durationSeconds": 2.775,
+      "sampleRateHz": 22050,
+      "sha256": "0404225b47465733f63df91e86a26319cde108effef72e24769c0ff7ea435297"
+    },
+    {
+      "id": "ENTRY-011",
+      "file": "entry/entry-011.wav",
+      "durationSeconds": 3.599,
+      "sampleRateHz": 22050,
+      "sha256": "20255aecc5c7f820b590fc688f8ad2851887d2ade508c517aa8a9a4ae4754f21"
+    },
+    {
+      "id": "ENTRY-012",
+      "file": "entry/entry-012.wav",
+      "durationSeconds": 3.077,
+      "sampleRateHz": 22050,
+      "sha256": "b9194b9120e277972d48f312d91ceffe281ebce9ccc33ebddadf0b6731959d5a"
+    },
+    {
+      "id": "ENTRY-013",
+      "file": "entry/entry-013.wav",
+      "durationSeconds": 3.262,
+      "sampleRateHz": 22050,
+      "sha256": "ed82208c9617878c9caf488ceb4f72864fb70bb55de995e70fb321f610178a38"
+    },
+    {
+      "id": "ENTRY-014",
+      "file": "entry/entry-014.wav",
+      "durationSeconds": 3.483,
+      "sampleRateHz": 22050,
+      "sha256": "2d67b27bd14ebe89aa1c0187c1da35e4b95e360936d8eee4e7c804c93102edfd"
+    },
+    {
+      "id": "ENTRY-015",
+      "file": "entry/entry-015.wav",
+      "durationSeconds": 2.949,
+      "sampleRateHz": 22050,
+      "sha256": "0755e15be71c320a2ca063072c193d6d683a686f3623e8d50a5ec87040c768f3"
+    },
+    {
+      "id": "ENTRY-016",
+      "file": "entry/entry-016.wav",
+      "durationSeconds": 2.961,
+      "sampleRateHz": 22050,
+      "sha256": "663a04a68664ef9f791a2a7fead01d312a167a18d53c96b2b44cb5ee8093f1b1"
+    },
+    {
+      "id": "ENTRY-017",
+      "file": "entry/entry-017.wav",
+      "durationSeconds": 2.694,
+      "sampleRateHz": 22050,
+      "sha256": "4bf86e0cb678647238f2e5ba67e5f72c47d857cbf64f49d299f1be3b54d6e315"
+    },
+    {
+      "id": "ENTRY-018",
+      "file": "entry/entry-018.wav",
+      "durationSeconds": 3.251,
+      "sampleRateHz": 22050,
+      "sha256": "d32117392b919479aefe7dcc526443baac5bd76dc564152f3b80c53ff1c8a663"
+    },
+    {
+      "id": "ENTRY-019",
+      "file": "entry/entry-019.wav",
+      "durationSeconds": 3.065,
+      "sampleRateHz": 22050,
+      "sha256": "7d34f9422051c9d97af5832e06253e6ee727b0c7f9743342cbe30edab196fc3c"
+    },
+    {
+      "id": "ENTRY-020",
+      "file": "entry/entry-020.wav",
+      "durationSeconds": 3.402,
+      "sampleRateHz": 22050,
+      "sha256": "30b36ceeb9befd53a00f7029be4b2f6f7054fe9878e1f3277977d5b1470283e2"
+    },
+    {
+      "id": "ENTRY-021",
+      "file": "entry/entry-021.wav",
+      "durationSeconds": 3.576,
+      "sampleRateHz": 22050,
+      "sha256": "df26d0f6cbc39ea2bc440a8bf94a350ea8e231c622434a1c94350b65ff50947b"
+    },
+    {
+      "id": "ENTRY-022",
+      "file": "entry/entry-022.wav",
+      "durationSeconds": 4.017,
+      "sampleRateHz": 22050,
+      "sha256": "2a1f443ae90c5286b06be64fc2d5668eee6a5cf278c428b1815cfc828a861730"
+    },
+    {
+      "id": "ENTRY-023",
+      "file": "entry/entry-023.wav",
+      "durationSeconds": 3.1,
+      "sampleRateHz": 22050,
+      "sha256": "f94677e6835c940851ccab8403e921c6e7315e937c6fa92ab70b59805176e499"
+    },
+    {
+      "id": "ENTRY-024",
+      "file": "entry/entry-024.wav",
+      "durationSeconds": 3.68,
+      "sampleRateHz": 22050,
+      "sha256": "29171efc4afe0f72e1225ea4b26908cd7dbc076a766c7be1dd3bc6e4dbe2b3d8"
+    },
+    {
+      "id": "ENTRY-025",
+      "file": "entry/entry-025.wav",
+      "durationSeconds": 3.471,
+      "sampleRateHz": 22050,
+      "sha256": "d6099917d30240fd5dae26ed3ee3e60b5b7970a8e9066e9716634c10f53043ca"
+    },
+    {
+      "id": "ENTRY-026",
+      "file": "entry/entry-026.wav",
+      "durationSeconds": 2.926,
+      "sampleRateHz": 22050,
+      "sha256": "d7f8c8167c55d6f3ae022975ff7d030d028252bb688c154f678c391d6bbba1e9"
+    },
+    {
+      "id": "ENTRY-027",
+      "file": "entry/entry-027.wav",
+      "durationSeconds": 3.715,
+      "sampleRateHz": 22050,
+      "sha256": "24b15f423adc46b28dc842b0ac91b3cc82c1e414af50ef49bcf31e8ed09c54a0"
+    },
+    {
+      "id": "ENTRY-028",
+      "file": "entry/entry-028.wav",
+      "durationSeconds": 3.019,
+      "sampleRateHz": 22050,
+      "sha256": "ec48e4e45f8e770b1e0cf62ff7936e9d6689f6b1bf928d16b3406c97969d94bf"
+    },
+    {
+      "id": "ENTRY-029",
+      "file": "entry/entry-029.wav",
+      "durationSeconds": 1.997,
+      "sampleRateHz": 22050,
+      "sha256": "ecd214fd8345a49e7e47270881a4f448864121a7b8ca9e60fdf341a7345c0aa6"
+    },
+    {
+      "id": "ENTRY-030",
+      "file": "entry/entry-030.wav",
+      "durationSeconds": 3.17,
+      "sampleRateHz": 22050,
+      "sha256": "3cfb04cb98af27f63d9cea3dab10b4657d0dd27a876147ce81418b514fe15924"
+    },
+    {
+      "id": "ENTRY-031",
+      "file": "entry/entry-031.wav",
+      "durationSeconds": 3.216,
+      "sampleRateHz": 22050,
+      "sha256": "913886fd4b3b2c4b258cf048df273dae77841a005956d61f19c7c3bdcf94416f"
+    },
+    {
+      "id": "ENTRY-032",
+      "file": "entry/entry-032.wav",
+      "durationSeconds": 2.937,
+      "sampleRateHz": 22050,
+      "sha256": "d3eed038002c96cd2a003388a925adfef6485261f827c3bb2d1d34f67ddcd265"
+    },
+    {
+      "id": "ENTRY-033",
+      "file": "entry/entry-033.wav",
+      "durationSeconds": 3.274,
+      "sampleRateHz": 22050,
+      "sha256": "7afa5a11b3949bd31b88df15c0c48099925ec30f57f968005a37424cd925f49d"
+    },
+    {
+      "id": "ENTRY-034",
+      "file": "entry/entry-034.wav",
+      "durationSeconds": 2.902,
+      "sampleRateHz": 22050,
+      "sha256": "7e5398125cbe278fe62c38a5be29e74427f1c3d51ca326dec425f8ba9dd1d9a6"
+    },
+    {
+      "id": "ENTRY-035",
+      "file": "entry/entry-035.wav",
+      "durationSeconds": 3.541,
+      "sampleRateHz": 22050,
+      "sha256": "c12f64791768f4489c5e90ac7186ca474669c1c9e10f603789edaad0848009db"
+    },
+    {
+      "id": "ENTRY-036",
+      "file": "entry/entry-036.wav",
+      "durationSeconds": 3.692,
+      "sampleRateHz": 22050,
+      "sha256": "995238663671e611adb110dbca450b3729a90c5b16d058c57f1cc9b0e48896eb"
+    },
+    {
+      "id": "ENTRY-037",
+      "file": "entry/entry-037.wav",
+      "durationSeconds": 3.03,
+      "sampleRateHz": 22050,
+      "sha256": "c8bd89a28c824d05e6f8702d806fcea0a880397c1f2e83c95cd52407d8c371eb"
+    },
+    {
+      "id": "ENTRY-038",
+      "file": "entry/entry-038.wav",
+      "durationSeconds": 3.053,
+      "sampleRateHz": 22050,
+      "sha256": "34aac39e7450590fe4e598c6a6c7572160023bdfda73c3e2d2285e00be64b2f5"
+    },
+    {
+      "id": "ENTRY-039",
+      "file": "entry/entry-039.wav",
+      "durationSeconds": 3.181,
+      "sampleRateHz": 22050,
+      "sha256": "9af1fbf5211c6e595474147b7ada576abb604558f1a900fd7a5ef10f386a5f86"
+    },
+    {
+      "id": "ENTRY-040",
+      "file": "entry/entry-040.wav",
+      "durationSeconds": 3.437,
+      "sampleRateHz": 22050,
+      "sha256": "d3ed527b2f78906f88f225b2b9bd947ee0141016c37fb45caa89d7bc3353a5a9"
+    },
+    {
+      "id": "ENTRY-041",
+      "file": "entry/entry-041.wav",
+      "durationSeconds": 3.495,
+      "sampleRateHz": 22050,
+      "sha256": "a20625616c42eff6c7079c4f5586fd3f22311349384cf27ba59a1263c728f199"
+    },
+    {
+      "id": "ENTRY-042",
+      "file": "entry/entry-042.wav",
+      "durationSeconds": 3.17,
+      "sampleRateHz": 22050,
+      "sha256": "c454ac5fdd3a37c6180bc57adbc53e066951d893ba972a450e321bed2e39912e"
+    },
+    {
+      "id": "ENTRY-043",
+      "file": "entry/entry-043.wav",
+      "durationSeconds": 2.879,
+      "sampleRateHz": 22050,
+      "sha256": "0d67d4d128096cc9083d564b80d151f783b93ef6ce5fa9b5c6a584512480376f"
+    },
+    {
+      "id": "ENTRY-044",
+      "file": "entry/entry-044.wav",
+      "durationSeconds": 3.019,
+      "sampleRateHz": 22050,
+      "sha256": "d691304dbd777dff623901806af7203708cd7828e095dc65a037c9522ff209f4"
+    },
+    {
+      "id": "ENTRY-045",
+      "file": "entry/entry-045.wav",
+      "durationSeconds": 3.808,
+      "sampleRateHz": 22050,
+      "sha256": "951689a7625e25a9997cc347058f448cb27763703f356788748e867451823a2d"
+    },
+    {
+      "id": "ENTRY-046",
+      "file": "entry/entry-046.wav",
+      "durationSeconds": 3.332,
+      "sampleRateHz": 22050,
+      "sha256": "805b04845c4fe30dfd1a09a847699f4a663e0e20fa9381f79039faa1a177514c"
+    },
+    {
+      "id": "ENTRY-047",
+      "file": "entry/entry-047.wav",
+      "durationSeconds": 2.705,
+      "sampleRateHz": 22050,
+      "sha256": "af6b245a2942542cfff72ca16ffa15b2825bef4d0d937456bc5a54a45cd424e0"
+    },
+    {
+      "id": "ENTRY-048",
+      "file": "entry/entry-048.wav",
+      "durationSeconds": 3.82,
+      "sampleRateHz": 22050,
+      "sha256": "444e183f91b1fde8e611a6e128633a269378ce9d9760d429dd0500f466d09c6a"
+    },
+    {
+      "id": "ENTRY-049",
+      "file": "entry/entry-049.wav",
+      "durationSeconds": 2.902,
+      "sampleRateHz": 22050,
+      "sha256": "738e6860d8fea29e3cca970decd0e117c02353839e2700a7095d2f4dee87e7f2"
+    },
+    {
+      "id": "ENTRY-050",
+      "file": "entry/entry-050.wav",
+      "durationSeconds": 2.218,
+      "sampleRateHz": 22050,
+      "sha256": "64c70e32fe10adb2e7f355be20c0524b2590359c2ee89ce485ac7b33b4db5fe8"
+    },
+    {
+      "id": "EXPENSE-001",
+      "file": "expense/expense-001.wav",
+      "durationSeconds": 2.879,
+      "sampleRateHz": 22050,
+      "sha256": "66c412280dc6b970c2a87f5bb3c219cb57de3ecf03ae96efc0b9ee83d49fd67a"
+    },
+    {
+      "id": "EXPENSE-002",
+      "file": "expense/expense-002.wav",
+      "durationSeconds": 2.775,
+      "sampleRateHz": 22050,
+      "sha256": "ae0783b7be6eb024c8a3f99ab4820d43f4977bee4691b8ad556be10005528636"
+    },
+    {
+      "id": "EXPENSE-003",
+      "file": "expense/expense-003.wav",
+      "durationSeconds": 2.659,
+      "sampleRateHz": 22050,
+      "sha256": "56ac94a17f26a657729bac8dbfa7475943597335127e7e402f64b933cd3da902"
+    },
+    {
+      "id": "EXPENSE-004",
+      "file": "expense/expense-004.wav",
+      "durationSeconds": 3.204,
+      "sampleRateHz": 22050,
+      "sha256": "9b72af127119c3e561de7802568b337930a429def8b0b136928ea34088938a20"
+    },
+    {
+      "id": "EXPENSE-005",
+      "file": "expense/expense-005.wav",
+      "durationSeconds": 3.773,
+      "sampleRateHz": 22050,
+      "sha256": "6c463e1f516b8295e01eda532217af836f3f6bb5ee2514ec51c554b1491de399"
+    },
+    {
+      "id": "EXPENSE-006",
+      "file": "expense/expense-006.wav",
+      "durationSeconds": 3.355,
+      "sampleRateHz": 22050,
+      "sha256": "4f56549975fea531f3f5df5b5ef2d7f36347dd8fd9f458efcf6271df3ee11c28"
+    },
+    {
+      "id": "EXPENSE-007",
+      "file": "expense/expense-007.wav",
+      "durationSeconds": 2.589,
+      "sampleRateHz": 22050,
+      "sha256": "de1e64e90aac39ab9c11790eb7d1a93eb499c3713aa68f3a81ad2fb08e0bc9c7"
+    },
+    {
+      "id": "EXPENSE-008",
+      "file": "expense/expense-008.wav",
+      "durationSeconds": 3.135,
+      "sampleRateHz": 22050,
+      "sha256": "0918b0286d037c5d42f319ebc8a7ede3be53896a6d950e3a3efc2c8400f9f1bf"
+    },
+    {
+      "id": "EXPENSE-009",
+      "file": "expense/expense-009.wav",
+      "durationSeconds": 2.415,
+      "sampleRateHz": 22050,
+      "sha256": "c230631ce3e48cc2402e2cbed928ecb6d0559e4e2f37082cf4cfdfd5aad92b52"
+    },
+    {
+      "id": "EXPENSE-010",
+      "file": "expense/expense-010.wav",
+      "durationSeconds": 2.798,
+      "sampleRateHz": 22050,
+      "sha256": "c4b1f430e00145ce10b5b9e3534c620223ef26dc388f2b0ce59bdbb700bf2e20"
+    },
+    {
+      "id": "EXPENSE-011",
+      "file": "expense/expense-011.wav",
+      "durationSeconds": 3.123,
+      "sampleRateHz": 22050,
+      "sha256": "c304b666fc4c0a088d5dac40d0711f48293d3ea9c481d9f4d37ec88939aea849"
+    },
+    {
+      "id": "EXPENSE-012",
+      "file": "expense/expense-012.wav",
+      "durationSeconds": 2.728,
+      "sampleRateHz": 22050,
+      "sha256": "64e7663e96d58020a005ecd821864c24bf6b2d4bc09e6290767a5d9eaac7b26d"
+    },
+    {
+      "id": "EXPENSE-013",
+      "file": "expense/expense-013.wav",
+      "durationSeconds": 3.297,
+      "sampleRateHz": 22050,
+      "sha256": "4a6aedb0c566ce712f4f2e210aa2e888e549190805111a3285e72d387f84679c"
+    },
+    {
+      "id": "EXPENSE-014",
+      "file": "expense/expense-014.wav",
+      "durationSeconds": 3.286,
+      "sampleRateHz": 22050,
+      "sha256": "1badd28c2eab4dd86b265af4a6c444daadab2d93cfe2b6064b19e13f4312a564"
+    },
+    {
+      "id": "EXPENSE-015",
+      "file": "expense/expense-015.wav",
+      "durationSeconds": 4.238,
+      "sampleRateHz": 22050,
+      "sha256": "126d393279433e8670404eb9f7226efbf8b94ca05a2be68846bff77276f4e476"
+    },
+    {
+      "id": "EXPENSE-016",
+      "file": "expense/expense-016.wav",
+      "durationSeconds": 3.053,
+      "sampleRateHz": 22050,
+      "sha256": "b8d63f2923a005a2ff5f5ea836d38f587fdc64588515ef80485224f85db038e2"
+    },
+    {
+      "id": "EXPENSE-017",
+      "file": "expense/expense-017.wav",
+      "durationSeconds": 2.531,
+      "sampleRateHz": 22050,
+      "sha256": "5e101fec2be7ce2fc4842575799e234b9e13a000d79e1a9562710989518e2b4b"
+    },
+    {
+      "id": "EXPENSE-018",
+      "file": "expense/expense-018.wav",
+      "durationSeconds": 2.752,
+      "sampleRateHz": 22050,
+      "sha256": "c36bfe3cbe9ced11b658aa95b18920842d4b2e8ba439d91ea1d89e3b86f63a99"
+    },
+    {
+      "id": "EXPENSE-019",
+      "file": "expense/expense-019.wav",
+      "durationSeconds": 3.75,
+      "sampleRateHz": 22050,
+      "sha256": "9a1743cc88486095094f75b3aa4c837bed497ffac3d42a19884b0dacc018cd87"
+    },
+    {
+      "id": "EXPENSE-020",
+      "file": "expense/expense-020.wav",
+      "durationSeconds": 2.647,
+      "sampleRateHz": 22050,
+      "sha256": "28e886aab4d7f82b0b7daa2030198f38e3432e2a35196b3db3956babbb93559c"
+    },
+    {
+      "id": "EXPENSE-021",
+      "file": "expense/expense-021.wav",
+      "durationSeconds": 3.646,
+      "sampleRateHz": 22050,
+      "sha256": "def6872f6429ee2718fb44f2126eb949c2b576b2e23a15ca5456c9f33e5ebceb"
+    },
+    {
+      "id": "EXPENSE-022",
+      "file": "expense/expense-022.wav",
+      "durationSeconds": 3.866,
+      "sampleRateHz": 22050,
+      "sha256": "009f55e37d2d72a55f4c14b6921d0b76648eebbcdde41ad31337e1761c63b9bc"
+    },
+    {
+      "id": "EXPENSE-023",
+      "file": "expense/expense-023.wav",
+      "durationSeconds": 3.692,
+      "sampleRateHz": 22050,
+      "sha256": "838f117cab1bd7e152712df909e2d418c1a9f1d7d2ca6cfebf1137475aca67d6"
+    },
+    {
+      "id": "EXPENSE-024",
+      "file": "expense/expense-024.wav",
+      "durationSeconds": 3.077,
+      "sampleRateHz": 22050,
+      "sha256": "0ff9196ae440658f8c89653d1d7d9873c70186e4b6bdbcb503f7a40cc24ed9b2"
+    },
+    {
+      "id": "EXPENSE-025",
+      "file": "expense/expense-025.wav",
+      "durationSeconds": 3.355,
+      "sampleRateHz": 22050,
+      "sha256": "4d04d079d00cb96acecd8f52d8f311916bcaba64dd1f08d565a955fdb621fe2b"
+    },
+    {
+      "id": "EXPENSE-026",
+      "file": "expense/expense-026.wav",
+      "durationSeconds": 2.833,
+      "sampleRateHz": 22050,
+      "sha256": "714e834e0160bec9c208a146a9e2a3377fa0d3920391ec41e50644831bb58419"
+    },
+    {
+      "id": "EXPENSE-027",
+      "file": "expense/expense-027.wav",
+      "durationSeconds": 2.287,
+      "sampleRateHz": 22050,
+      "sha256": "165b27cd62d4177908184889e9ffdcc7aece0fbbb3b8b557f19f14c2a281cc98"
+    },
+    {
+      "id": "EXPENSE-028",
+      "file": "expense/expense-028.wav",
+      "durationSeconds": 2.995,
+      "sampleRateHz": 22050,
+      "sha256": "d95931b840619b25af31dfdd0c8cf97b47736a29928a7df3ac1c1fb9eb34f4f8"
+    },
+    {
+      "id": "EXPENSE-029",
+      "file": "expense/expense-029.wav",
+      "durationSeconds": 2.194,
+      "sampleRateHz": 22050,
+      "sha256": "ee5b5cf1c0515d9a3d5aa6fe8483eefa7960c31838b9133dd2004f2493a31e8e"
+    },
+    {
+      "id": "EXPENSE-030",
+      "file": "expense/expense-030.wav",
+      "durationSeconds": 3.042,
+      "sampleRateHz": 22050,
+      "sha256": "a035b2c558e41756043c0dd63ea2fcc03590b198aab0c912324a36e77eba669b"
+    },
+    {
+      "id": "EXPENSE-031",
+      "file": "expense/expense-031.wav",
+      "durationSeconds": 3.762,
+      "sampleRateHz": 22050,
+      "sha256": "26081deac7b71a7ad39402d19712a8a20e02b8f008862bbab1da229d2f17292e"
+    },
+    {
+      "id": "EXPENSE-032",
+      "file": "expense/expense-032.wav",
+      "durationSeconds": 3.541,
+      "sampleRateHz": 22050,
+      "sha256": "12385f9bc39332b879065e9ab3dada51ef2e8353ab89de4dac1e8f5fea18a474"
+    },
+    {
+      "id": "EXPENSE-033",
+      "file": "expense/expense-033.wav",
+      "durationSeconds": 3.123,
+      "sampleRateHz": 22050,
+      "sha256": "5253ffb69badfd80e14c1f4c5903d0d7ac1b9a61b627a2bda72a0450ff71b1ed"
+    },
+    {
+      "id": "EXPENSE-034",
+      "file": "expense/expense-034.wav",
+      "durationSeconds": 2.914,
+      "sampleRateHz": 22050,
+      "sha256": "6d6979c7e909a2778a9830c1c44449a98bec12f5fc880b4f423bffdab013d86b"
+    },
+    {
+      "id": "EXPENSE-035",
+      "file": "expense/expense-035.wav",
+      "durationSeconds": 3.019,
+      "sampleRateHz": 22050,
+      "sha256": "08dd448877c24ab34db6dae0e04edc0b25a767288bc49b31a3ecc36df7ce268c"
+    },
+    {
+      "id": "EXPENSE-036",
+      "file": "expense/expense-036.wav",
+      "durationSeconds": 3.495,
+      "sampleRateHz": 22050,
+      "sha256": "811c4eb01a0fade5591f599a349b7d9cd402d36b3fd4ec8192bfb73e93ca8d6d"
+    },
+    {
+      "id": "EXPENSE-037",
+      "file": "expense/expense-037.wav",
+      "durationSeconds": 2.937,
+      "sampleRateHz": 22050,
+      "sha256": "d7500f759ff99b56bb4cbafb80a5fd0cc2f8001f3247aa5bbcb5011120a46e7e"
+    },
+    {
+      "id": "EXPENSE-038",
+      "file": "expense/expense-038.wav",
+      "durationSeconds": 2.926,
+      "sampleRateHz": 22050,
+      "sha256": "5667680b41a5640e7c6f55a425ce8c1dbcd67f0ee9bcc029075559415e72a6ee"
+    },
+    {
+      "id": "EXPENSE-039",
+      "file": "expense/expense-039.wav",
+      "durationSeconds": 3.448,
+      "sampleRateHz": 22050,
+      "sha256": "5e1fdc9608ae5f6ba87f35fe0ef2033f644119e82cbda5f9edd660f7edb2f18a"
+    },
+    {
+      "id": "EXPENSE-040",
+      "file": "expense/expense-040.wav",
+      "durationSeconds": 2.937,
+      "sampleRateHz": 22050,
+      "sha256": "324430c3b4f3d378bbb529bfe77d403481ae5120fa7d752ff27050d859714719"
+    },
+    {
+      "id": "EXPENSE-041",
+      "file": "expense/expense-041.wav",
+      "durationSeconds": 3.332,
+      "sampleRateHz": 22050,
+      "sha256": "47a3c376730079d63224dc275e413ba050edf7aeb09c6e26332dfcd7ec5a4070"
+    },
+    {
+      "id": "EXPENSE-042",
+      "file": "expense/expense-042.wav",
+      "durationSeconds": 3.193,
+      "sampleRateHz": 22050,
+      "sha256": "a8a92ca5893b78555642d7f5e87d3901a97c430e2a737c002be4219400dc5008"
+    },
+    {
+      "id": "EXPENSE-043",
+      "file": "expense/expense-043.wav",
+      "durationSeconds": 3.135,
+      "sampleRateHz": 22050,
+      "sha256": "c7efba8400de407a0592b991e2e5475f9f38a8962dafab7a0dddd2ce8164343a"
+    },
+    {
+      "id": "EXPENSE-044",
+      "file": "expense/expense-044.wav",
+      "durationSeconds": 3.065,
+      "sampleRateHz": 22050,
+      "sha256": "59bf3e263bb1fee01728bcfad175f746e3b949488a510e16a9136f5ab6af9ddb"
+    },
+    {
+      "id": "EXPENSE-045",
+      "file": "expense/expense-045.wav",
+      "durationSeconds": 2.589,
+      "sampleRateHz": 22050,
+      "sha256": "0db5e759074ef6fb1917307cc46642a62fe94253a7f750b6bfc3c282f378d0c5"
+    },
+    {
+      "id": "EXPENSE-046",
+      "file": "expense/expense-046.wav",
+      "durationSeconds": 3.553,
+      "sampleRateHz": 22050,
+      "sha256": "f6e5f5bac30c89b0808807f2f322b5445fee533062d9f153ecec85ef4c66ee8d"
+    },
+    {
+      "id": "EXPENSE-047",
+      "file": "expense/expense-047.wav",
+      "durationSeconds": 3.924,
+      "sampleRateHz": 22050,
+      "sha256": "85b520c36ab506250b03df7adc8f4a6b6ab9d47a40f013f5719a52ecaf7fc05b"
+    },
+    {
+      "id": "EXPENSE-048",
+      "file": "expense/expense-048.wav",
+      "durationSeconds": 3.379,
+      "sampleRateHz": 22050,
+      "sha256": "a27848d3d2b3d266366473dc04af68bd75fabb4ffc2858cbc05e5f4727f61d7f"
+    },
+    {
+      "id": "EXPENSE-049",
+      "file": "expense/expense-049.wav",
+      "durationSeconds": 3.506,
+      "sampleRateHz": 22050,
+      "sha256": "6fcea38a7df7dbd181564fc83ee48398bf6d951719411fa94ae34eea36fd86dc"
+    },
+    {
+      "id": "EXPENSE-050",
+      "file": "expense/expense-050.wav",
+      "durationSeconds": 3.587,
+      "sampleRateHz": 22050,
+      "sha256": "adfdc648e8d33d6ce4b093ac12cb6aee111d9b505554eb8f0073da12b27a6fb7"
+    },
+    {
+      "id": "INVALID-001",
+      "file": "invalid/invalid-001.wav",
+      "durationSeconds": 2.322,
+      "sampleRateHz": 22050,
+      "sha256": "bf6de18399a4c447cc26a2eaf30f31a8a97860e511a82c549fa854eb35cae98c"
+    },
+    {
+      "id": "INVALID-002",
+      "file": "invalid/invalid-002.wav",
+      "durationSeconds": 1.289,
+      "sampleRateHz": 22050,
+      "sha256": "115b51b1bda5b71f1b51bd3d1ef70b15bc8a424df78adea83d9885fcb2c799d0"
+    },
+    {
+      "id": "INVALID-003",
+      "file": "invalid/invalid-003.wav",
+      "durationSeconds": 1.683,
+      "sampleRateHz": 22050,
+      "sha256": "2bda5d9b38ce100ca299921de3c76812e2e1b5142fff552be7b4ac51f855c111"
+    },
+    {
+      "id": "INVALID-004",
+      "file": "invalid/invalid-004.wav",
+      "durationSeconds": 1.962,
+      "sampleRateHz": 22050,
+      "sha256": "678ca77f79c5dd00bded40a77a61959c261979de7ca59d80a3876f8d38e9246a"
+    },
+    {
+      "id": "INVALID-005",
+      "file": "invalid/invalid-005.wav",
+      "durationSeconds": 2.136,
+      "sampleRateHz": 22050,
+      "sha256": "d56dd75217cd1732d3e9ea5af3abe31a9ae7d2103ff65222379d3e3c4c6a2469"
+    },
+    {
+      "id": "INVALID-006",
+      "file": "invalid/invalid-006.wav",
+      "durationSeconds": 1.73,
+      "sampleRateHz": 22050,
+      "sha256": "9c10033770b54793285cca1b9c095de3d91efecf70c00b7ca01bc98f3a5ff0a1"
+    },
+    {
+      "id": "INVALID-007",
+      "file": "invalid/invalid-007.wav",
+      "durationSeconds": 1.451,
+      "sampleRateHz": 22050,
+      "sha256": "49f8ec79ef9c0d26b8652a7b17e1c0cca2930bd798599c5a366464fab6e7cfde"
+    },
+    {
+      "id": "INVALID-008",
+      "file": "invalid/invalid-008.wav",
+      "durationSeconds": 1.625,
+      "sampleRateHz": 22050,
+      "sha256": "b3099b1b98ade057843fe8764cdd1c19bb04d1943a3255d6433b6a39c6ba7947"
+    },
+    {
+      "id": "INVALID-009",
+      "file": "invalid/invalid-009.wav",
+      "durationSeconds": 1.916,
+      "sampleRateHz": 22050,
+      "sha256": "f4f51ef32633dd41c9598ca76ea53ef3f1a1f30d3e382cb969e3a8aa869a01dc"
+    },
+    {
+      "id": "INVALID-010",
+      "file": "invalid/invalid-010.wav",
+      "durationSeconds": 2.31,
+      "sampleRateHz": 22050,
+      "sha256": "b2a29cd8655ee0b762933c65059f2f09e826332195bae6ac1f5f24ac172bc8c0"
+    },
+    {
+      "id": "INVALID-011",
+      "file": "invalid/invalid-011.wav",
+      "durationSeconds": 1.776,
+      "sampleRateHz": 22050,
+      "sha256": "4f89d3216c067c2ba9eea53d5efc359988effe9166227b202904d0e902fe291b"
+    },
+    {
+      "id": "INVALID-012",
+      "file": "invalid/invalid-012.wav",
+      "durationSeconds": 2.206,
+      "sampleRateHz": 22050,
+      "sha256": "0db1e21c18b3641120d414787952c3d8e543f7a0704decbc8354f29bf170944f"
+    },
+    {
+      "id": "INVALID-013",
+      "file": "invalid/invalid-013.wav",
+      "durationSeconds": 1.927,
+      "sampleRateHz": 22050,
+      "sha256": "79e4c39bc07a130c94a0355d3f6d2db867fe6be07cefa19f477ffdbec89cfbc1"
+    },
+    {
+      "id": "INVALID-014",
+      "file": "invalid/invalid-014.wav",
+      "durationSeconds": 2.206,
+      "sampleRateHz": 22050,
+      "sha256": "54592f391c5712d1357505c442dd331bdcd42b5fa1ea166b7f88c62ebf7700ed"
+    },
+    {
+      "id": "INVALID-015",
+      "file": "invalid/invalid-015.wav",
+      "durationSeconds": 2.183,
+      "sampleRateHz": 22050,
+      "sha256": "8a4575b6840a4f2cd7c1b1b53bff36400549359b734727d79d6db6d796818a14"
+    },
+    {
+      "id": "INVALID-016",
+      "file": "invalid/invalid-016.wav",
+      "durationSeconds": 1.741,
+      "sampleRateHz": 22050,
+      "sha256": "8b1da9b13113e4b04b76a1986aff920b9cc0212f2cbc9c95c17924dc0dfe7bf2"
+    },
+    {
+      "id": "INVALID-017",
+      "file": "invalid/invalid-017.wav",
+      "durationSeconds": 2.334,
+      "sampleRateHz": 22050,
+      "sha256": "d15bcc2d0c18abb1974d7b79556f1b3fef7aa26624f7d2dbc92ae7a69a7a8b8b"
+    },
+    {
+      "id": "INVALID-018",
+      "file": "invalid/invalid-018.wav",
+      "durationSeconds": 1.602,
+      "sampleRateHz": 22050,
+      "sha256": "7c32f5ba16817c9f800d1eded3e4868032cc034464952f9b04793cb149458da8"
+    },
+    {
+      "id": "INVALID-019",
+      "file": "invalid/invalid-019.wav",
+      "durationSeconds": 2.473,
+      "sampleRateHz": 22050,
+      "sha256": "8d38273a837b720cf753475f620181f85cdc190ee4fd02a952bafc56b53b67bc"
+    },
+    {
+      "id": "INVALID-020",
+      "file": "invalid/invalid-020.wav",
+      "durationSeconds": 2.183,
+      "sampleRateHz": 22050,
+      "sha256": "74d639a50454140bf7c03010b9c39b365c185449c2ecb44821c51fc182a52d14"
+    },
+    {
+      "id": "INCOMPLETE-001",
+      "file": "incomplete/incomplete-001.wav",
+      "durationSeconds": 1.544,
+      "sampleRateHz": 22050,
+      "sha256": "e11e526fb8992a6c4b7747473d6189ad4e79cd38cc064f6a142143d4269b0f1b"
+    },
+    {
+      "id": "INCOMPLETE-002",
+      "file": "incomplete/incomplete-002.wav",
+      "durationSeconds": 0.964,
+      "sampleRateHz": 22050,
+      "sha256": "cbe3765dd812158c2e82efbff041aed854a823d55550836b9d23ff4c2094c149"
+    },
+    {
+      "id": "INCOMPLETE-003",
+      "file": "incomplete/incomplete-003.wav",
+      "durationSeconds": 1.347,
+      "sampleRateHz": 22050,
+      "sha256": "0b908b9bc085ef420ed55614e604cd53fb1ab812287f23a5e3c4055a323db3d0"
+    },
+    {
+      "id": "INCOMPLETE-004",
+      "file": "incomplete/incomplete-004.wav",
+      "durationSeconds": 1.324,
+      "sampleRateHz": 22050,
+      "sha256": "41dac45ff31fd4ae08f74693656986cbd3fd0bd8929676d2000a30e32ad99c95"
+    },
+    {
+      "id": "INCOMPLETE-005",
+      "file": "incomplete/incomplete-005.wav",
+      "durationSeconds": 1.834,
+      "sampleRateHz": 22050,
+      "sha256": "b8d0662abe539ebef748564822496179b154f6c6356004914b55fb343ffd5907"
+    },
+    {
+      "id": "INCOMPLETE-006",
+      "file": "incomplete/incomplete-006.wav",
+      "durationSeconds": 1.486,
+      "sampleRateHz": 22050,
+      "sha256": "43398ec634006dfbd7d4d0a8cb76afef679a045d41f0c009155c4339b2de99df"
+    },
+    {
+      "id": "INCOMPLETE-007",
+      "file": "incomplete/incomplete-007.wav",
+      "durationSeconds": 1.66,
+      "sampleRateHz": 22050,
+      "sha256": "9d4bfc365008df36edd6f6e5fa181c57dc4aef832b098ab5c31b5c4f98ae3c2a"
+    },
+    {
+      "id": "INCOMPLETE-008",
+      "file": "incomplete/incomplete-008.wav",
+      "durationSeconds": 1.707,
+      "sampleRateHz": 22050,
+      "sha256": "50e9ea015c860ff986984fe8e007d4b0ec05888ae20d086d37a6c3afaf65d616"
+    },
+    {
+      "id": "INCOMPLETE-009",
+      "file": "incomplete/incomplete-009.wav",
+      "durationSeconds": 1.533,
+      "sampleRateHz": 22050,
+      "sha256": "a9d2a3bef72b5651b24f9a8dfd01833421e927cca5fea498351c011d5b3a708f"
+    },
+    {
+      "id": "INCOMPLETE-010",
+      "file": "incomplete/incomplete-010.wav",
+      "durationSeconds": 1.498,
+      "sampleRateHz": 22050,
+      "sha256": "f3e73938080b2f7faeff9280af97584573f80a32b2897a590e53a6d059109244"
+    },
+    {
+      "id": "INCOMPLETE-011",
+      "file": "incomplete/incomplete-011.wav",
+      "durationSeconds": 1.486,
+      "sampleRateHz": 22050,
+      "sha256": "b0d522e6a7e46979bf18e7ee4df5dc2a09e77dbf2f0b1d5a83883d7fe17483a0"
+    },
+    {
+      "id": "INCOMPLETE-012",
+      "file": "incomplete/incomplete-012.wav",
+      "durationSeconds": 1.707,
+      "sampleRateHz": 22050,
+      "sha256": "fd3d2421be18894589137987e6d1b34f57f7b600fc930b5febee38e82d19202e"
+    },
+    {
+      "id": "INCOMPLETE-013",
+      "file": "incomplete/incomplete-013.wav",
+      "durationSeconds": 1.358,
+      "sampleRateHz": 22050,
+      "sha256": "2b38466e0b8fba2fd41a1383e80c82a9c58786106c6a99c0538589d8e198cbc9"
+    },
+    {
+      "id": "INCOMPLETE-014",
+      "file": "incomplete/incomplete-014.wav",
+      "durationSeconds": 1.115,
+      "sampleRateHz": 22050,
+      "sha256": "d566e4a8d0df9b9965cc06a17a1010ab03b2c07108d34b4efecc3405a7a70f53"
+    },
+    {
+      "id": "INCOMPLETE-015",
+      "file": "incomplete/incomplete-015.wav",
+      "durationSeconds": 1.44,
+      "sampleRateHz": 22050,
+      "sha256": "9d9b908abe27530961e37dde3cab2a3a7bd2384cfae07f822c97491a4030a29e"
+    },
+    {
+      "id": "INCOMPLETE-016",
+      "file": "incomplete/incomplete-016.wav",
+      "durationSeconds": 1.474,
+      "sampleRateHz": 22050,
+      "sha256": "2d1925e696e55611d1dc8f2ec04572f78a235124df248a5090362299a6de77e2"
+    },
+    {
+      "id": "INCOMPLETE-017",
+      "file": "incomplete/incomplete-017.wav",
+      "durationSeconds": 1.881,
+      "sampleRateHz": 22050,
+      "sha256": "f2029e3fae36b6e4d37a2bbf9587b73936cc23c496c2a134be204c0d97550999"
+    },
+    {
+      "id": "INCOMPLETE-018",
+      "file": "incomplete/incomplete-018.wav",
+      "durationSeconds": 1.602,
+      "sampleRateHz": 22050,
+      "sha256": "06b6ed6908968de8d2e987c770d08ae3e9d8686b655d46e3d2d3647e1363b595"
+    },
+    {
+      "id": "INCOMPLETE-019",
+      "file": "incomplete/incomplete-019.wav",
+      "durationSeconds": 1.672,
+      "sampleRateHz": 22050,
+      "sha256": "b7201da9fb062e90d82a3d19203e3c5f0f6acbc7a0d17f713be41ec8d1ebcc8f"
+    },
+    {
+      "id": "INCOMPLETE-020",
+      "file": "incomplete/incomplete-020.wav",
+      "durationSeconds": 1.103,
+      "sampleRateHz": 22050,
+      "sha256": "c250f979270229262555967bf8a4595dee30084f43a0ff5cf9e4ade7a1380914"
+    },
+    {
+      "id": "INCOMPLETE-021",
+      "file": "incomplete/incomplete-021.wav",
+      "durationSeconds": 2.171,
+      "sampleRateHz": 22050,
+      "sha256": "3be7ee53afcce150271b221d99219f82d1dcd70a1bca54c0e17136a883f79202"
+    },
+    {
+      "id": "INCOMPLETE-022",
+      "file": "incomplete/incomplete-022.wav",
+      "durationSeconds": 1.741,
+      "sampleRateHz": 22050,
+      "sha256": "24a8192a4cebb16874bd3a3443dd3e9a34b4e3c5fb8edfea8715fa935afd2667"
+    },
+    {
+      "id": "INCOMPLETE-023",
+      "file": "incomplete/incomplete-023.wav",
+      "durationSeconds": 1.242,
+      "sampleRateHz": 22050,
+      "sha256": "e7d70ded4181c7d08d11385c337343030e6740cc0c5ac8cf7666c1fbcfe0851d"
+    },
+    {
+      "id": "INCOMPLETE-024",
+      "file": "incomplete/incomplete-024.wav",
+      "durationSeconds": 1.416,
+      "sampleRateHz": 22050,
+      "sha256": "464e3a6f9dce7e9b77e4c799b9156f9d7a1089004eebd35b9b709bd0f08ad2b7"
+    },
+    {
+      "id": "INCOMPLETE-025",
+      "file": "incomplete/incomplete-025.wav",
+      "durationSeconds": 1.625,
+      "sampleRateHz": 22050,
+      "sha256": "3b1b52112a887151c2b41ec478e3b6ed614a58ea16b70af0c92f4eda353f6021"
+    },
+    {
+      "id": "INCOMPLETE-026",
+      "file": "incomplete/incomplete-026.wav",
+      "durationSeconds": 1.765,
+      "sampleRateHz": 22050,
+      "sha256": "cc86d5f8b29116ec6ea70d6c6ea44d1971330a3953f9def84114b8e61e2afd59"
+    },
+    {
+      "id": "INCOMPLETE-027",
+      "file": "incomplete/incomplete-027.wav",
+      "durationSeconds": 2.345,
+      "sampleRateHz": 22050,
+      "sha256": "3fad1dffc4848b10a9894d11f82b45c4a363061e3ee9d12afce2a05c02cd1742"
+    },
+    {
+      "id": "INCOMPLETE-028",
+      "file": "incomplete/incomplete-028.wav",
+      "durationSeconds": 1.451,
+      "sampleRateHz": 22050,
+      "sha256": "073ae751610e77757aa8875529292f83e7737d11db80650478257a3cf7b893d1"
+    },
+    {
+      "id": "INCOMPLETE-029",
+      "file": "incomplete/incomplete-029.wav",
+      "durationSeconds": 1.741,
+      "sampleRateHz": 22050,
+      "sha256": "bab7b95900d81d00a2d87f3f73c2459575e3f2096cad80008bb113a3ff1f7ef2"
+    },
+    {
+      "id": "INCOMPLETE-030",
+      "file": "incomplete/incomplete-030.wav",
+      "durationSeconds": 1.44,
+      "sampleRateHz": 22050,
+      "sha256": "32a17972987e3d11815cd046d300e1086d9a653dd975ecd3684e62ca3437d892"
+    }
+  ]
+}
