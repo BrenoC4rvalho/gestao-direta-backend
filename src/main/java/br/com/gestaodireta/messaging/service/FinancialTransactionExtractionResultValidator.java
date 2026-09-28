@@ -39,6 +39,7 @@ public class FinancialTransactionExtractionResultValidator {
                     "pagar",
                     "gastei",
                     "gastar",
+                    "gasto",
                     "comprei",
                     "comprar",
                     "comprado",
@@ -62,7 +63,8 @@ public class FinancialTransactionExtractionResultValidator {
                     "entrou",
                     "faturamento",
                     "pagamento",
-                    "recebido");
+                    "recebido",
+                    "recebimento");
     private static final Set<String> GENERIC_DESCRIPTION_WORDS =
             Set.of(
                     "movimentacao",

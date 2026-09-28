@@ -142,6 +142,48 @@ class FinancialExtractionResultValidatorTest {
                 .isTrue();
     }
 
+    @Test
+    void shouldAcceptReceiptAsIncomeSignal() {
+        FinancialTransactionExtractionResult result =
+                new FinancialTransactionExtractionResult(
+                        true,
+                        TransactionType.INCOME,
+                        new BigDecimal("1250.00"),
+                        null,
+                        "Venda de café",
+                        null,
+                        new BigDecimal("0.95"),
+                        List.of("transactionDate"));
+
+        assertThat(
+                        validator
+                                .validate(
+                                        "Recebimento por transferência de R$ 1250 pelo café.",
+                                        result)
+                                .valid())
+                .isTrue();
+    }
+
+    @Test
+    void shouldAcceptSpentMoneyAsExpenseSignal() {
+        FinancialTransactionExtractionResult result =
+                new FinancialTransactionExtractionResult(
+                        true,
+                        TransactionType.EXPENSE,
+                        new BigDecimal("850.00"),
+                        null,
+                        "Conserto do trator",
+                        null,
+                        new BigDecimal("0.95"),
+                        List.of("transactionDate"));
+
+        assertThat(
+                        validator
+                                .validate("Dinheiro gasto: R$ 850 com conserto do trator.", result)
+                                .valid())
+                .isTrue();
+    }
+
     private FinancialTransactionExtractionResult result(
             BigDecimal amount, BigDecimal confidence, List<String> missingFields) {
         return new FinancialTransactionExtractionResult(

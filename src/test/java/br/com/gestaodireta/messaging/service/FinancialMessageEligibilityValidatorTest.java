@@ -19,6 +19,9 @@ class FinancialMessageEligibilityValidatorTest {
                         "paguei 300 no diesel",
                         "recebi 2000 pela soja",
                         "entrou 1500 da venda do gado",
+                        "caiu 1250 na conta com a venda de bezerros",
+                        "pix de 850 para pagar energia",
+                        "transferência de 500 para manutenção da bomba",
                         "gastei 90 com combustível",
                         "foi 400 de manutenção no trator")) {
             assertThat(validator.isEligible(text)).as(text).isTrue();

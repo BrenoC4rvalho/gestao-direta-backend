@@ -38,7 +38,12 @@ class AiBenchmarkReportWriterTest {
         JsonNode summaryJson = configuredObjectMapper().readTree(Files.readString(summary));
         assertThat(summaryJson.path("gemini").path("total").asInt()).isEqualTo(1);
         assertThat(Files.readString(csv)).contains("ENTRY-01", "1250.00");
-        assertThat(Files.readString(html)).contains("BENCHMARK IA — MOVIMENTAÇÕES", "ENTRY-01");
+        assertThat(Files.readString(html))
+                .contains(
+                        "BENCHMARK IA — MOVIMENTAÇÕES",
+                        "ENTRY-01",
+                        "table-layout:fixed",
+                        "overflow-wrap:anywhere");
     }
 
     private AiBenchmarkCaseResult resultWithTransactionDate() {

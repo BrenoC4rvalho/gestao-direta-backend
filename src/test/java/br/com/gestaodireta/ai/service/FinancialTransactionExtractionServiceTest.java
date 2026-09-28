@@ -125,6 +125,27 @@ class FinancialTransactionExtractionServiceTest {
         assertTrue(!request.get().prompt().contains("R$1000,00"));
     }
 
+    @Test
+    void shouldDescribeOptionalTransactionDateAsValidFinancialExtraction() {
+        AtomicReference<AiGenerationRequest> request = new AtomicReference<>();
+        FinancialTransactionExtractionService service =
+                serviceWith(
+                        """
+                        {"status":"VALID","isFinancialTransaction":true,"type":"EXPENSE","amount":500,
+                        "transactionDate":null,"description":"Compra de sementes","categoryName":null,"confidence":0.95,"missingFields":["transactionDate"]}
+                        """,
+                        request);
+
+        service.extract("Paguei R$ 500 de sementes.", "Boa Vista", java.util.List.of());
+
+        assertTrue(
+                request.get()
+                        .prompt()
+                        .contains(
+                                "Use VALID quando houver exatamente uma operação com type, amount e description presentes"));
+        assertTrue(request.get().prompt().contains("transactionDate e categoryName são opcionais"));
+    }
+
     private void assertStructuredResponse(String text, String response, String description) {
         AtomicReference<AiGenerationRequest> request = new AtomicReference<>();
         FinancialTransactionExtractionService service = serviceWith(response, request);

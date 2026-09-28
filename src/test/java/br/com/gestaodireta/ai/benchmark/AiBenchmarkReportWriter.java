@@ -108,7 +108,7 @@ final class AiBenchmarkReportWriter {
         String rows = results.stream().map(this::row).collect(Collectors.joining());
         return """
                 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Benchmark IA</title>
-                <style>body{font:14px system-ui;margin:2rem;color:#1f2937}table{border-collapse:collapse;width:100%%}th,td{padding:.5rem;border:1px solid #d1d5db;text-align:left}th{background:#f3f4f6}.critical{background:#fee2e2}.filters button{margin-right:.5rem}</style>
+                <style>body{font:14px system-ui;margin:2rem;color:#1f2937}table{border-collapse:collapse;table-layout:fixed;width:100%%}th,td{min-width:0;overflow-wrap:anywhere;padding:.5rem;border:1px solid #d1d5db;text-align:left;word-break:break-word}th{background:#f3f4f6}.critical{background:#fee2e2}.filters button{margin-right:.5rem}</style>
                 </head><body><h1>BENCHMARK IA — MOVIMENTAÇÕES</h1>%s<h2>COMPARAÇÃO</h2><table><thead><tr><th>Provider</th><th>Completas</th><th>Incompletas</th><th>Inválidas</th><th>Hallucinations</th></tr></thead><tbody>%s</tbody></table>
                 <h2>Casos</h2><div class="filters"><button onclick="filter('')">Todos</button><button onclick="filter('ENTRY')">ENTRY</button><button onclick="filter('EXIT')">EXIT</button><button onclick="filter('INVALID')">INVALID</button><button onclick="filter('INCOMPLETE')">INCOMPLETE</button><button onclick="filter('SECURITY')">SECURITY</button><button onclick="filter('CRITICAL')">Críticos</button></div>
                 <table><thead><tr><th>ID</th><th>Provider</th><th>Grupo</th><th>Texto</th><th>Resultado</th><th>Tempo</th><th>Motivo</th></tr></thead><tbody id="cases">%s</tbody></table>

@@ -24,7 +24,7 @@ public class FinancialMessageEvidenceExtractor {
                     "(?<!\\d)(\\d{1,3}(?:\\.\\d{3})+,\\d{1,2}|\\d+,\\d{1,2})(?!\\d|[.,]\\d)");
     private static final Pattern CONTEXTUAL_AMOUNT =
             Pattern.compile(
-                    "(?:por|paguei|pagou|recebi|recebeu|entrou|entrada(?:\\s+de)?|gastei|gastou|custou|foi|valor\\s+de)\\s*"
+                    "(?:por|paguei|pagou|recebi|recebeu|entrou|entrada(?:\\s+de)?|gastei|gastou|custou|foi|caiu|creditado|pix(?:\\s+de)?|transferencia(?:\\s+de)?|recebimento(?:\\s+de)?|valor\\s+de)\\s*"
                             + NUMBER,
                     Pattern.CASE_INSENSITIVE);
     private static final Pattern CONTEXTUAL_THOUSAND =
