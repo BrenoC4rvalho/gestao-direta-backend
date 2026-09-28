@@ -450,6 +450,27 @@ Para gerar o artefato e executar a suíte de testes:
 ./mvnw verify
 ```
 
+### Benchmark de áudio por IA
+
+O benchmark usa os fixtures OGG/Opus em `audios/audio`, o transcritor real e a
+mesma extração e validação financeira do fluxo produtivo. Não chama Telegram e
+não persiste pendências ou movimentações. Gere os fixtures uma vez, localmente,
+com Piper e ffmpeg (`python audios/generate_dataset.py`), então execute:
+
+```bash
+./mvnw test -Pai-audio-benchmark \
+  -Dai.audio.benchmark.provider=ollama \
+  -Dai.audio.benchmark.limit=5
+```
+
+Use `gemini` ou `both` para a extração. O provider/modelo de transcrição é
+registrado separadamente. `-Dai.audio.benchmark.resume=true` reaproveita os IDs já
+gravados em `target/ai-audio-benchmark/results.jsonl`. Os relatórios incluem
+WER, CER, acerto de valor transcrito, extração e resultado ponta a ponta.
+
+O dataset TTS sintético é apropriado para repetibilidade e regressão, mas não
+representa sotaques, ruído, hesitações, celular ou fala rural real.
+
 Para gerar o pacote da aplicação:
 
 ```bash

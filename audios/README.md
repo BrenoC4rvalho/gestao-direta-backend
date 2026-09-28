@@ -1,6 +1,7 @@
 # Benchmark de áudio do Gestão Direta
 
-Contém 150 arquivos WAV em pt-BR, manifesto, inventário e relatório de validação.
+Contém 150 WAV mestre em pt-BR, manifesto, inventário e relatório de validação.
+O gerador produz as fixtures OGG/Opus correspondentes para o benchmark.
 
 Gerado com Piper TTS, voz `pt_BR-faber-medium`, modelo de `rhasspy/piper-voices`. A voz não é incluída no ZIP para reduzir tamanho; os áudios prontos estão incluídos.
 
@@ -14,4 +15,4 @@ curl -L -o model/pt_BR-faber-medium.onnx.json https://huggingface.co/rhasspy/pip
 python generate_dataset.py
 ```
 
-O script preserva arquivos existentes por padrão. Use `--force` para substituir. O formato WAV mestre foi escolhido para permitir decodificação direta e conversão posterior para OGG/Opus caso a aplicação exija o formato recebido pelo Telegram.
+O script exige `piper-tts` e `ffmpeg`, preserva arquivos existentes por padrão e gera OGG/Opus com `libopus` para reproduzir o formato recebido do Telegram. Use `--force` para substituir. O benchmark nunca chama TTS.

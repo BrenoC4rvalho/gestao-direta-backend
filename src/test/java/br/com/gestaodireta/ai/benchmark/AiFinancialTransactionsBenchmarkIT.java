@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,6 +57,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers
+@Tag("ai-text-benchmark")
 class AiFinancialTransactionsBenchmarkIT {
     private static final Logger LOGGER =
             LoggerFactory.getLogger(AiFinancialTransactionsBenchmarkIT.class);
