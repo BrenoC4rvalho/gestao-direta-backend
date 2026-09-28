@@ -103,6 +103,29 @@ class FinancialExtractionResultValidatorTest {
     }
 
     @Test
+    void shouldRejectTwoDistinctBrazilianCurrencyAmounts() {
+        FinancialTransactionExtractionResult result =
+                new FinancialTransactionExtractionResult(
+                        true,
+                        TransactionType.EXPENSE,
+                        new BigDecimal("700.00"),
+                        null,
+                        "Sementes",
+                        null,
+                        new BigDecimal("0.95"),
+                        List.of());
+
+        assertThat(
+                        validator
+                                .validate(
+                                        "Comprei R$700,00 de semente e R$500,00 de adubo.", result)
+                                .reason())
+                .isEqualTo(
+                        FinancialTransactionExtractionResultValidator.RejectionReason
+                                .MULTIPLE_TRANSACTIONS);
+    }
+
+    @Test
     void shouldAcceptPhysicalQuantityWithOneMonetaryValue() {
         FinancialTransactionExtractionResult result =
                 new FinancialTransactionExtractionResult(

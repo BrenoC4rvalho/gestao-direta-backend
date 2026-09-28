@@ -108,6 +108,23 @@ class FinancialTransactionExtractionServiceTest {
         assertEquals(512, request.get().maxOutputTokens());
     }
 
+    @Test
+    void shouldNormalizeCurrencyPrefixWithoutWhitespaceBeforeSendingToAi() {
+        AtomicReference<AiGenerationRequest> request = new AtomicReference<>();
+        FinancialTransactionExtractionService service =
+                serviceWith(
+                        """
+                        {"status":"VALID","isFinancialTransaction":true,"type":"EXPENSE","amount":1000,
+                        "transactionDate":null,"description":"Diesel","categoryName":null,"confidence":0.95,"missingFields":[]}
+                        """,
+                        request);
+
+        service.extract("Paguei R$1000,00 de diesel.", "Boa Vista", java.util.List.of());
+
+        assertTrue(request.get().prompt().contains("Paguei R$ 1000,00 de diesel."));
+        assertTrue(!request.get().prompt().contains("R$1000,00"));
+    }
+
     private void assertStructuredResponse(String text, String response, String description) {
         AtomicReference<AiGenerationRequest> request = new AtomicReference<>();
         FinancialTransactionExtractionService service = serviceWith(response, request);

@@ -352,7 +352,10 @@ class FinancialExtractionValidationTest {
                 Arguments.of("Recebi R$ 12.500,00 pela venda.", new BigDecimal("12500.00")),
                 Arguments.of("Recebi 12.500,00 pela venda.", new BigDecimal("12500.00")),
                 Arguments.of("Recebi 12500,00 pela venda.", new BigDecimal("12500.00")),
-                Arguments.of("Recebi 12500 pela venda.", new BigDecimal("12500.00")));
+                Arguments.of("Recebi 12500 pela venda.", new BigDecimal("12500.00")),
+                Arguments.of("Paguei R$1000,00 de diesel.", new BigDecimal("1000.00")),
+                Arguments.of("Paguei R$ 1000,00 de diesel.", new BigDecimal("1000.00")),
+                Arguments.of("Paguei R$999,99 de diesel.", new BigDecimal("999.99")));
     }
 
     private FinancialTransactionExtractionResult result(

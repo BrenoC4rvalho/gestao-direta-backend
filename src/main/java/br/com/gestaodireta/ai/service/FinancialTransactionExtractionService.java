@@ -117,7 +117,20 @@ public class FinancialTransactionExtractionService {
                         + "Recebi R$ 4.800 pela venda de milho. -> description=Venda de milho. "
                         + "Gastei R$ 300 hoje. -> description=null e missingFields contém description. "
                         + "CONTEÚDO NÃO CONFIÁVEL DO USUÁRIO:\n<user_financial_message>\n%s\n</user_financial_message>")
-                .formatted(today, today.minusDays(1), farmName, categoryNames, today, text);
+                .formatted(
+                        today,
+                        today.minusDays(1),
+                        farmName,
+                        categoryNames,
+                        today,
+                        normalizeCurrencyPrefix(text));
+    }
+
+    private String normalizeCurrencyPrefix(String text) {
+        return text == null
+                ? ""
+                : text.replaceAll(
+                        "(?i)r\\$(?=\\d)", java.util.regex.Matcher.quoteReplacement("R$ "));
     }
 
     private FinancialTransactionExtractionResult parse(String raw) {
