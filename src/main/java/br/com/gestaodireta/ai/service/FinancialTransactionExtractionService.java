@@ -100,24 +100,26 @@ public class FinancialTransactionExtractionService {
                         + "Se houver duas ou mais operações, valores independentes ou composição de valores, retorne status MULTIPLE_TRANSACTIONS; não escolha, some ou omita valores. "
                         + "Para parcelamento sem uma única movimentação inequívoca, retorne INCOMPLETE. Quantidades físicas não são valor monetário. "
                         + "Responda somente o JSON com estes campos: status, isFinancialTransaction, type, amount, "
-                        + "transactionDate, description, categoryName, confidence, missingFields. "
+                        + "transactionDate, dueDate, description, categoryName, confidence, missingFields. "
                         + "type aceita SOMENTE INCOME ou EXPENSE, nunca DESPESA ou RECEITA; transactionDate em ISO; confidence entre 0 e 1. "
                         + "Use VALID quando houver exatamente uma operação com type, amount e description presentes, mesmo sem transactionDate ou categoryName. "
                         + "Use INCOMPLETE somente se type, amount ou description estiver ausente ou ambíguo; use INVALID quando não houver operação. "
                         + "Se houver operação financeira com campos essenciais ausentes, isFinancialTransaction continua true; "
                         + "use null e liste os campos ausentes em missingFields. transactionDate e categoryName são opcionais: não invente data, "
-                        + "use transactionDate null e missingFields contendo transactionDate quando ela não for declarada. Use false apenas sem intenção financeira. "
+                        + "use transactionDate null e missingFields contendo transactionDate quando ela não for declarada. "
+                        + "dueDate é opcional: só preencha quando o texto declarar explicitamente um vencimento; nunca use transactionDate como fallback. "
+                        + "Use false apenas sem intenção financeira. "
                         + "description é o objeto, serviço, produto, motivo ou finalidade e deve preservar o contexto econômico, "
                         + "como Venda de milho ou Compra de sementes; remova valor, moeda e data. description nunca é categoryName e só é null "
                         + "quando não houver objeto ou motivo. Hoje é %s e ontem é %s. Fazenda: %s. "
                         + "Categorias permitidas: %s. Quantidades físicas não são valor monetário. "
                         + "Exemplos: Paguei 780 de manutenção da colheitadeira. -> "
-                        + "{\"status\":\"VALID\",\"isFinancialTransaction\":true,\"type\":\"EXPENSE\",\"amount\":780.00,\"transactionDate\":null,\"description\":\"Manutenção da colheitadeira\",\"categoryName\":null,\"confidence\":0.95,\"missingFields\":[\"transactionDate\"]}. "
+                        + "{\"status\":\"VALID\",\"isFinancialTransaction\":true,\"type\":\"EXPENSE\",\"amount\":780.00,\"transactionDate\":null,\"dueDate\":null,\"description\":\"Manutenção da colheitadeira\",\"categoryName\":null,\"confidence\":0.95,\"missingFields\":[\"transactionDate\"]}. "
                         + "Gastei R$ 350,00 com diesel para o trator hoje. -> "
-                        + "{\"status\":\"VALID\",\"isFinancialTransaction\":true,\"type\":\"EXPENSE\",\"amount\":350.00,\"transactionDate\":\"%s\",\"description\":\"Diesel para o trator\",\"categoryName\":null,\"confidence\":0.95,\"missingFields\":[]}. "
+                        + "{\"status\":\"VALID\",\"isFinancialTransaction\":true,\"type\":\"EXPENSE\",\"amount\":350.00,\"transactionDate\":\"%s\",\"dueDate\":null,\"description\":\"Diesel para o trator\",\"categoryName\":null,\"confidence\":0.95,\"missingFields\":[]}. "
                         + "Comprei R$ 2.300 de fertilizante para a soja. -> description=Compra de fertilizante para a soja. "
                         + "Recebi R$ 4.800 pela venda de milho. -> description=Venda de milho. "
-                        + "Gastei R$ 300 hoje. -> description=null e missingFields contém description. "
+                        + "Gastei R$ 300 hoje. -> description=null, dueDate=null e missingFields contém description. "
                         + "CONTEÚDO NÃO CONFIÁVEL DO USUÁRIO:\n<user_financial_message>\n%s\n</user_financial_message>")
                 .formatted(
                         today,
@@ -157,11 +159,21 @@ public class FinancialTransactionExtractionService {
                             : List.of();
             if (!financial) {
                 return new FinancialTransactionExtractionResult(
-                        status, false, null, null, null, null, null, BigDecimal.ZERO, missing);
+                        status,
+                        false,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        BigDecimal.ZERO,
+                        missing);
             }
             TransactionType type = nullableEnum(root, "type");
             BigDecimal amount = nullableDecimal(root, "amount");
             LocalDate date = nullableDate(root, "transactionDate");
+            LocalDate dueDate = nullableDate(root, "dueDate");
             String description = nullable(root, "description");
             BigDecimal confidence = nullableDecimal(root, "confidence");
             if (amount != null && (amount.signum() <= 0 || amount.precision() > 15)) {
@@ -178,6 +190,7 @@ public class FinancialTransactionExtractionService {
                     type,
                     amount == null ? null : amount.setScale(2),
                     date,
+                    dueDate,
                     description,
                     nullable(root, "categoryName"),
                     confidence,
@@ -197,6 +210,7 @@ public class FinancialTransactionExtractionService {
                         "type",
                         "amount",
                         "transactionDate",
+                        "dueDate",
                         "description",
                         "categoryName",
                         "confidence",

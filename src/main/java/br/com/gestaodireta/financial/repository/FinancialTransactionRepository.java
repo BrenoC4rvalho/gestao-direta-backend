@@ -460,6 +460,110 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
             """
             select transaction
             from FinancialTransaction transaction
+              where transaction.farm.id = :farmId
+              and transaction.recordStatus = br.com.gestaodireta.financial.enumeration.FinancialRecordStatus.ACTIVE
+              and (:filterCategoryIds = false or transaction.category.id in :categoryIds)
+              and (:harvestSeasonId is null or transaction.harvestSeason.id = :harvestSeasonId)
+              and (
+                (:segment = 'PAID_ON_TIME'
+                  and transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PAID
+                  and transaction.paidAt between :startDate and :endDate
+                  and transaction.paidAt <= transaction.dueDate)
+                or (:segment = 'PAID_LATE'
+                  and transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PAID
+                  and transaction.paidAt between :startDate and :endDate
+                  and transaction.paidAt > transaction.dueDate)
+                or (:segment = 'RECEIVED_ON_TIME'
+                  and transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME
+                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PAID
+                  and transaction.paidAt between :startDate and :endDate
+                  and transaction.paidAt <= transaction.dueDate)
+                or (:segment = 'RECEIVED_LATE'
+                  and transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME
+                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PAID
+                  and transaction.paidAt between :startDate and :endDate
+                  and transaction.paidAt > transaction.dueDate)
+                or (:segment = 'UNCLASSIFIABLE_EXPENSE'
+                  and transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PAID
+                  and transaction.paidAt between :startDate and :endDate
+                  and transaction.dueDate is null)
+                or (:segment = 'UNCLASSIFIABLE_RECEIVABLE'
+                  and transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME
+                  and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PAID
+                  and transaction.paidAt between :startDate and :endDate
+                  and transaction.dueDate is null)
+                or (:segment = 'OVERDUE_PAYABLE'
+                  and transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+                  and transaction.status in (
+                    br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING,
+                    br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE)
+                  and transaction.dueDate < :today)
+                or (:segment = 'OVERDUE_RECEIVABLE'
+                  and transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME
+                  and transaction.status in (
+                    br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING,
+                    br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE)
+                  and transaction.dueDate < :today)
+                or (:segment = 'UPCOMING_PAYABLE'
+                  and transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.EXPENSE
+                  and transaction.status in (
+                    br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING,
+                    br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE)
+                  and transaction.dueDate between :today and :next7Days)
+                or (:segment = 'UPCOMING_RECEIVABLE'
+                  and transaction.type = br.com.gestaodireta.financial.enumeration.TransactionType.INCOME
+                  and transaction.status in (
+                    br.com.gestaodireta.financial.enumeration.PaymentStatus.PENDING,
+                    br.com.gestaodireta.financial.enumeration.PaymentStatus.OVERDUE)
+                  and transaction.dueDate between :today and :next7Days)
+              )
+            order by transaction.dueDate asc, transaction.id asc
+            """)
+    Page<FinancialTransaction> findCommitmentSegment(
+            @Param("farmId") Long farmId,
+            @Param("segment") String segment,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("today") LocalDate today,
+            @Param("next7Days") LocalDate next7Days,
+            @Param("filterCategoryIds") boolean filterCategoryIds,
+            @Param("categoryIds") Collection<Long> categoryIds,
+            @Param("harvestSeasonId") Long harvestSeasonId,
+            Pageable pageable);
+
+    @EntityGraph(attributePaths = {"farm", "category", "harvestSeason"})
+    @Query(
+            """
+            select transaction
+            from FinancialTransaction transaction
+            where transaction.farm.id = :farmId
+              and transaction.recordStatus = br.com.gestaodireta.financial.enumeration.FinancialRecordStatus.ACTIVE
+              and transaction.type = :type
+              and transaction.status = br.com.gestaodireta.financial.enumeration.PaymentStatus.PAID
+              and transaction.paidAt between :startDate and :endDate
+              and transaction.dueDate is null
+              and (:filterCategoryIds = false or transaction.category.id in :categoryIds)
+              and (:harvestSeasonId is null or transaction.harvestSeason.id = :harvestSeasonId)
+            order by transaction.paidAt desc, transaction.id desc
+            """)
+    Page<FinancialTransaction> findUnclassifiableCommitmentSegment(
+            @Param("farmId") Long farmId,
+            @Param("type") TransactionType type,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("filterCategoryIds") boolean filterCategoryIds,
+            @Param("categoryIds") Collection<Long> categoryIds,
+            @Param("harvestSeasonId") Long harvestSeasonId,
+            Pageable pageable);
+
+    @EntityGraph(attributePaths = {"farm", "category", "harvestSeason"})
+    @Query(
+            """
+            select transaction
+            from FinancialTransaction transaction
             where transaction.farm.id = :farmId
               and transaction.recordStatus = br.com.gestaodireta.financial.enumeration.FinancialRecordStatus.ACTIVE
               and transaction.status in (

@@ -128,7 +128,7 @@ public class PendingFinancialTransactionService {
                         approval.status(),
                         pending.getPaymentMethod(),
                         pending.getTransactionDate(),
-                        approval.dueDate(),
+                        approval.dueDate() == null ? pending.getDueDate() : approval.dueDate(),
                         paidAt(approval, pending),
                         pending.getNotes(),
                         pending.getFarm().getId(),
@@ -233,10 +233,6 @@ public class PendingFinancialTransactionService {
     private void validateApproval(ApprovePendingFinancialTransactionRequest approval) {
         if (approval.status() != PaymentStatus.PAID && approval.status() != PaymentStatus.PENDING) {
             throw new BusinessException("Only paid or pending approval statuses are allowed");
-        }
-
-        if (approval.status() == PaymentStatus.PAID && approval.dueDate() != null) {
-            throw new BusinessException("Due date must be null for a paid approval");
         }
 
         if (approval.status() == PaymentStatus.PENDING && approval.dueDate() == null) {

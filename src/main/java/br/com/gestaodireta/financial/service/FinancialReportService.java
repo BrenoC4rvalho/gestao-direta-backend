@@ -18,6 +18,7 @@ import br.com.gestaodireta.financial.dto.FinancialLiquidityIndicatorsResponse;
 import br.com.gestaodireta.financial.dto.FinancialPlanningIndicatorsResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportCategoryIndicatorResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportCommitmentsResponse;
+import br.com.gestaodireta.financial.dto.FinancialCommitmentStatusResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportComparisonMetricResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportComparisonResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportFilter;
@@ -181,6 +182,14 @@ public class FinancialReportService {
                         normalizedFilter),
                 indicators(performanceEvolution, categories, harvests),
                 unallocated);
+    }
+
+    @Transactional(readOnly = true)
+    public FinancialCommitmentStatusResponse commitmentStatus(FinancialReportFilter filter) {
+        ValidatedFilter validatedFilter = validateAndNormalize(filter);
+        LocalDate today = LocalDate.now(clock);
+        return financialReportRepository.summarizeCommitmentStatus(
+                validatedFilter.filter(), today);
     }
 
     private FinancialReportComparisonResponse comparison(

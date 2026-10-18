@@ -7,6 +7,7 @@ import br.com.gestaodireta.farm.entity.Farm;
 import br.com.gestaodireta.farm.enumeration.FarmStatus;
 import br.com.gestaodireta.farm.repository.FarmRepository;
 import br.com.gestaodireta.financial.dto.FinancialReportFilter;
+import br.com.gestaodireta.financial.dto.FinancialCommitmentStatusResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportTransactionResponse;
 import br.com.gestaodireta.financial.entity.FinancialCategory;
@@ -82,6 +83,119 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
         financialCategoryRepository.deleteAll();
         farmRepository.deleteAll();
         userRepository.deleteAll();
+    }
+
+    @Test
+    void shouldClassifyCommitmentsAndUseTheInclusiveUpcomingWindow() {
+        Farm farm = saveFarm();
+        User user = saveUser();
+
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                new BigDecimal("100.00"),
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 10),
+                LocalDate.of(2026, 8, 10));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                new BigDecimal("80.00"),
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 5),
+                LocalDate.of(2026, 8, 6));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                new BigDecimal("120.00"),
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 15),
+                LocalDate.of(2026, 8, 14));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                new BigDecimal("60.00"),
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 15),
+                LocalDate.of(2026, 8, 16));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                new BigDecimal("30.00"),
+                LocalDate.of(2026, 8, 1),
+                null,
+                LocalDate.of(2026, 8, 12));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PAID,
+                new BigDecimal("45.00"),
+                LocalDate.of(2026, 8, 1),
+                null,
+                LocalDate.of(2026, 8, 13));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PENDING,
+                new BigDecimal("50.00"),
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 29),
+                null);
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PENDING,
+                new BigDecimal("70.00"),
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 9, 6),
+                null);
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PENDING,
+                new BigDecimal("40.00"),
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 9, 6),
+                null);
+
+        FinancialCommitmentStatusResponse result =
+                financialReportService.commitmentStatus(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 8, 1),
+                                LocalDate.of(2026, 8, 31),
+                                FinancialReportBasis.CASH,
+                                null,
+                                null));
+
+        assertThat(result.history().expensesOnTime()).isEqualTo(1);
+        assertThat(result.history().expensesLate()).isEqualTo(1);
+        assertThat(result.history().incomesOnTime()).isEqualTo(1);
+        assertThat(result.history().incomesLate()).isEqualTo(1);
+        assertThat(result.history().expenseOnTimeRate()).isEqualByComparingTo("50.00");
+        assertThat(result.history().incomeOnTimeRate()).isEqualByComparingTo("50.00");
+        assertThat(result.history().unclassifiableExpenses()).isEqualTo(1);
+        assertThat(result.history().unclassifiableIncomes()).isEqualTo(1);
+        assertThat(result.current().overduePayables().count()).isEqualTo(1);
+        assertThat(result.current().overduePayables().amount()).isEqualByComparingTo("50.00");
+        assertThat(result.upcoming().receivables().count()).isEqualTo(1);
+        assertThat(result.upcoming().receivables().amount()).isEqualByComparingTo("70.00");
+        assertThat(result.upcoming().payables().count()).isEqualTo(1);
+        assertThat(result.upcoming().payables().amount()).isEqualByComparingTo("40.00");
     }
 
     @Test

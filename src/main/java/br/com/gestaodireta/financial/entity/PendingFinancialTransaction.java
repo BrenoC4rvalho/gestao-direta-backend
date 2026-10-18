@@ -58,6 +58,9 @@ public class PendingFinancialTransaction extends BaseEntity {
     @Column(name = "transaction_date")
     private LocalDate transactionDate;
 
+    @Column(name = "due_date")
+    private LocalDate dueDate;
+
     @Column(length = 160)
     private String description;
 
@@ -184,6 +187,14 @@ public class PendingFinancialTransaction extends BaseEntity {
 
     public void setTransactionDate(LocalDate value) {
         transactionDate = value;
+    }
+
+    public LocalDate getDueDate() {
+        return dueDate;
+    }
+
+    public void setDueDate(LocalDate value) {
+        dueDate = value;
     }
 
     public String getDescription() {

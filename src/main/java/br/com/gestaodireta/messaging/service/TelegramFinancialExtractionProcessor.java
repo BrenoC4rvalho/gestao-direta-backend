@@ -160,6 +160,7 @@ public class TelegramFinancialExtractionProcessor {
             pending.setType(result.type());
             pending.setAmount(result.amount());
             pending.setTransactionDate(result.transactionDate());
+            pending.setDueDate(result.dueDate());
             pending.setDescription(result.description());
             pending.setMissingFields(String.join(",", missingFields(result)));
             pending.setSuggestedCategory(resolveCategory(categories, result));

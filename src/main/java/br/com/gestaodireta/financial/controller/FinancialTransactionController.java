@@ -1,6 +1,7 @@
 package br.com.gestaodireta.financial.controller;
 
 import br.com.gestaodireta.financial.dto.FinancialTransactionExportFile;
+import br.com.gestaodireta.financial.dto.FinancialCommitmentTransactionsRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionFilterRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionResponse;
@@ -8,6 +9,7 @@ import br.com.gestaodireta.financial.dto.FinancialTransactionUpdateRequest;
 import br.com.gestaodireta.financial.dto.MonthlyFinancialSummaryResponse;
 import br.com.gestaodireta.financial.dto.PayTransactionRequest;
 import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
+import br.com.gestaodireta.financial.enumeration.FinancialCommitmentSegment;
 import br.com.gestaodireta.financial.enumeration.FinancialReportBasis;
 import br.com.gestaodireta.financial.enumeration.PaymentMethod;
 import br.com.gestaodireta.financial.enumeration.PaymentStatus;
@@ -105,6 +107,22 @@ public class FinancialTransactionController {
                         basis);
 
         return financialTransactionService.findAll(filterRequest, paginationParams);
+    }
+
+    @GetMapping("/commitments")
+    @PreAuthorize("@financialAccess.canViewFinancialData(#farmId)")
+    public PageResponse<FinancialTransactionResponse> findCommitments(
+            @RequestParam Long farmId,
+            @RequestParam FinancialCommitmentSegment segment,
+            @RequestParam(required = false) LocalDate startDate,
+            @RequestParam(required = false) LocalDate endDate,
+            @RequestParam(required = false) List<Long> categoryIds,
+            @RequestParam(required = false) Long harvestSeasonId,
+            @Valid @ModelAttribute PaginationParams paginationParams) {
+        return financialTransactionService.findCommitments(
+                new FinancialCommitmentTransactionsRequest(
+                        farmId, segment, startDate, endDate, categoryIds, harvestSeasonId),
+                paginationParams);
     }
 
     @GetMapping("/monthly-summary")

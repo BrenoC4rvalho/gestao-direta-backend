@@ -16,6 +16,7 @@ public record PendingFinancialTransactionResponse(
         TransactionType type,
         BigDecimal amount,
         LocalDate transactionDate,
+        LocalDate dueDate,
         String description,
         List<String> missingFields,
         Long categoryId,

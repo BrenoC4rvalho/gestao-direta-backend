@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import br.com.gestaodireta.ai.config.FinancialExtractionProperties;
 import br.com.gestaodireta.ai.service.FinancialTransactionExtractionService;
 import br.com.gestaodireta.ai.service.dto.FinancialTransactionExtractionResult;
+import br.com.gestaodireta.ai.service.dto.FinancialTransactionExtractionStatus;
 import br.com.gestaodireta.farm.entity.Farm;
 import br.com.gestaodireta.farm.enumeration.FarmUserRole;
 import br.com.gestaodireta.farm.repository.FarmUserRepository;
@@ -155,6 +156,34 @@ class TelegramPendingFinancialTransactionTest {
         assertThat(pending.getValue().getAmount()).isEqualByComparingTo("4800.00");
         assertThat(pending.getValue().getDescription()).isEqualTo("Venda de milho");
         assertThat(pending.getValue().getTransactionDate()).isEqualTo(LocalDate.of(2026, 8, 23));
+    }
+
+    @Test
+    void shouldPreserveDueDateExtractedFromTelegram() {
+        Fixture fixture = fixture();
+        configureExtraction(
+                fixture,
+                new FinancialTransactionExtractionResult(
+                        FinancialTransactionExtractionStatus.VALID,
+                        true,
+                        TransactionType.EXPENSE,
+                        new BigDecimal("780.00"),
+                        LocalDate.of(2026, 8, 23),
+                        LocalDate.of(2026, 8, 30),
+                        "Manutenção da colheitadeira",
+                        "Manutenção",
+                        new BigDecimal("0.95"),
+                        List.of()));
+
+        fixture.processor.process(
+                fixture.account,
+                fixture.conversation,
+                message("Paguei 780 com vencimento em 30/08/2026 pela manutenção."));
+
+        ArgumentCaptor<PendingFinancialTransaction> pending =
+                ArgumentCaptor.forClass(PendingFinancialTransaction.class);
+        verify(fixture.pendingRepository).save(pending.capture());
+        assertThat(pending.getValue().getDueDate()).isEqualTo(LocalDate.of(2026, 8, 30));
     }
 
     @Test

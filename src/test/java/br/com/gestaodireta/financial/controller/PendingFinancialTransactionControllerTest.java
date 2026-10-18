@@ -138,15 +138,7 @@ class PendingFinancialTransactionControllerTest extends PostgresIntegrationTest 
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
-                                        "{\"status\":\"PAID\",\"paidAt\":null,\"dueDate\":\"2026-07-30\"}"))
-                .andExpect(status().isBadRequest());
-        mockMvc.perform(
-                        post(path)
-                                .contextPath("/api")
-                                .with(user(String.valueOf(fixture.reviewer.getId())).roles("ADMIN"))
-                                .with(csrf())
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"status\":\"PAID\",\"paidAt\":null,\"dueDate\":null}"))
+                                        "{\"status\":\"PAID\",\"paidAt\":\"2026-07-21\",\"dueDate\":\"2026-07-30\"}"))
                 .andExpect(status().isOk());
         mockMvc.perform(
                         post(path)

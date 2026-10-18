@@ -11,10 +11,34 @@ public record FinancialTransactionExtractionResult(
         TransactionType type,
         BigDecimal amount,
         LocalDate transactionDate,
+        LocalDate dueDate,
         String description,
         String categoryName,
         BigDecimal confidence,
-        List<String> missingFields) {
+    List<String> missingFields) {
+
+    public FinancialTransactionExtractionResult(
+            FinancialTransactionExtractionStatus status,
+            boolean isFinancialTransaction,
+            TransactionType type,
+            BigDecimal amount,
+            LocalDate transactionDate,
+            String description,
+            String categoryName,
+            BigDecimal confidence,
+            List<String> missingFields) {
+        this(
+                status,
+                isFinancialTransaction,
+                type,
+                amount,
+                transactionDate,
+                null,
+                description,
+                categoryName,
+                confidence,
+                missingFields);
+    }
 
     public FinancialTransactionExtractionResult(
             boolean isFinancialTransaction,
@@ -33,6 +57,7 @@ public record FinancialTransactionExtractionResult(
                 type,
                 amount,
                 transactionDate,
+                null,
                 description,
                 categoryName,
                 confidence,

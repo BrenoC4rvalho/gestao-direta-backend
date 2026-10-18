@@ -8,12 +8,14 @@ import br.com.gestaodireta.farm.enumeration.FarmStatus;
 import br.com.gestaodireta.farm.repository.FarmRepository;
 import br.com.gestaodireta.farm.repository.FarmUserRepository;
 import br.com.gestaodireta.financial.dto.FinancialTransactionFilterRequest;
+import br.com.gestaodireta.financial.dto.FinancialCommitmentTransactionsRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionResponse;
 import br.com.gestaodireta.financial.dto.FinancialTransactionUpdateRequest;
 import br.com.gestaodireta.financial.entity.FinancialCategory;
 import br.com.gestaodireta.financial.entity.FinancialTransaction;
 import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
+import br.com.gestaodireta.financial.enumeration.FinancialCommitmentSegment;
 import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
 import br.com.gestaodireta.financial.enumeration.PaymentMethod;
 import br.com.gestaodireta.financial.enumeration.PaymentStatus;
@@ -30,6 +32,7 @@ import br.com.gestaodireta.shared.exception.BusinessException;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
 import br.com.gestaodireta.shared.exception.ValidationException;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
+import br.com.gestaodireta.shared.response.PageResponse;
 import br.com.gestaodireta.support.PostgresIntegrationTest;
 import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.enumeration.UserStatus;
@@ -56,6 +59,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 @SpringBootTest
 class FinancialTransactionServiceTest extends PostgresIntegrationTest {
+
+    private static final LocalDate TODAY = LocalDate.of(2026, 6, 29);
 
     @Autowired private FinancialTransactionService financialTransactionService;
 
@@ -85,6 +90,68 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
         farmUserRepository.deleteAll();
         farmRepository.deleteAll();
         userRepository.deleteAll();
+    }
+
+    @Test
+    void shouldListCommitmentsUsingTheSameSegmentPredicateAsTheReport() {
+        Farm farm = saveFarm("Commitments Farm", FarmStatus.ACTIVE);
+        User user = saveUser("Commitments User", "commitments@example.com", UserType.ADMIN);
+        saveTransaction(
+                farm,
+                null,
+                user,
+                "Paid on time",
+                new BigDecimal("25.00"),
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                PaymentMethod.PIX,
+                TODAY.minusDays(10),
+                TODAY.minusDays(6),
+                FinancialRecordStatus.ACTIVE);
+
+        PageResponse<FinancialTransactionResponse> result =
+                financialTransactionService.findCommitments(
+                        new FinancialCommitmentTransactionsRequest(
+                                farm.getId(),
+                                FinancialCommitmentSegment.PAID_ON_TIME,
+                                TODAY.minusDays(20),
+                                TODAY,
+                                null,
+                                null),
+                        new PaginationParams());
+
+        assertThat(result.totalElements()).isEqualTo(1);
+        assertThat(result.content()).extracting(FinancialTransactionResponse::description)
+                .containsExactly("Paid on time");
+
+        FinancialTransaction missingDueDate =
+                saveTransaction(
+                        farm,
+                        user,
+                        TransactionType.EXPENSE,
+                        PaymentStatus.PAID,
+                        FinancialRecordStatus.ACTIVE,
+                        null);
+        missingDueDate.setDescription("Missing due date");
+        missingDueDate.setPaidAt(TODAY.minusDays(10));
+        missingDueDate.setDueDate(null);
+        financialTransactionRepository.save(missingDueDate);
+        financialTransactionRepository.flush();
+        PageResponse<FinancialTransactionResponse> unclassifiable =
+                financialTransactionService.findCommitments(
+                        new FinancialCommitmentTransactionsRequest(
+                                farm.getId(),
+                                FinancialCommitmentSegment.UNCLASSIFIABLE_EXPENSE,
+                                TODAY.minusDays(20),
+                                TODAY,
+                                null,
+                                null),
+                        new PaginationParams());
+
+        assertThat(unclassifiable.totalElements()).isEqualTo(1);
+        assertThat(unclassifiable.content())
+                .extracting(FinancialTransactionResponse::description)
+                .containsExactly("Missing due date");
     }
 
     @Test

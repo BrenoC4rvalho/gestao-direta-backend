@@ -16,6 +16,7 @@ public class PendingFinancialTransactionMapper {
                 pending.getType(),
                 pending.getAmount(),
                 pending.getTransactionDate(),
+                pending.getDueDate(),
                 pending.getDescription(),
                 missingFields(pending),
                 pending.getSuggestedCategory() == null

@@ -1,6 +1,7 @@
 package br.com.gestaodireta.financial.controller;
 
 import br.com.gestaodireta.financial.dto.FinancialReportExportFile;
+import br.com.gestaodireta.financial.dto.FinancialCommitmentStatusResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportFilter;
 import br.com.gestaodireta.financial.dto.FinancialReportResponse;
 import br.com.gestaodireta.financial.dto.FinancialReportTransactionResponse;
@@ -103,5 +104,24 @@ public class FinancialReportController {
                 size,
                 sort,
                 direction);
+    }
+
+    @GetMapping("/commitment-status")
+    @PreAuthorize("@financialAccess.canViewFinancialDataOrMissingFarm(#farmId)")
+    public FinancialCommitmentStatusResponse commitmentStatus(
+            @RequestParam Long farmId,
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate,
+            @RequestParam FinancialReportBasis basis,
+            @RequestParam(required = false) List<Long> harvestSeasonIds,
+            @RequestParam(required = false) List<Long> categoryIds) {
+        return financialReportService.commitmentStatus(
+                new FinancialReportFilter(
+                        farmId,
+                        startDate,
+                        endDate,
+                        basis,
+                        harvestSeasonIds,
+                        categoryIds));
     }
 }

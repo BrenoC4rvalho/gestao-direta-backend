@@ -46,6 +46,12 @@ public class FinancialExtractionResponseSchema {
                                         "The BRL monetary amount, never a physical quantity."),
                         "transactionDate",
                                 Map.of("type", List.of("string", "null"), "format", "date"),
+                        "dueDate",
+                                Map.of(
+                                        "type", List.of("string", "null"),
+                                        "format", "date",
+                                        "description",
+                                        "The explicitly declared payment or receipt due date; never infer it."),
                         "description",
                                 Map.of(
                                         "type",
@@ -63,6 +69,7 @@ public class FinancialExtractionResponseSchema {
                         "type",
                         "amount",
                         "transactionDate",
+                        "dueDate",
                         "description",
                         "categoryName",
                         "confidence",

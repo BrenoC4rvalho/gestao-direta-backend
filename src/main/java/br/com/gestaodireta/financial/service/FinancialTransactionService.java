@@ -4,6 +4,7 @@ import br.com.gestaodireta.farm.entity.Farm;
 import br.com.gestaodireta.farm.enumeration.FarmStatus;
 import br.com.gestaodireta.farm.service.FarmService;
 import br.com.gestaodireta.financial.dto.FinancialTransactionFilterRequest;
+import br.com.gestaodireta.financial.dto.FinancialCommitmentTransactionsRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionResponse;
 import br.com.gestaodireta.financial.dto.FinancialTransactionUpdateRequest;
@@ -13,6 +14,7 @@ import br.com.gestaodireta.financial.entity.FinancialCategory;
 import br.com.gestaodireta.financial.entity.FinancialTransaction;
 import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
 import br.com.gestaodireta.financial.enumeration.FinancialRecordStatus;
+import br.com.gestaodireta.financial.enumeration.FinancialCommitmentSegment;
 import br.com.gestaodireta.financial.enumeration.FinancialReportBasis;
 import br.com.gestaodireta.financial.enumeration.PaymentMethod;
 import br.com.gestaodireta.financial.enumeration.PaymentStatus;
@@ -142,6 +144,66 @@ public class FinancialTransactionService {
                                 paginationParams.toPageable())
                         .map(financialTransactionMapper::toResponse);
 
+        return PageResponse.from(transactions);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<FinancialTransactionResponse> findCommitments(
+            FinancialCommitmentTransactionsRequest request, PaginationParams paginationParams) {
+        if (request == null || request.farmId() == null || request.segment() == null) {
+            throw new ValidationException("Farm and commitment segment are required");
+        }
+        if (isHistorical(request.segment())
+                && (request.startDate() == null || request.endDate() == null)) {
+            throw new ValidationException("Historical commitment period is required");
+        }
+        if (request.startDate() != null
+                && request.endDate() != null
+                && request.startDate().isAfter(request.endDate())) {
+            throw new ValidationException("Commitment start date cannot be after end date");
+        }
+
+        Farm farm = farmService.findEntityById(request.farmId());
+        List<Long> categoryIds = normalizeIds(request.categoryIds());
+        if (categoryIds != null) {
+            financialCategoryService.ensureCategoriesBelongToFarm(categoryIds, farm.getId());
+        }
+        if (request.harvestSeasonId() != null) {
+            ensureHarvestSeasonBelongsToFarm(
+                    findHarvestSeasonById(request.harvestSeasonId()), farm);
+        }
+
+        LocalDate today = LocalDate.now(clock);
+        Page<FinancialTransaction> page;
+        if (request.segment() == FinancialCommitmentSegment.UNCLASSIFIABLE_EXPENSE
+                || request.segment() == FinancialCommitmentSegment.UNCLASSIFIABLE_RECEIVABLE) {
+            page =
+                    financialTransactionRepository.findUnclassifiableCommitmentSegment(
+                            request.farmId(),
+                            request.segment() == FinancialCommitmentSegment.UNCLASSIFIABLE_EXPENSE
+                                    ? TransactionType.EXPENSE
+                                    : TransactionType.INCOME,
+                            request.startDate(),
+                            request.endDate(),
+                            categoryIds != null,
+                            categoryIds == null ? List.of(-1L) : categoryIds,
+                            request.harvestSeasonId(),
+                            paginationParams.toPageable());
+        } else {
+            page =
+                    financialTransactionRepository.findCommitmentSegment(
+                            request.farmId(),
+                            request.segment().name(),
+                            request.startDate() == null ? MIN_FILTER_DATE : request.startDate(),
+                            request.endDate() == null ? MAX_FILTER_DATE : request.endDate(),
+                            today,
+                            today.plusDays(7),
+                            categoryIds != null,
+                            categoryIds == null ? List.of(-1L) : categoryIds,
+                            request.harvestSeasonId(),
+                            paginationParams.toPageable());
+        }
+        Page<FinancialTransactionResponse> transactions = page.map(financialTransactionMapper::toResponse);
         return PageResponse.from(transactions);
     }
 
@@ -358,6 +420,23 @@ public class FinancialTransactionService {
         if (amount != null && amount.compareTo(BigDecimal.ZERO) < 0) {
             throw new ValidationException(message);
         }
+    }
+
+    private boolean isHistorical(FinancialCommitmentSegment segment) {
+        return segment == FinancialCommitmentSegment.PAID_ON_TIME
+                || segment == FinancialCommitmentSegment.PAID_LATE
+                || segment == FinancialCommitmentSegment.RECEIVED_ON_TIME
+                || segment == FinancialCommitmentSegment.RECEIVED_LATE
+                || segment == FinancialCommitmentSegment.UNCLASSIFIABLE_EXPENSE
+                || segment == FinancialCommitmentSegment.UNCLASSIFIABLE_RECEIVABLE;
+    }
+
+    private List<Long> normalizeIds(List<Long> ids) {
+        if (ids == null) {
+            return null;
+        }
+        List<Long> normalized = ids.stream().filter(Objects::nonNull).distinct().toList();
+        return normalized.isEmpty() ? null : normalized;
     }
 
     private boolean hasCategoryIds(FinancialTransactionFilterRequest filterRequest) {
