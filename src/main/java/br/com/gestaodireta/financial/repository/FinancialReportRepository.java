@@ -228,21 +228,21 @@ public class FinancialReportRepository {
                   count(case when type = 'INCOME' and status = 'PAID'
                     and paid_at between :startDate and :endDate and due_date is null then 1 end) as unclassifiable_incomes,
                   count(case when type = 'EXPENSE' and status in ('PENDING', 'OVERDUE')
-                    and due_date < :today then 1 end) as overdue_payable_count,
+                    and due_date is not null and due_date < :today then 1 end) as overdue_payable_count,
                   coalesce(sum(case when type = 'EXPENSE' and status in ('PENDING', 'OVERDUE')
-                    and due_date < :today then amount else 0 end), 0) as overdue_payable_amount,
+                    and due_date is not null and due_date < :today then amount else 0 end), 0) as overdue_payable_amount,
                   count(case when type = 'INCOME' and status in ('PENDING', 'OVERDUE')
-                    and due_date < :today then 1 end) as overdue_receivable_count,
+                    and due_date is not null and due_date < :today then 1 end) as overdue_receivable_count,
                   coalesce(sum(case when type = 'INCOME' and status in ('PENDING', 'OVERDUE')
-                    and due_date < :today then amount else 0 end), 0) as overdue_receivable_amount,
+                    and due_date is not null and due_date < :today then amount else 0 end), 0) as overdue_receivable_amount,
                   count(case when type = 'EXPENSE' and status in ('PENDING', 'OVERDUE')
-                    and due_date between :today and :next7Days then 1 end) as upcoming_payable_count,
+                    and due_date is not null and due_date between :today and :next7Days then 1 end) as upcoming_payable_count,
                   coalesce(sum(case when type = 'EXPENSE' and status in ('PENDING', 'OVERDUE')
-                    and due_date between :today and :next7Days then amount else 0 end), 0) as upcoming_payable_amount,
+                    and due_date is not null and due_date between :today and :next7Days then amount else 0 end), 0) as upcoming_payable_amount,
                   count(case when type = 'INCOME' and status in ('PENDING', 'OVERDUE')
-                    and due_date between :today and :next7Days then 1 end) as upcoming_receivable_count,
+                    and due_date is not null and due_date between :today and :next7Days then 1 end) as upcoming_receivable_count,
                   coalesce(sum(case when type = 'INCOME' and status in ('PENDING', 'OVERDUE')
-                    and due_date between :today and :next7Days then amount else 0 end), 0) as upcoming_receivable_amount
+                    and due_date is not null and due_date between :today and :next7Days then amount else 0 end), 0) as upcoming_receivable_amount
                 from financial_transactions
                 where farm_id = :farmId
                   and record_status = 'ACTIVE'
@@ -262,14 +262,16 @@ public class FinancialReportRepository {
                     long expensesLate = resultSet.getLong("expenses_late");
                     long incomesOnTime = resultSet.getLong("incomes_on_time");
                     long incomesLate = resultSet.getLong("incomes_late");
+                    long overduePayableCount = resultSet.getLong("overdue_payable_count");
+                    long overdueReceivableCount = resultSet.getLong("overdue_receivable_count");
                     return new FinancialCommitmentStatusResponse(
                             new FinancialCommitmentHistoryResponse(
                                     expensesOnTime,
                                     expensesLate,
                                     incomesOnTime,
                                     incomesLate,
-                                    rate(expensesOnTime, expensesLate),
-                                    rate(incomesOnTime, incomesLate),
+                                    rate(expensesOnTime, expensesLate, overduePayableCount),
+                                    rate(incomesOnTime, incomesLate, overdueReceivableCount),
                                     resultSet.getLong("unclassifiable_expenses"),
                                     resultSet.getLong("unclassifiable_incomes")),
                             new FinancialCommitmentCurrentResponse(
@@ -290,8 +292,8 @@ public class FinancialReportRepository {
                 resultSet.getLong(countColumn), decimal(resultSet.getBigDecimal(amountColumn)));
     }
 
-    private BigDecimal rate(long onTime, long late) {
-        long total = onTime + late;
+    private BigDecimal rate(long onTime, long late, long overdueOpen) {
+        long total = onTime + late + overdueOpen;
         if (total == 0) {
             return null;
         }

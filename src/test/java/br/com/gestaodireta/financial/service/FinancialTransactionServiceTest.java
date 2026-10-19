@@ -12,6 +12,7 @@ import br.com.gestaodireta.financial.dto.FinancialCommitmentTransactionsRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionRequest;
 import br.com.gestaodireta.financial.dto.FinancialTransactionResponse;
 import br.com.gestaodireta.financial.dto.FinancialTransactionUpdateRequest;
+import br.com.gestaodireta.financial.dto.PayTransactionRequest;
 import br.com.gestaodireta.financial.entity.FinancialCategory;
 import br.com.gestaodireta.financial.entity.FinancialTransaction;
 import br.com.gestaodireta.financial.enumeration.FinancialCategoryStatus;
@@ -166,6 +167,73 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
         assertThat(response.createdByUserId()).isEqualTo(admin.getId());
         assertThat(response.recordStatus()).isEqualTo(FinancialRecordStatus.ACTIVE);
         assertThat(response.status()).isEqualTo(PaymentStatus.PENDING);
+    }
+
+    @Test
+    void shouldRequirePaidAtWhenCreatingOrUpdatingPaidTransaction() {
+        User admin = saveUser("Admin", "paid-date@example.com", UserType.ADMIN);
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        authenticateAs(admin, "ROLE_ADMIN");
+
+        FinancialTransactionRequest createRequest =
+                new FinancialTransactionRequest(
+                        "Pagamento sem data",
+                        BigDecimal.TEN,
+                        TransactionType.EXPENSE,
+                        PaymentStatus.PAID,
+                        PaymentMethod.PIX,
+                        TODAY,
+                        TODAY.plusDays(5),
+                        null,
+                        null,
+                        farm.getId(),
+                        null,
+                        null);
+
+        assertThatThrownBy(() -> financialTransactionService.create(createRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Paid date is required for paid transactions");
+
+        FinancialTransaction transaction =
+                saveTransaction(farm, null, admin, TransactionType.EXPENSE);
+        FinancialTransactionUpdateRequest updateRequest =
+                new FinancialTransactionUpdateRequest(
+                        "Atualização sem data",
+                        BigDecimal.TEN,
+                        TransactionType.EXPENSE,
+                        PaymentStatus.PAID,
+                        PaymentMethod.PIX,
+                        TODAY,
+                        TODAY.plusDays(5),
+                        null,
+                        null,
+                        null,
+                        null);
+
+        assertThatThrownBy(
+                        () ->
+                                financialTransactionService.update(
+                                        transaction.getId(), updateRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Paid date is required for paid transactions");
+    }
+
+    @Test
+    void shouldPreserveDueDateWhenMarkingTransactionAsPaid() {
+        User admin = saveUser("Admin", "pay-preserve-due@example.com", UserType.ADMIN);
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        FinancialTransaction transaction =
+                saveTransaction(farm, null, admin, TransactionType.EXPENSE);
+        LocalDate dueDate = transaction.getDueDate();
+        authenticateAs(admin, "ROLE_ADMIN");
+
+        FinancialTransactionResponse response =
+                financialTransactionService.pay(
+                        transaction.getId(), new PayTransactionRequest(TODAY, PaymentMethod.PIX));
+
+        assertThat(response.status()).isEqualTo(PaymentStatus.PAID);
+        assertThat(response.paidAt()).isEqualTo(TODAY);
+        assertThat(response.dueDate()).isEqualTo(dueDate);
     }
 
     @Test

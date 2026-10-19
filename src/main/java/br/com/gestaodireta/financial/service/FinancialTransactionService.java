@@ -92,12 +92,14 @@ public class FinancialTransactionService {
         FinancialCategory category = resolveCategory(request.categoryId(), farm, request.type());
         HarvestSeason harvestSeason = resolveHarvestSeasonForWrite(request.harvestSeasonId(), farm);
         User currentUser = getCurrentUser();
+        PaymentStatus status = request.status() == null ? PaymentStatus.PENDING : request.status();
 
         FinancialTransaction transaction = new FinancialTransaction();
         transaction.setFarm(farm);
         transaction.setCreatedByUser(currentUser);
         transaction.setRecordStatus(FinancialRecordStatus.ACTIVE);
-        transaction.setStatus(request.status() == null ? PaymentStatus.PENDING : request.status());
+        transaction.setStatus(status);
+        validateSettlementDates(status, request.paidAt());
         applyRequest(transaction, request, category, harvestSeason);
 
         return financialTransactionMapper.toResponse(
@@ -292,6 +294,7 @@ public class FinancialTransactionService {
                 resolveHarvestSeasonForWrite(request.harvestSeasonId(), transaction.getFarm());
         transaction.setUpdatedByUser(getCurrentUser());
         transaction.setStatus(request.status());
+        validateSettlementDates(request.status(), request.paidAt());
         applyRequest(transaction, request, category, harvestSeason);
 
         return financialTransactionMapper.toResponse(
@@ -310,7 +313,8 @@ public class FinancialTransactionService {
     public FinancialTransactionResponse pay(Long id, PayTransactionRequest request) {
         FinancialTransaction transaction = findEntityById(id);
         transaction.setStatus(PaymentStatus.PAID);
-        transaction.setPaidAt(request.paidAt() == null ? LocalDate.now() : request.paidAt());
+        transaction.setPaidAt(
+                request.paidAt() == null ? LocalDate.now(clock) : request.paidAt());
         transaction.setPaymentMethod(request.paymentMethod());
         transaction.setUpdatedByUser(getCurrentUser());
 
@@ -577,6 +581,16 @@ public class FinancialTransactionService {
         transaction.setNotes(request.notes());
         transaction.setCategory(category);
         transaction.setHarvestSeason(harvestSeason);
+    }
+
+    private void validateSettlementDates(PaymentStatus status, LocalDate paidAt) {
+        if (status == PaymentStatus.PAID && paidAt == null) {
+            throw new BusinessException("Paid date is required for paid transactions");
+        }
+
+        if (status != PaymentStatus.PAID && paidAt != null) {
+            throw new BusinessException("Paid date can only be set for paid transactions");
+        }
     }
 
     private FinancialCategory resolveCategory(

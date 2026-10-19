@@ -42,6 +42,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -186,7 +187,7 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
         assertThat(result.history().expensesLate()).isEqualTo(1);
         assertThat(result.history().incomesOnTime()).isEqualTo(1);
         assertThat(result.history().incomesLate()).isEqualTo(1);
-        assertThat(result.history().expenseOnTimeRate()).isEqualByComparingTo("50.00");
+        assertThat(result.history().expenseOnTimeRate()).isEqualByComparingTo("33.33");
         assertThat(result.history().incomeOnTimeRate()).isEqualByComparingTo("50.00");
         assertThat(result.history().unclassifiableExpenses()).isEqualTo(1);
         assertThat(result.history().unclassifiableIncomes()).isEqualTo(1);
@@ -196,6 +197,157 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
         assertThat(result.upcoming().receivables().amount()).isEqualByComparingTo("70.00");
         assertThat(result.upcoming().payables().count()).isEqualTo(1);
         assertThat(result.upcoming().payables().amount()).isEqualByComparingTo("40.00");
+    }
+
+    @Test
+    void shouldReturnZeroRateWhenOnlyOverdueOpenCommitmentsExist() {
+        Farm farm = saveFarm();
+        User user = saveUser();
+
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PENDING,
+                new BigDecimal("100.00"),
+                TODAY,
+                TODAY.minusDays(1),
+                null);
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.OVERDUE,
+                new BigDecimal("75.00"),
+                TODAY,
+                TODAY.minusDays(1),
+                null);
+
+        FinancialCommitmentStatusResponse result =
+                financialReportService.commitmentStatus(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                TODAY.minusMonths(1),
+                                TODAY,
+                                FinancialReportBasis.CASH,
+                                null,
+                                null));
+
+        assertThat(result.history().expensesOnTime()).isZero();
+        assertThat(result.history().expensesLate()).isZero();
+        assertThat(result.history().incomesOnTime()).isZero();
+        assertThat(result.history().incomesLate()).isZero();
+        assertThat(result.history().expenseOnTimeRate()).isEqualByComparingTo("0.00");
+        assertThat(result.history().incomeOnTimeRate()).isEqualByComparingTo("0.00");
+        assertThat(result.current().overduePayables().count()).isEqualTo(1);
+        assertThat(result.current().overdueReceivables().count()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldKeepCurrentAndUpcomingIndependentFromHistoricalPeriod() {
+        Farm farm = saveFarm();
+        User user = saveUser();
+
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                new BigDecimal("100.00"),
+                LocalDate.of(2025, 6, 1),
+                LocalDate.of(2025, 6, 10),
+                LocalDate.of(2025, 6, 10));
+        saveTransaction(
+                farm,
+                user,
+                TransactionType.INCOME,
+                PaymentStatus.PENDING,
+                new BigDecimal("75.00"),
+                TODAY,
+                TODAY,
+                null);
+
+        FinancialCommitmentStatusResponse historical2025 =
+                financialReportService.commitmentStatus(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2025, 1, 1),
+                                LocalDate.of(2025, 12, 31),
+                                FinancialReportBasis.CASH,
+                                null,
+                                null));
+        FinancialCommitmentStatusResponse historical2026 =
+                financialReportService.commitmentStatus(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 1, 1),
+                                LocalDate.of(2026, 12, 31),
+                                FinancialReportBasis.CASH,
+                                null,
+                                null));
+
+        assertThat(historical2025.history().expensesOnTime()).isEqualTo(1);
+        assertThat(historical2026.history().expensesOnTime()).isZero();
+        assertThat(historical2025.current()).isEqualTo(historical2026.current());
+        assertThat(historical2025.upcoming()).isEqualTo(historical2026.upcoming());
+    }
+
+    @Test
+    void shouldApplyHarvestAndCategoryFiltersBeforeCommitmentAggregation() {
+        Farm farm = saveFarm();
+        User user = saveUser();
+        FinancialCategory selectedCategory =
+                saveCategory(farm, "Selected", TransactionType.EXPENSE);
+        FinancialCategory ignoredCategory =
+                saveCategory(farm, "Ignored", TransactionType.EXPENSE);
+        HarvestSeason selectedHarvest = saveHarvest(farm, "Selected harvest");
+        HarvestSeason ignoredHarvest = saveHarvest(farm, "Ignored harvest");
+
+        saveCommitmentTransaction(
+                farm,
+                user,
+                selectedCategory,
+                selectedHarvest,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                new BigDecimal("100.00"),
+                LocalDate.of(2026, 8, 10),
+                LocalDate.of(2026, 8, 10));
+        saveCommitmentTransaction(
+                farm,
+                user,
+                ignoredCategory,
+                selectedHarvest,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                new BigDecimal("200.00"),
+                LocalDate.of(2026, 8, 10),
+                LocalDate.of(2026, 8, 10));
+        saveCommitmentTransaction(
+                farm,
+                user,
+                selectedCategory,
+                ignoredHarvest,
+                TransactionType.EXPENSE,
+                PaymentStatus.PAID,
+                new BigDecimal("300.00"),
+                LocalDate.of(2026, 8, 10),
+                LocalDate.of(2026, 8, 10));
+
+        FinancialCommitmentStatusResponse result =
+                financialReportService.commitmentStatus(
+                        new FinancialReportFilter(
+                                farm.getId(),
+                                LocalDate.of(2026, 8, 1),
+                                LocalDate.of(2026, 8, 31),
+                                FinancialReportBasis.CASH,
+                                List.of(selectedHarvest.getId()),
+                                List.of(selectedCategory.getId())));
+
+        assertThat(result.history().expensesOnTime()).isEqualTo(1);
+        assertThat(result.history().expensesLate()).isZero();
+        assertThat(result.history().incomesOnTime()).isZero();
+        assertThat(result.history().unclassifiableExpenses()).isZero();
     }
 
     @Test
@@ -1698,6 +1850,32 @@ class FinancialReportServiceTest extends PostgresIntegrationTest {
         transaction.setTransactionDate(transactionDate);
         transaction.setDueDate(transactionDate);
         transaction.setPaidAt(transactionDate);
+        transaction.setFarm(farm);
+        transaction.setCategory(category);
+        transaction.setHarvestSeason(harvest);
+        transaction.setCreatedByUser(user);
+        transaction.setRecordStatus(FinancialRecordStatus.ACTIVE);
+        financialTransactionRepository.save(transaction);
+    }
+
+    private void saveCommitmentTransaction(
+            Farm farm,
+            User user,
+            FinancialCategory category,
+            HarvestSeason harvest,
+            TransactionType type,
+            PaymentStatus status,
+            BigDecimal amount,
+            LocalDate dueDate,
+            LocalDate paidAt) {
+        FinancialTransaction transaction = new FinancialTransaction();
+        transaction.setDescription("Filtered commitment");
+        transaction.setAmount(amount);
+        transaction.setType(type);
+        transaction.setStatus(status);
+        transaction.setTransactionDate(dueDate);
+        transaction.setDueDate(dueDate);
+        transaction.setPaidAt(paidAt);
         transaction.setFarm(farm);
         transaction.setCategory(category);
         transaction.setHarvestSeason(harvest);

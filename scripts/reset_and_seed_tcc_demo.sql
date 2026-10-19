@@ -458,7 +458,34 @@ SELECT
         WHEN 'Venda da produção' THEN category.start_date + 175
         ELSE category.start_date + 190
     END,
-    NULL,
+    CASE category.variance_group % 2
+        WHEN 0 THEN CASE category.category_name
+            WHEN 'Sementes e mudas' THEN category.start_date + 16
+            WHEN 'Fertilizantes' THEN category.start_date + 45
+            WHEN 'Defensivos agrícolas' THEN category.start_date + 80
+            WHEN 'Combustíveis' THEN category.start_date + 97
+            WHEN 'Mão de obra' THEN category.start_date + 123
+            WHEN 'Manutenção de máquinas' THEN category.start_date + 57
+            WHEN 'Serviços terceirizados' THEN category.start_date + 108
+            WHEN 'Energia e irrigação' THEN category.start_date + 134
+            WHEN 'Transporte' THEN category.start_date + 168
+            WHEN 'Venda da produção' THEN category.start_date + 178
+            ELSE category.start_date + 193
+        END
+        ELSE CASE category.category_name
+            WHEN 'Sementes e mudas' THEN category.start_date + 13
+            WHEN 'Fertilizantes' THEN category.start_date + 42
+            WHEN 'Defensivos agrícolas' THEN category.start_date + 77
+            WHEN 'Combustíveis' THEN category.start_date + 94
+            WHEN 'Mão de obra' THEN category.start_date + 120
+            WHEN 'Manutenção de máquinas' THEN category.start_date + 105
+            WHEN 'Serviços terceirizados' THEN category.start_date + 105
+            WHEN 'Energia e irrigação' THEN category.start_date + 131
+            WHEN 'Transporte' THEN category.start_date + 165
+            WHEN 'Venda da produção' THEN category.start_date + 175
+            ELSE category.start_date + 190
+        END
+    END,
     CASE category.category_name
         WHEN 'Sementes e mudas' THEN category.start_date + 16
         WHEN 'Fertilizantes' THEN category.start_date + 45
@@ -496,7 +523,7 @@ SELECT
     'Reparo corretivo após desgaste operacional',
     ROUND(plan.planned_cost * 0.027, 2),
     'EXPENSE', 'PAID', 'BANK_TRANSFER',
-    season.start_date + 145, NULL, season.start_date + 147,
+    season.start_date + 145, season.start_date + 144, season.start_date + 147,
     'Despesa não prevista no orçamento inicial da safra.',
     farm_seed.farm_id, category.category_id, season.harvest_season_id, producer.user_id, NULL,
     'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
@@ -544,7 +571,28 @@ SELECT
         WHEN 'Venda da produção' THEN 172
         ELSE 187
     END,
-    NULL,
+    CASE category.variance_group % 2
+        WHEN 0 THEN CASE category.category_name
+            WHEN 'Sementes e mudas' THEN category.start_date + 14
+            WHEN 'Fertilizantes' THEN category.start_date + 40
+            WHEN 'Defensivos agrícolas' THEN category.start_date + 76
+            WHEN 'Combustíveis' THEN category.start_date + 94
+            WHEN 'Mão de obra' THEN category.start_date + 120
+            WHEN 'Manutenção de máquinas' THEN category.start_date + 56
+            WHEN 'Venda da produção' THEN category.start_date + 174
+            ELSE category.start_date + 189
+        END
+        ELSE CASE category.category_name
+            WHEN 'Sementes e mudas' THEN category.start_date + 11
+            WHEN 'Fertilizantes' THEN category.start_date + 37
+            WHEN 'Defensivos agrícolas' THEN category.start_date + 73
+            WHEN 'Combustíveis' THEN category.start_date + 91
+            WHEN 'Mão de obra' THEN category.start_date + 117
+            WHEN 'Manutenção de máquinas' THEN category.start_date + 53
+            WHEN 'Venda da produção' THEN category.start_date + 171
+            ELSE category.start_date + 186
+        END
+    END,
     category.start_date + CASE category.category_name
         WHEN 'Sementes e mudas' THEN 14
         WHEN 'Fertilizantes' THEN 40
@@ -640,11 +688,11 @@ SELECT
     producer.user_id, NULL, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 FROM (
     VALUES
-        ('Aplicação complementar de fertilizante', 120000.00, 'EXPENSE', 'PAID', 'BANK_TRANSFER', DATE '2026-09-04', NULL, DATE '2026-09-04', 'Pagamento realizado durante o manejo da safra.', 'Fertilizantes'),
-        ('Aplicação corretiva de defensivos', 86500.00, 'EXPENSE', 'PAID', 'PIX', DATE '2026-08-25', NULL, DATE '2026-08-25', 'Aplicação adicional já concluída.', 'Defensivos agrícolas'),
-        ('Reparo extraordinário na colheitadeira', 74000.00, 'EXPENSE', 'PAID', 'BANK_TRANSFER', DATE '2026-08-28', NULL, DATE '2026-08-28', 'Manutenção corretiva já liquidada.', 'Manutenção de máquinas'),
-        ('Diesel para preparo e aplicação', 42300.00, 'EXPENSE', 'PAID', 'PIX', DATE '2026-09-02', NULL, DATE '2026-09-02', 'Combustível utilizado nas operações iniciais.', 'Combustíveis'),
-        ('Equipe de campo do manejo inicial', 55800.00, 'EXPENSE', 'PAID', 'BANK_TRANSFER', DATE '2026-09-05', NULL, DATE '2026-09-05', 'Mão de obra já liquidada.', 'Mão de obra'),
+        ('Aplicação complementar de fertilizante', 120000.00, 'EXPENSE', 'PAID', 'BANK_TRANSFER', DATE '2026-09-04', DATE '2026-09-04', DATE '2026-09-04', 'Pagamento realizado durante o manejo da safra.', 'Fertilizantes'),
+        ('Aplicação corretiva de defensivos', 86500.00, 'EXPENSE', 'PAID', 'PIX', DATE '2026-08-25', DATE '2026-08-22', DATE '2026-08-25', 'Aplicação adicional já concluída.', 'Defensivos agrícolas'),
+        ('Reparo extraordinário na colheitadeira', 74000.00, 'EXPENSE', 'PAID', 'BANK_TRANSFER', DATE '2026-08-28', DATE '2026-08-28', DATE '2026-08-28', 'Manutenção corretiva já liquidada.', 'Manutenção de máquinas'),
+        ('Diesel para preparo e aplicação', 42300.00, 'EXPENSE', 'PAID', 'PIX', DATE '2026-09-02', DATE '2026-08-30', DATE '2026-09-02', 'Combustível utilizado nas operações iniciais.', 'Combustíveis'),
+        ('Equipe de campo do manejo inicial', 55800.00, 'EXPENSE', 'PAID', 'BANK_TRANSFER', DATE '2026-09-05', DATE '2026-09-05', DATE '2026-09-05', 'Mão de obra já liquidada.', 'Mão de obra'),
         ('Compra de fertilizante com vencimento em aberto', 104800.00, 'EXPENSE', 'OVERDUE', 'BOLETO', DATE '2026-08-20', DATE '2026-08-28', NULL, 'Fornecedor aguarda regularização do boleto.', 'Fertilizantes'),
         ('Defensivo adquirido para controle emergencial', 88450.00, 'EXPENSE', 'OVERDUE', 'BOLETO', DATE '2026-08-21', DATE '2026-08-25', NULL, 'Compra adicional com vencimento ultrapassado.', 'Defensivos agrícolas'),
         ('Abastecimento operacional em aberto', 43620.00, 'EXPENSE', 'OVERDUE', 'PIX', DATE '2026-08-20', DATE '2026-08-27', NULL, 'Pendência de combustível do início da safra.', 'Combustíveis'),
@@ -656,7 +704,7 @@ FROM (
         ('Fertilizante contratado para cobertura', 68420.00, 'EXPENSE', 'PENDING', 'BOLETO', DATE '2026-09-05', DATE '2026-09-18', NULL, 'Compromisso programado para a próxima etapa de manejo.', 'Fertilizantes'),
         ('Frete programado para recebimento de insumos', 35760.00, 'EXPENSE', 'PENDING', 'BOLETO', DATE '2026-09-05', DATE '2026-10-05', NULL, 'Vencimento futuro relacionado ao escoamento interno.', 'Transporte'),
         ('Assistência técnica contratada para outubro', 42890.00, 'EXPENSE', 'PENDING', 'BANK_TRANSFER', DATE '2026-09-06', DATE '2026-10-17', NULL, 'Serviço técnico já contratado, ainda não vencido.', 'Serviços terceirizados'),
-        ('Recebimento de lote entregue', 95000.00, 'INCOME', 'PAID', 'BANK_TRANSFER', DATE '2026-09-05', NULL, DATE '2026-09-05', 'Entrada efetivamente recebida pela venda já entregue.', 'Venda da produção'),
+        ('Recebimento de lote entregue', 95000.00, 'INCOME', 'PAID', 'BANK_TRANSFER', DATE '2026-09-05', DATE '2026-09-05', DATE '2026-09-05', 'Entrada efetivamente recebida pela venda já entregue.', 'Venda da produção'),
         ('Venda de soja com prazo comercial vencido', 125400.00, 'INCOME', 'OVERDUE', 'BANK_TRANSFER', DATE '2026-08-20', DATE '2026-08-26', NULL, 'Cliente ainda não liquidou o lote faturado.', 'Venda da produção'),
         ('Recebível de lote comercializado', 98750.00, 'INCOME', 'OVERDUE', 'BOLETO', DATE '2026-08-22', DATE '2026-08-31', NULL, 'Parcela de venda vencida e não recebida.', 'Venda da produção'),
         ('Receita de lote complementar faturado', 64980.00, 'INCOME', 'OVERDUE', 'BANK_TRANSFER', DATE '2026-08-24', DATE '2026-09-02', NULL, 'Recebimento complementar pendente.', 'Venda de lote complementar'),
@@ -684,7 +732,7 @@ INSERT INTO financial_transactions (
 SELECT
     'Manutenção da infraestrutura da fazenda',
     3180.00 + (ROW_NUMBER() OVER (ORDER BY farm_seed.farm_key) * 470.00),
-    'EXPENSE', 'PAID', 'PIX', DATE '2026-08-05', NULL, DATE '2026-08-06',
+    'EXPENSE', 'PAID', 'PIX', DATE '2026-08-05', DATE '2026-08-04', DATE '2026-08-06',
     'Despesa geral da propriedade sem vínculo a uma safra específica.',
     farm_seed.farm_id, category.category_id, NULL,
     CASE WHEN farm_seed.farm_key = 'vale' THEN collaborator.user_id ELSE producer.user_id END,
