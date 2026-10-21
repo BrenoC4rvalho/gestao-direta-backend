@@ -108,7 +108,7 @@ app:
 
   jwt:
     issuer: gestao-direta-api
-    secret: ${APP_JWT_SECRET:change-this-secret-in-production-change-this-secret}
+    secret: ${APP_JWT_SECRET}
     expiration-minutes: ${APP_JWT_EXPIRATION_MINUTES:120}
     remember-me-expiration-days: ${APP_JWT_REMEMBER_ME_EXPIRATION_DAYS:15}
 
@@ -121,7 +121,7 @@ app:
 
   cookie:
     name: gd_session
-    secure: ${APP_COOKIE_SECURE:false}
+    secure: ${APP_COOKIE_SECURE}
     same-site: ${APP_COOKIE_SAME_SITE:Lax}
 
 messaging:
@@ -133,7 +133,3 @@ messaging:
 
   conversation:
     expiration-hours: ${MESSAGING_CONVERSATION_EXPIRATION_HOURS:24}
-
-logging:
-  level:
-    br.com.gestaodireta.messaging.service.TelegramVoiceMessageProcessor: DEBUG

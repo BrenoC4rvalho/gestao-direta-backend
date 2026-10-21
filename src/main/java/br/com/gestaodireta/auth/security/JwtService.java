@@ -14,6 +14,9 @@ import org.springframework.stereotype.Service;
 @Service
 public class JwtService {
 
+    private static final String INSECURE_DEVELOPMENT_SECRET =
+            "change-this-secret-in-production-change-this-secret";
+
     private final String issuer;
 
     private final long expirationMinutes;
@@ -31,11 +34,18 @@ public class JwtService {
             @Value("${app.jwt.expiration-minutes}") long expirationMinutes,
             @Value("${app.jwt.remember-me-expiration-days}") long rememberMeExpirationDays,
             Clock clock) {
+        validateSecret(secret);
         this.issuer = issuer;
         this.expirationMinutes = expirationMinutes;
         this.rememberMeExpirationDays = rememberMeExpirationDays;
         this.clock = clock;
         this.algorithm = Algorithm.HMAC256(secret);
+    }
+
+    private void validateSecret(String secret) {
+        if (secret == null || secret.length() < 32 || INSECURE_DEVELOPMENT_SECRET.equals(secret)) {
+            throw new IllegalArgumentException("JWT signing secret must be configured securely");
+        }
     }
 
     public String generateToken(User user) {

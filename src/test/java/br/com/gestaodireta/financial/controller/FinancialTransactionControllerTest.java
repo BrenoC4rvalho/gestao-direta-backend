@@ -7,6 +7,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -139,6 +140,157 @@ class FinancialTransactionControllerTest extends PostgresIntegrationTest {
                 financialTransactionRepository.findById(transaction.getId()).orElseThrow();
         org.assertj.core.api.Assertions.assertThat(savedTransaction.getRecordStatus())
                 .isEqualTo(FinancialRecordStatus.DELETED);
+    }
+
+    @Test
+    void shouldRejectAmountsWithMoreThanTwoDecimalPlaces() throws Exception {
+        Farm farm = saveFarm(FarmStatus.ACTIVE);
+        User admin = saveUser("Admin", "precision-admin@example.com", UserType.ADMIN);
+
+        mockMvc.perform(
+                        post("/api/financial/transactions")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(admin.getId())).roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {
+                                          "description": "Precision check",
+                                          "amount": 10.005,
+                                          "type": "EXPENSE",
+                                          "transactionDate": "%s",
+                                          "farmId": %d
+                                        }
+                                        """
+                                                .formatted(LocalDate.now(), farm.getId())))
+                .andExpect(status().isBadRequest());
+
+        assertThat(financialTransactionRepository.count()).isZero();
+    }
+
+    @Test
+    void shouldDenyCrossFarmTransactionAccessAndMutation() throws Exception {
+        Farm farmA = saveFarm(FarmStatus.ACTIVE);
+        Farm farmB = saveFarm(FarmStatus.ACTIVE);
+        User userA = saveUser("User A", "user-a-isolation@example.com", UserType.USER);
+        User userB = saveUser("User B", "user-b-isolation@example.com", UserType.USER);
+        saveFarmUser(farmA, userA, FarmUserRole.PRODUCER);
+        FinancialTransaction transactionB = saveTransaction(farmB, userB);
+        FinancialCategory categoryB = saveCategory(farmB, TransactionType.EXPENSE);
+        HarvestSeason seasonB = saveSeason(farmB, "Season B", HarvestSeasonStatus.PLANNED);
+
+        mockMvc.perform(
+                        get("/api/financial/transactions/{id}", transactionB.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(userA.getId())).roles("USER")))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        put("/api/financial/transactions/{id}", transactionB.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(userA.getId())).roles("USER"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {
+                                          "description": "Unauthorized change",
+                                          "amount": 10.00,
+                                          "type": "EXPENSE",
+                                          "status": "PENDING",
+                                          "transactionDate": "%s"
+                                        }
+                                        """
+                                                .formatted(LocalDate.now())))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        delete("/api/financial/transactions/{id}", transactionB.getId())
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(userA.getId())).roles("USER"))
+                                .with(csrf()))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        post("/api/financial/transactions")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(userA.getId())).roles("USER"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(transactionBody(farmB.getId(), "Wrong farm")))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(
+                        post("/api/financial/transactions")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(userA.getId())).roles("USER"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {
+                                          "description": "Wrong category",
+                                          "amount": 10.00,
+                                          "type": "EXPENSE",
+                                          "transactionDate": "%s",
+                                          "farmId": %d,
+                                          "categoryId": %d
+                                        }
+                                        """
+                                                .formatted(
+                                                        LocalDate.now(),
+                                                farmA.getId(),
+                                                categoryB.getId())))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(
+                        post("/api/financial/transactions")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(userA.getId())).roles("USER"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {
+                                          "description": "Missing category",
+                                          "amount": 10.00,
+                                          "type": "EXPENSE",
+                                          "transactionDate": "%s",
+                                          "farmId": %d,
+                                          "categoryId": 99999999
+                                        }
+                                        """
+                                                .formatted(LocalDate.now(), farmA.getId())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Financial category not found"));
+
+        mockMvc.perform(
+                        post("/api/financial/transactions")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(userA.getId())).roles("USER"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        transactionBody(
+                                                farmA.getId(), "Wrong season", seasonB.getId())))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(
+                        get("/api/financial/reports")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user(String.valueOf(userA.getId())).roles("USER"))
+                                .param("farmId", String.valueOf(farmB.getId()))
+                                .param("startDate", "2026-01-01")
+                                .param("endDate", "2026-01-31")
+                                .param("basis", "ACCRUAL"))
+                .andExpect(status().isForbidden());
+
+        FinancialTransaction unchanged =
+                financialTransactionRepository.findById(transactionB.getId()).orElseThrow();
+        assertThat(unchanged.getDescription()).isEqualTo(transactionB.getDescription());
+        assertThat(unchanged.getRecordStatus()).isEqualTo(FinancialRecordStatus.ACTIVE);
+        assertThat(financialTransactionRepository.count()).isEqualTo(1);
     }
 
     @Test

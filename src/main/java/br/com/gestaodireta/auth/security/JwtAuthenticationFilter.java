@@ -2,6 +2,7 @@ package br.com.gestaodireta.auth.security;
 
 import br.com.gestaodireta.auth.cookie.AuthCookieService;
 import br.com.gestaodireta.user.enumeration.UserStatus;
+import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -9,6 +10,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
@@ -38,11 +42,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         try {
             authenticate(request);
-            filterChain.doFilter(request, response);
-        } catch (RuntimeException exception) {
+        } catch (AuthenticationException
+                | JWTVerificationException
+                | NumberFormatException exception) {
             SecurityContextHolder.clearContext();
             response.setStatus(HttpStatus.UNAUTHORIZED.value());
+            return;
         }
+
+        filterChain.doFilter(request, response);
     }
 
     @Override
@@ -62,12 +70,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         CustomUserDetails userDetails = customUserDetailsService.loadUserById(userId);
 
         if (!UserStatus.ACTIVE.equals(userDetails.getUser().getStatus())) {
-            throw new IllegalStateException("User is not active");
+            throw new DisabledException("User is not active");
         }
 
         if (decodedJwt.getClaim("credentialsVersion").asInt()
                 != userDetails.getUser().getCredentialsVersion()) {
-            throw new IllegalStateException("Credentials have changed");
+            throw new BadCredentialsException("Credentials have changed");
         }
 
         UserAuthenticationToken authentication =

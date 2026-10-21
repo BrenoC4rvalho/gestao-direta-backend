@@ -145,10 +145,10 @@ MESSAGING_CONVERSATION_EXPIRATION_HOURS=24
 | `DB_URL` | Sim | URL JDBC do PostgreSQL. | — |
 | `DB_USERNAME` | Sim | Usuário do banco. | — |
 | `DB_PASSWORD` | Sim | Senha do banco. | — |
-| `APP_JWT_SECRET` | Produção | Segredo de assinatura do JWT. | Valor inseguro de desenvolvimento configurado na aplicação. |
+| `APP_JWT_SECRET` | Sim | Segredo aleatório de assinatura do JWT, com pelo menos 32 caracteres. | — |
 | `APP_JWT_EXPIRATION_MINUTES` | Não | Duração da sessão padrão em minutos. | `120` |
 | `APP_JWT_REMEMBER_ME_EXPIRATION_DAYS` | Não | Duração da sessão com “lembrar de mim” em dias. | `15` |
-| `APP_COOKIE_SECURE` | Não | Exige HTTPS no cookie de sessão. | `false` |
+| `APP_COOKIE_SECURE` | Sim | Exige HTTPS no cookie de sessão; use `false` somente em desenvolvimento local e `true` em produção. | — |
 | `APP_COOKIE_SAME_SITE` | Não | Política SameSite do cookie. | `Lax` |
 | `APP_CORS_ALLOWED_ORIGINS` | Não | Origens permitidas pelo CORS; aceita lista configurada pelo Spring. | `http://localhost:4200` |
 | `PASSWORD_RECOVERY_CODE_EXPIRATION_MINUTES` | Não | Expiração do código de recuperação. | `10` |
