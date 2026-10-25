@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 
 public record FinancialTransactionResponse(
         Long id,
+        Long version,
         String description,
         BigDecimal amount,
         TransactionType type,

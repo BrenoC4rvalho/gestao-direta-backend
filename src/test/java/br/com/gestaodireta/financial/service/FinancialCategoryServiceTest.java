@@ -360,8 +360,8 @@ class FinancialCategoryServiceTest extends PostgresIntegrationTest {
                                 financialCategoryService.ensureCategoriesBelongToFarm(
                                         List.of(category.getId(), otherCategory.getId()),
                                         farm.getId()))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage("Financial category does not belong to farm");
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Financial category not found");
     }
 
     private FinancialCategoryCreateRequest createRequest(

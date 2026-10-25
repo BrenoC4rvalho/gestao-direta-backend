@@ -68,6 +68,9 @@ public class FinancialTransactionService {
 
     private final Clock clock;
 
+    private final FinancialTransactionStatusPolicy statusPolicy =
+            new FinancialTransactionStatusPolicy();
+
     public FinancialTransactionService(
             FinancialTransactionRepository financialTransactionRepository,
             FarmService farmService,
@@ -293,6 +296,7 @@ public class FinancialTransactionService {
         HarvestSeason harvestSeason =
                 resolveHarvestSeasonForWrite(request.harvestSeasonId(), transaction.getFarm());
         transaction.setUpdatedByUser(getCurrentUser());
+        statusPolicy.validateUpdate(transaction.getStatus(), request.status());
         transaction.setStatus(request.status());
         validateSettlementDates(request.status(), request.paidAt());
         applyRequest(transaction, request, category, harvestSeason);
@@ -312,6 +316,7 @@ public class FinancialTransactionService {
     @Transactional
     public FinancialTransactionResponse pay(Long id, PayTransactionRequest request) {
         FinancialTransaction transaction = findEntityById(id);
+        statusPolicy.validatePay(transaction.getStatus());
         transaction.setStatus(PaymentStatus.PAID);
         transaction.setPaidAt(
                 request.paidAt() == null ? LocalDate.now(clock) : request.paidAt());
@@ -325,7 +330,22 @@ public class FinancialTransactionService {
     @Transactional
     public FinancialTransactionResponse cancel(Long id) {
         FinancialTransaction transaction = findEntityById(id);
+        statusPolicy.validateCancel(transaction.getStatus());
         transaction.setStatus(PaymentStatus.CANCELED);
+        transaction.setUpdatedByUser(getCurrentUser());
+
+        return financialTransactionMapper.toResponse(
+                financialTransactionRepository.save(transaction));
+    }
+
+    @Transactional
+    public FinancialTransactionResponse reopen(Long id) {
+        FinancialTransaction transaction = findEntityById(id);
+        statusPolicy.validateReopen(transaction.getStatus());
+        transaction.setStatus(
+                statusPolicy.reopenedStatus(transaction.getDueDate(), LocalDate.now(clock)));
+        transaction.setPaidAt(null);
+        transaction.setPaymentMethod(null);
         transaction.setUpdatedByUser(getCurrentUser());
 
         return financialTransactionMapper.toResponse(
@@ -599,14 +619,19 @@ public class FinancialTransactionService {
             return null;
         }
 
-        FinancialCategory category = financialCategoryService.findEntityById(categoryId);
+        FinancialCategory category;
+        try {
+            category = financialCategoryService.findEntityById(categoryId);
+        } catch (ResourceNotFoundException exception) {
+            throw unavailableCategory();
+        }
 
         if (!FinancialCategoryStatus.ACTIVE.equals(category.getStatus())) {
             throw new BusinessException("Financial category is inactive");
         }
 
         if (!category.getFarm().getId().equals(farm.getId())) {
-            throw new BusinessException("Financial category does not belong to farm");
+            throw unavailableCategory();
         }
 
         if (!category.getType().equals(transactionType)) {
@@ -659,8 +684,12 @@ public class FinancialTransactionService {
 
     private void ensureHarvestSeasonBelongsToFarm(HarvestSeason harvestSeason, Farm farm) {
         if (!harvestSeason.getFarm().getId().equals(farm.getId())) {
-            throw new BusinessException("Harvest season does not belong to transaction farm");
+            throw new ResourceNotFoundException("Harvest season not found");
         }
+    }
+
+    private ResourceNotFoundException unavailableCategory() {
+        return new ResourceNotFoundException("Financial category not found");
     }
 
     private void ensureFarmIsActive(Farm farm) {

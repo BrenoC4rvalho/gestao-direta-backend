@@ -82,6 +82,23 @@ class PasswordRecoveryServiceTest {
     }
 
     @Test
+    void shouldReturnTheSameGenericMessageForMissingAndUnlinkedAccounts() {
+        PasswordRecoveryRequest request = new PasswordRecoveryRequest("user@example.com");
+        when(userRepository.findByEmailIgnoreCase("user@example.com"))
+                .thenReturn(Optional.of(activeUser()));
+        when(messagingAccountRepository
+                        .findFirstByUserContactUserIdAndChannelAndStatusAndVerifiedAtIsNotNullAndExternalChatIdIsNotNull(
+                                any(),
+                                eq(MessagingChannel.TELEGRAM),
+                                eq(MessagingAccountStatus.ACTIVE)))
+                .thenReturn(Optional.empty());
+
+        assertThat(service.options(request).message()).isEqualTo(PasswordRecoveryService.GENERIC_MESSAGE);
+        assertThat(service.options(new PasswordRecoveryRequest("missing@example.com")).message())
+                .isEqualTo(PasswordRecoveryService.GENERIC_MESSAGE);
+    }
+
+    @Test
     void shouldBlockCodeAfterMaximumInvalidAttempts() {
         User user = activeUser();
         PasswordRecoveryCode code = activeCode(user);
@@ -151,11 +168,7 @@ class PasswordRecoveryServiceTest {
         PasswordRecoveryCode previousCode = activeCode(user);
         PasswordResetToken previousToken = new PasswordResetToken();
         MessagingAccount account = mock(MessagingAccount.class);
-        br.com.gestaodireta.user.entity.UserContact contact =
-                mock(br.com.gestaodireta.user.entity.UserContact.class);
         when(account.getExternalChatId()).thenReturn("123");
-        when(account.getUserContact()).thenReturn(contact);
-        when(contact.getPhoneNumber()).thenReturn("+55 11 99999-6875");
         when(userRepository.findByEmailIgnoreCase(user.getEmail())).thenReturn(Optional.of(user));
         when(codeRepository.countByUserIdAndRequestedAtAfter(any(), any())).thenReturn(0L);
         when(messagingAccountRepository

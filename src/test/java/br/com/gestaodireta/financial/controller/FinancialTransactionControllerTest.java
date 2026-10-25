@@ -242,7 +242,8 @@ class FinancialTransactionControllerTest extends PostgresIntegrationTest {
                                                         LocalDate.now(),
                                                 farmA.getId(),
                                                 categoryB.getId())))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Financial category not found"));
 
         mockMvc.perform(
                         post("/api/financial/transactions")
@@ -274,7 +275,8 @@ class FinancialTransactionControllerTest extends PostgresIntegrationTest {
                                 .content(
                                         transactionBody(
                                                 farmA.getId(), "Wrong season", seasonB.getId())))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Harvest season not found"));
 
         mockMvc.perform(
                         get("/api/financial/reports")
@@ -688,10 +690,8 @@ class FinancialTransactionControllerTest extends PostgresIntegrationTest {
                                 .with(user(String.valueOf(admin.getId())).roles("ADMIN"))
                                 .param("farmId", String.valueOf(farm.getId()))
                                 .param("harvestSeasonId", String.valueOf(otherFarmSeason.getId())))
-                .andExpect(status().isBadRequest())
-                .andExpect(
-                        jsonPath("$.message")
-                                .value("Harvest season does not belong to transaction farm"));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Harvest season not found"));
     }
 
     @Test

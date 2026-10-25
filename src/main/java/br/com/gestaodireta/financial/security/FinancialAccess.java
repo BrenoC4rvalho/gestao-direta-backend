@@ -116,6 +116,10 @@ public class FinancialAccess {
         return canUpdateTransaction(transactionId);
     }
 
+    public boolean canReopenTransaction(Long transactionId) {
+        return canUpdateTransaction(transactionId);
+    }
+
     public boolean canViewPendingTransaction(Long pendingTransactionId) {
         return pendingFinancialTransactionRepository
                 .findFarmIdById(pendingTransactionId)

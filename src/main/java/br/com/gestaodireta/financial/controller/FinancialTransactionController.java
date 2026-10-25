@@ -324,4 +324,10 @@ public class FinancialTransactionController {
     public FinancialTransactionResponse cancel(@PathVariable Long id) {
         return financialTransactionService.cancel(id);
     }
+
+    @PatchMapping("/{id}/reopen")
+    @PreAuthorize("@financialAccess.canReopenTransaction(#id)")
+    public FinancialTransactionResponse reopen(@PathVariable Long id) {
+        return financialTransactionService.reopen(id);
+    }
 }

@@ -237,6 +237,106 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldReopenPaidTransactionAndClassifyItByItsCurrentDueDate() {
+        User admin = saveUser("Admin", "reopen@example.com", UserType.ADMIN);
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        FinancialTransaction transaction =
+                saveTransaction(
+                        farm,
+                        null,
+                        admin,
+                        "Paid expense",
+                        BigDecimal.TEN,
+                        TransactionType.EXPENSE,
+                        PaymentStatus.PAID,
+                        PaymentMethod.PIX,
+                        TODAY.minusDays(10),
+                        TODAY.minusDays(5),
+                        FinancialRecordStatus.ACTIVE);
+        authenticateAs(admin, "ROLE_ADMIN");
+
+        FinancialTransactionResponse response =
+                financialTransactionService.reopen(transaction.getId());
+
+        assertThat(response.status()).isEqualTo(PaymentStatus.OVERDUE);
+        assertThat(response.paidAt()).isNull();
+        assertThat(response.paymentMethod()).isNull();
+    }
+
+    @Test
+    void shouldCancelPaidTransactionWithoutCountingItAsPaid() {
+        User admin = saveUser("Admin", "cancel-paid@example.com", UserType.ADMIN);
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        FinancialTransaction transaction =
+                saveTransaction(
+                        farm,
+                        null,
+                        admin,
+                        "Paid income",
+                        BigDecimal.TEN,
+                        TransactionType.INCOME,
+                        PaymentStatus.PAID,
+                        PaymentMethod.PIX,
+                        TODAY,
+                        TODAY,
+                        FinancialRecordStatus.ACTIVE);
+        authenticateAs(admin, "ROLE_ADMIN");
+
+        FinancialTransactionResponse response =
+                financialTransactionService.cancel(transaction.getId());
+
+        assertThat(response.status()).isEqualTo(PaymentStatus.CANCELED);
+        assertThat(response.paidAt()).isEqualTo(TODAY);
+        assertThat(financialTransactionRepository.findById(transaction.getId()).orElseThrow().getStatus())
+                .isEqualTo(PaymentStatus.CANCELED);
+    }
+
+    @Test
+    void shouldRejectDuplicateAndInvalidFinancialTransitions() {
+        User admin = saveUser("Admin", "invalid-transitions@example.com", UserType.ADMIN);
+        Farm farm = saveFarm("Farm", FarmStatus.ACTIVE);
+        FinancialTransaction paid =
+                saveTransaction(
+                        farm,
+                        null,
+                        admin,
+                        "Paid expense",
+                        BigDecimal.TEN,
+                        TransactionType.EXPENSE,
+                        PaymentStatus.PAID,
+                        PaymentMethod.PIX,
+                        TODAY,
+                        TODAY,
+                        FinancialRecordStatus.ACTIVE);
+        FinancialTransaction canceled =
+                saveTransaction(
+                        farm,
+                        null,
+                        admin,
+                        "Canceled expense",
+                        BigDecimal.TEN,
+                        TransactionType.EXPENSE,
+                        PaymentStatus.CANCELED,
+                        null,
+                        TODAY,
+                        null,
+                        FinancialRecordStatus.ACTIVE);
+        authenticateAs(admin, "ROLE_ADMIN");
+
+        assertThatThrownBy(
+                        () -> financialTransactionService.pay(
+                                paid.getId(), new PayTransactionRequest(TODAY, PaymentMethod.PIX)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Only pending or overdue transactions can be paid");
+        assertThatThrownBy(() -> financialTransactionService.reopen(canceled.getId()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Only paid transactions can be reopened");
+        assertThatThrownBy(() -> financialTransactionService.cancel(canceled.getId()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Transaction is already canceled");
+    }
+
+    @Test
     void shouldFillUpdatedByUserWhenUpdatingTransaction() {
         User creator = saveUser("Creator", "creator@example.com", UserType.USER);
         User updater = saveUser("Updater", "updater@example.com", UserType.USER);
@@ -332,11 +432,11 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
 
         assertThatThrownBy(
                         () ->
-                                financialTransactionService.create(
+                financialTransactionService.create(
                                         transactionRequest(
                                                 farm, otherFarmCategory, BigDecimal.TEN)))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage("Financial category does not belong to farm");
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Financial category not found");
 
         assertThatThrownBy(
                         () ->
@@ -346,8 +446,8 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
                                                 otherFarmCategory,
                                                 BigDecimal.TEN,
                                                 TransactionType.EXPENSE)))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage("Financial category does not belong to farm");
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Financial category not found");
     }
 
     @Test
@@ -392,8 +492,8 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
                                 financialTransactionService.create(
                                         transactionRequest(
                                                 farm, null, BigDecimal.TEN, otherFarmSeason)))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage("Harvest season does not belong to transaction farm");
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Harvest season not found");
 
         assertThatThrownBy(
                         () ->
@@ -463,8 +563,8 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
                                                 BigDecimal.TEN,
                                                 TransactionType.EXPENSE,
                                                 otherFarmSeason)))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage("Harvest season does not belong to transaction farm");
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Harvest season not found");
 
         assertThatThrownBy(
                         () ->
@@ -526,8 +626,8 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
                                         filterByHarvestSeason(
                                                 farm.getId(), otherFarmSeason.getId()),
                                         new PaginationParams()))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage("Harvest season does not belong to transaction farm");
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Harvest season not found");
     }
 
     @Test
@@ -726,8 +826,8 @@ class FinancialTransactionServiceTest extends PostgresIntegrationTest {
                                                 null,
                                                 null),
                                         new PaginationParams()))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage("Financial category does not belong to farm");
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Financial category not found");
     }
 
     @Test

@@ -3,7 +3,6 @@ package br.com.gestaodireta.auth.service;
 import br.com.gestaodireta.auth.dto.PasswordRecoveryOptionsResponse;
 import br.com.gestaodireta.auth.dto.PasswordRecoveryRequest;
 import br.com.gestaodireta.auth.dto.PasswordRecoveryResetRequest;
-import br.com.gestaodireta.auth.dto.PasswordRecoveryTelegramResponse;
 import br.com.gestaodireta.auth.dto.PasswordRecoveryVerifyRequest;
 import br.com.gestaodireta.auth.dto.PasswordRecoveryVerifyResponse;
 import br.com.gestaodireta.auth.entity.PasswordRecoveryCode;
@@ -27,6 +26,8 @@ import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -35,8 +36,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PasswordRecoveryService {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(PasswordRecoveryService.class);
+
     public static final String GENERIC_MESSAGE =
-            "Se existir uma conta associada a este e-mail, serão apresentadas as opções disponíveis.";
+            "Se existir uma conta associada a este e-mail, você receberá as orientações de recuperação pelos canais disponíveis.";
 
     private static final String INVALID_CODE_MESSAGE = "Código inválido.";
     private static final String EXPIRED_CODE_MESSAGE = "Código expirado.";
@@ -85,29 +88,37 @@ public class PasswordRecoveryService {
         this.maxRequests = maxRequests;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public PasswordRecoveryOptionsResponse options(PasswordRecoveryRequest request) {
-        return new PasswordRecoveryOptionsResponse(
-                findAvailableTelegramAccount(request.email()) != null);
+        requestTelegramCode(request);
+        return new PasswordRecoveryOptionsResponse(GENERIC_MESSAGE);
     }
 
     @Transactional
-    public PasswordRecoveryTelegramResponse requestTelegramCode(PasswordRecoveryRequest request) {
+    public void requestTelegramCode(PasswordRecoveryRequest request) {
+        try {
+            issueTelegramCode(request);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Password recovery request could not be completed internally");
+        }
+    }
+
+    private void issueTelegramCode(PasswordRecoveryRequest request) {
         User user = findActiveUser(request.email());
         if (user == null) {
-            return new PasswordRecoveryTelegramResponse(null);
+            return;
         }
 
         LocalDateTime now = LocalDateTime.now(clock);
         if (codeRepository.countByUserIdAndRequestedAtAfter(
                         user.getId(), now.minusMinutes(windowMinutes))
                 >= maxRequests) {
-            return new PasswordRecoveryTelegramResponse(null);
+            return;
         }
 
         MessagingAccount account = findAvailableTelegramAccount(user.getId());
         if (account == null) {
-            return new PasswordRecoveryTelegramResponse(null);
+            return;
         }
 
         invalidateActiveCredentials(user.getId(), now);
@@ -135,10 +146,8 @@ public class PasswordRecoveryService {
         if (!sent) {
             code.setStatus(PasswordRecoveryCodeStatus.INVALIDATED);
             code.setInvalidatedAt(now);
-            return new PasswordRecoveryTelegramResponse(null);
+            return;
         }
-
-        return new PasswordRecoveryTelegramResponse(phoneLastFour(account));
     }
 
     @Transactional
@@ -210,12 +219,6 @@ public class PasswordRecoveryService {
                             code.setStatus(PasswordRecoveryCodeStatus.INVALIDATED);
                             code.setInvalidatedAt(now);
                         });
-    }
-
-    private String phoneLastFour(MessagingAccount account) {
-        String phoneNumber = account.getUserContact().getPhoneNumber();
-        String digits = phoneNumber.replaceAll("\\D", "");
-        return digits.substring(Math.max(0, digits.length() - 4));
     }
 
     private User findActiveUser(String email) {

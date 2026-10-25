@@ -17,6 +17,7 @@ public class FinancialTransactionMapper {
 
         return new FinancialTransactionResponse(
                 transaction.getId(),
+                transaction.getVersion(),
                 transaction.getDescription(),
                 transaction.getAmount(),
                 transaction.getType(),

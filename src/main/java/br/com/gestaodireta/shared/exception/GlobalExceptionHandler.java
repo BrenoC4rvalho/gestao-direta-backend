@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -28,6 +29,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleConflictException(
             ConflictException exception, HttpServletRequest request) {
         return buildResponse(HttpStatus.CONFLICT, exception.getMessage(), request, List.of());
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleOptimisticLockingException(
+            ObjectOptimisticLockingFailureException exception, HttpServletRequest request) {
+        return buildResponse(
+                HttpStatus.CONFLICT,
+                "The transaction was changed by another operation. Reload and try again.",
+                request,
+                List.of());
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)

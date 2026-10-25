@@ -154,7 +154,7 @@ public class FinancialCategoryService {
                 financialCategoryRepository.countByFarmIdAndIdIn(farmId, categoryIds);
 
         if (matchingCategories != categoryIds.size()) {
-            throw new BusinessException("Financial category does not belong to farm");
+            throw new ResourceNotFoundException("Financial category not found");
         }
     }
 

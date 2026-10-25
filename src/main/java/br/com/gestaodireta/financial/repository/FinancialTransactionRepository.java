@@ -785,6 +785,7 @@ public interface FinancialTransactionRepository extends JpaRepository<FinancialT
             """
             update FinancialTransaction transaction
             set transaction.status = :overdueStatus,
+                transaction.version = transaction.version + 1,
                 transaction.updatedAt = :updatedAt
             where transaction.type = :type
               and transaction.status = :pendingStatus
