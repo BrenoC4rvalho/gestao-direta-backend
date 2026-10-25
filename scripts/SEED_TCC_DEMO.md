@@ -8,9 +8,9 @@ O script [`reset_and_seed_tcc_demo.sql`](./reset_and_seed_tcc_demo.sql) recria a
 
 Ele remove os dados de usuários, contatos, vínculos usuário x fazenda, fazendas, categorias, atividades produtivas, safras, itens de planejamento, movimentações, pendências financeiras, mensageria e recuperação de senha. A estrutura do banco, as migrations e `flyway_schema_history` são preservadas.
 
-Em seguida, ele cria cinco fazendas, oito usuários, categorias e atividades por fazenda, 48 safras entre 2020 e 2028, planejamento detalhado e movimentações financeiras. A data de referência do cenário é **08/09/2026**.
+Em seguida, ele cria cinco fazendas, oito usuários, categorias e atividades por fazenda, 48 safras entre 2020 e 2028, planejamento detalhado e movimentações financeiras. A data de referência operacional é a data atual do PostgreSQL no momento da execução; o histórico de safras permanece fixo.
 
-Não são criados dados de Telegram, conversas, mensagens, pendências originadas por IA, transcrições ou respostas de IA. Agenda, contas a pagar/receber e alertas são derivados de movimentações `PENDING` e `OVERDUE` de 2026.
+O cenário operacional contém movimentações `PAID`, `PENDING`, `OVERDUE` e `CANCELED`, com compromissos vencidos, vencendo hoje, nos próximos sete dias e além desse horizonte. Não são criados dados de Telegram, conversas, mensagens, pendências originadas por IA, transcrições ou respostas de IA. Agenda, contas a pagar/receber e alertas são derivados de movimentações abertas.
 
 ## Pré-requisitos e execução
 

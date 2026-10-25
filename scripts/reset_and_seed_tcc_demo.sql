@@ -1,8 +1,11 @@
 -- Gestão Direta — base demonstrativa para desenvolvimento e TCC.
 -- DESTRUTIVO: remove todos os dados de negócio e usuários, mas não altera o schema
--- nem a tabela flyway_schema_history. Data de referência do cenário: 2026-09-08.
+-- nem a tabela flyway_schema_history. A data operacional é a data da execução.
 
 BEGIN;
+
+CREATE TEMP TABLE demo_context AS
+SELECT CURRENT_DATE::DATE AS reference_date;
 
 DO $$
 BEGIN
@@ -623,7 +626,7 @@ WHERE category.season_status = 'IN_PROGRESS'
       WHEN 'Manutenção de máquinas' THEN 56
       WHEN 'Venda da produção' THEN 174
       ELSE 189
-  END <= DATE '2026-09-08';
+  END <= (SELECT reference_date FROM demo_context);
 
 INSERT INTO financial_transactions (
     description, amount, type, status, payment_method, transaction_date, due_date, paid_at,
@@ -637,11 +640,11 @@ SELECT
         ELSE 'Recebimento previsto de venda contratada'
     END,
     ROUND(category.planned_amount * CASE WHEN category.type = 'INCOME' THEN 0.52 ELSE 0.45 END, 2),
-    category.type, 'PENDING', 'BOLETO', DATE '2026-09-05',
+    category.type, 'PENDING', 'BOLETO', (SELECT reference_date - 5 FROM demo_context),
     CASE category.category_name
-        WHEN 'Fertilizantes' THEN DATE '2026-09-18'
-        WHEN 'Transporte' THEN DATE '2026-10-05'
-        ELSE DATE '2026-10-20'
+        WHEN 'Fertilizantes' THEN (SELECT reference_date + 2 FROM demo_context)
+        WHEN 'Transporte' THEN (SELECT reference_date + 4 FROM demo_context)
+        ELSE (SELECT reference_date + 7 FROM demo_context)
     END,
     NULL,
     'Compromisso da safra em andamento para composição da agenda financeira.',
@@ -661,7 +664,8 @@ INSERT INTO financial_transactions (
 )
 SELECT
     'Manutenção emergencial do pulverizador', 6840.00, 'EXPENSE', 'OVERDUE', 'BOLETO',
-    DATE '2026-08-12', DATE '2026-08-28', NULL,
+    (SELECT reference_date - 12 FROM demo_context),
+    (SELECT reference_date - 5 FROM demo_context), NULL,
     'Conta em aberto para demonstrar alertas e agenda vencida.',
     farm_seed.farm_id, category.category_id, season.harvest_season_id, producer.user_id, NULL,
     'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
@@ -688,29 +692,30 @@ SELECT
     producer.user_id, NULL, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 FROM (
     VALUES
-        ('Aplicação complementar de fertilizante', 120000.00, 'EXPENSE', 'PAID', 'BANK_TRANSFER', DATE '2026-09-04', DATE '2026-09-04', DATE '2026-09-04', 'Pagamento realizado durante o manejo da safra.', 'Fertilizantes'),
-        ('Aplicação corretiva de defensivos', 86500.00, 'EXPENSE', 'PAID', 'PIX', DATE '2026-08-25', DATE '2026-08-22', DATE '2026-08-25', 'Aplicação adicional já concluída.', 'Defensivos agrícolas'),
-        ('Reparo extraordinário na colheitadeira', 74000.00, 'EXPENSE', 'PAID', 'BANK_TRANSFER', DATE '2026-08-28', DATE '2026-08-28', DATE '2026-08-28', 'Manutenção corretiva já liquidada.', 'Manutenção de máquinas'),
-        ('Diesel para preparo e aplicação', 42300.00, 'EXPENSE', 'PAID', 'PIX', DATE '2026-09-02', DATE '2026-08-30', DATE '2026-09-02', 'Combustível utilizado nas operações iniciais.', 'Combustíveis'),
-        ('Equipe de campo do manejo inicial', 55800.00, 'EXPENSE', 'PAID', 'BANK_TRANSFER', DATE '2026-09-05', DATE '2026-09-05', DATE '2026-09-05', 'Mão de obra já liquidada.', 'Mão de obra'),
-        ('Compra de fertilizante com vencimento em aberto', 104800.00, 'EXPENSE', 'OVERDUE', 'BOLETO', DATE '2026-08-20', DATE '2026-08-28', NULL, 'Fornecedor aguarda regularização do boleto.', 'Fertilizantes'),
-        ('Defensivo adquirido para controle emergencial', 88450.00, 'EXPENSE', 'OVERDUE', 'BOLETO', DATE '2026-08-21', DATE '2026-08-25', NULL, 'Compra adicional com vencimento ultrapassado.', 'Defensivos agrícolas'),
-        ('Abastecimento operacional em aberto', 43620.00, 'EXPENSE', 'OVERDUE', 'PIX', DATE '2026-08-20', DATE '2026-08-27', NULL, 'Pendência de combustível do início da safra.', 'Combustíveis'),
-        ('Manutenção corretiva contratada', 96780.00, 'EXPENSE', 'OVERDUE', 'BOLETO', DATE '2026-08-22', DATE '2026-08-29', NULL, 'Reparo extraordinário ainda não liquidado.', 'Manutenção de máquinas'),
-        ('Serviço de regulagem de equipamentos', 54930.00, 'EXPENSE', 'OVERDUE', 'BOLETO', DATE '2026-08-23', DATE '2026-08-30', NULL, 'Serviço concluído com cobrança pendente.', 'Serviços terceirizados'),
-        ('Folha complementar da equipe temporária', 71240.00, 'EXPENSE', 'OVERDUE', 'BANK_TRANSFER', DATE '2026-08-19', DATE '2026-09-01', NULL, 'Parcela de mão de obra permanece em aberto.', 'Mão de obra'),
-        ('Fatura de energia do sistema de apoio', 28760.00, 'EXPENSE', 'OVERDUE', 'BOLETO', DATE '2026-08-21', DATE '2026-09-02', NULL, 'Fatura operacional vencida.', 'Energia e irrigação'),
-        ('Frete de insumos para a propriedade', 37890.00, 'EXPENSE', 'OVERDUE', 'BOLETO', DATE '2026-08-24', DATE '2026-09-03', NULL, 'Transporte aguardando pagamento.', 'Transporte'),
-        ('Fertilizante contratado para cobertura', 68420.00, 'EXPENSE', 'PENDING', 'BOLETO', DATE '2026-09-05', DATE '2026-09-18', NULL, 'Compromisso programado para a próxima etapa de manejo.', 'Fertilizantes'),
-        ('Frete programado para recebimento de insumos', 35760.00, 'EXPENSE', 'PENDING', 'BOLETO', DATE '2026-09-05', DATE '2026-10-05', NULL, 'Vencimento futuro relacionado ao escoamento interno.', 'Transporte'),
-        ('Assistência técnica contratada para outubro', 42890.00, 'EXPENSE', 'PENDING', 'BANK_TRANSFER', DATE '2026-09-06', DATE '2026-10-17', NULL, 'Serviço técnico já contratado, ainda não vencido.', 'Serviços terceirizados'),
-        ('Recebimento de lote entregue', 95000.00, 'INCOME', 'PAID', 'BANK_TRANSFER', DATE '2026-09-05', DATE '2026-09-05', DATE '2026-09-05', 'Entrada efetivamente recebida pela venda já entregue.', 'Venda da produção'),
-        ('Venda de soja com prazo comercial vencido', 125400.00, 'INCOME', 'OVERDUE', 'BANK_TRANSFER', DATE '2026-08-20', DATE '2026-08-26', NULL, 'Cliente ainda não liquidou o lote faturado.', 'Venda da produção'),
-        ('Recebível de lote comercializado', 98750.00, 'INCOME', 'OVERDUE', 'BOLETO', DATE '2026-08-22', DATE '2026-08-31', NULL, 'Parcela de venda vencida e não recebida.', 'Venda da produção'),
-        ('Receita de lote complementar faturado', 64980.00, 'INCOME', 'OVERDUE', 'BANK_TRANSFER', DATE '2026-08-24', DATE '2026-09-02', NULL, 'Recebimento complementar pendente.', 'Venda de lote complementar'),
-        ('Recebível complementar com vencimento ultrapassado', 42860.00, 'INCOME', 'OVERDUE', 'BOLETO', DATE '2026-08-25', DATE '2026-09-04', NULL, 'Cliente aguarda reprogramação de pagamento.', 'Venda de lote complementar'),
-        ('Venda contratada com vencimento em novembro', 165280.00, 'INCOME', 'PENDING', 'BANK_TRANSFER', DATE '2026-09-06', DATE '2026-11-10', NULL, 'Receita contratada com recebimento futuro.', 'Venda da produção'),
-        ('Venda complementar programada', 76540.00, 'INCOME', 'PENDING', 'BOLETO', DATE '2026-09-06', DATE '2026-10-12', NULL, 'Receita prevista para lote complementar.', 'Venda de lote complementar')
+        ('Aplicação complementar de fertilizante', 120000.00, 'EXPENSE', 'PAID', 'BANK_TRANSFER', (SELECT reference_date - 50 FROM demo_context), (SELECT reference_date - 50 FROM demo_context), (SELECT reference_date - 50 FROM demo_context), 'Pagamento realizado durante o manejo da safra.', 'Fertilizantes'),
+        ('Aplicação corretiva de defensivos', 86500.00, 'EXPENSE', 'PAID', 'PIX', (SELECT reference_date - 60 FROM demo_context), (SELECT reference_date - 63 FROM demo_context), (SELECT reference_date - 60 FROM demo_context), 'Aplicação adicional já concluída.', 'Defensivos agrícolas'),
+        ('Reparo extraordinário na colheitadeira', 74000.00, 'EXPENSE', 'PAID', 'BANK_TRANSFER', (SELECT reference_date - 55 FROM demo_context), (SELECT reference_date - 55 FROM demo_context), (SELECT reference_date - 55 FROM demo_context), 'Manutenção corretiva já liquidada.', 'Manutenção de máquinas'),
+        ('Diesel para preparo e aplicação', 42300.00, 'EXPENSE', 'PAID', 'PIX', (SELECT reference_date - 48 FROM demo_context), (SELECT reference_date - 50 FROM demo_context), (SELECT reference_date - 48 FROM demo_context), 'Combustível utilizado nas operações iniciais.', 'Combustíveis'),
+        ('Equipe de campo do manejo inicial', 55800.00, 'EXPENSE', 'PAID', 'BANK_TRANSFER', (SELECT reference_date - 45 FROM demo_context), (SELECT reference_date - 45 FROM demo_context), (SELECT reference_date - 45 FROM demo_context), 'Mão de obra já liquidada.', 'Mão de obra'),
+        ('Compra de fertilizante com vencimento em aberto', 104800.00, 'EXPENSE', 'OVERDUE', 'BOLETO', (SELECT reference_date - 25 FROM demo_context), (SELECT reference_date - 20 FROM demo_context), NULL, 'Fornecedor aguarda regularização do boleto.', 'Fertilizantes'),
+        ('Defensivo adquirido para controle emergencial', 88450.00, 'EXPENSE', 'OVERDUE', 'BOLETO', (SELECT reference_date - 23 FROM demo_context), (SELECT reference_date - 18 FROM demo_context), NULL, 'Compra adicional com vencimento ultrapassado.', 'Defensivos agrícolas'),
+        ('Abastecimento operacional em aberto', 43620.00, 'EXPENSE', 'OVERDUE', 'PIX', (SELECT reference_date - 22 FROM demo_context), (SELECT reference_date - 16 FROM demo_context), NULL, 'Pendência de combustível do início da safra.', 'Combustíveis'),
+        ('Manutenção corretiva contratada', 96780.00, 'EXPENSE', 'OVERDUE', 'BOLETO', (SELECT reference_date - 20 FROM demo_context), (SELECT reference_date - 14 FROM demo_context), NULL, 'Reparo extraordinário ainda não liquidado.', 'Manutenção de máquinas'),
+        ('Serviço de regulagem de equipamentos', 54930.00, 'EXPENSE', 'OVERDUE', 'BOLETO', (SELECT reference_date - 18 FROM demo_context), (SELECT reference_date - 12 FROM demo_context), NULL, 'Serviço concluído com cobrança pendente.', 'Serviços terceirizados'),
+        ('Folha complementar da equipe temporária', 71240.00, 'EXPENSE', 'OVERDUE', 'BANK_TRANSFER', (SELECT reference_date - 16 FROM demo_context), (SELECT reference_date - 10 FROM demo_context), NULL, 'Parcela de mão de obra permanece em aberto.', 'Mão de obra'),
+        ('Fatura de energia do sistema de apoio', 28760.00, 'EXPENSE', 'OVERDUE', 'BOLETO', (SELECT reference_date - 14 FROM demo_context), (SELECT reference_date - 8 FROM demo_context), NULL, 'Fatura operacional vencida.', 'Energia e irrigação'),
+        ('Frete de insumos para a propriedade', 37890.00, 'EXPENSE', 'OVERDUE', 'BOLETO', (SELECT reference_date - 12 FROM demo_context), (SELECT reference_date - 6 FROM demo_context), NULL, 'Transporte aguardando pagamento.', 'Transporte'),
+        ('Fertilizante contratado para cobertura', 68420.00, 'EXPENSE', 'PENDING', 'BOLETO', (SELECT reference_date - 5 FROM demo_context), (SELECT reference_date + 2 FROM demo_context), NULL, 'Compromisso programado para a próxima etapa de manejo.', 'Fertilizantes'),
+        ('Frete programado para recebimento de insumos', 35760.00, 'EXPENSE', 'PENDING', 'BOLETO', (SELECT reference_date - 5 FROM demo_context), (SELECT reference_date + 4 FROM demo_context), NULL, 'Vencimento futuro relacionado ao escoamento interno.', 'Transporte'),
+        ('Assistência técnica contratada para outubro', 42890.00, 'EXPENSE', 'PENDING', 'BANK_TRANSFER', (SELECT reference_date - 4 FROM demo_context), (SELECT reference_date FROM demo_context), NULL, 'Serviço técnico contratado com vencimento no dia da execução.', 'Serviços terceirizados'),
+        ('Recebimento de lote entregue', 95000.00, 'INCOME', 'PAID', 'BANK_TRANSFER', (SELECT reference_date - 45 FROM demo_context), (SELECT reference_date - 45 FROM demo_context), (SELECT reference_date - 45 FROM demo_context), 'Entrada efetivamente recebida pela venda já entregue.', 'Venda da produção'),
+        ('Contrato de manutenção cancelado', 23100.00, 'EXPENSE', 'CANCELED', NULL, (SELECT reference_date - 30 FROM demo_context), (SELECT reference_date FROM demo_context), NULL, 'Compromisso cancelado sem liquidação financeira.', 'Manutenção de máquinas'),
+        ('Venda de soja com prazo comercial vencido', 125400.00, 'INCOME', 'OVERDUE', 'BANK_TRANSFER', (SELECT reference_date - 24 FROM demo_context), (SELECT reference_date - 20 FROM demo_context), NULL, 'Cliente ainda não liquidou o lote faturado.', 'Venda da produção'),
+        ('Recebível de lote comercializado', 98750.00, 'INCOME', 'OVERDUE', 'BOLETO', (SELECT reference_date - 22 FROM demo_context), (SELECT reference_date - 17 FROM demo_context), NULL, 'Parcela de venda vencida e não recebida.', 'Venda da produção'),
+        ('Receita de lote complementar faturado', 64980.00, 'INCOME', 'OVERDUE', 'BANK_TRANSFER', (SELECT reference_date - 20 FROM demo_context), (SELECT reference_date - 14 FROM demo_context), NULL, 'Recebimento complementar pendente.', 'Venda de lote complementar'),
+        ('Recebível complementar com vencimento ultrapassado', 42860.00, 'INCOME', 'OVERDUE', 'BOLETO', (SELECT reference_date - 18 FROM demo_context), (SELECT reference_date - 12 FROM demo_context), NULL, 'Cliente aguarda reprogramação de pagamento.', 'Venda de lote complementar'),
+        ('Venda contratada com vencimento em novembro', 165280.00, 'INCOME', 'PENDING', 'BANK_TRANSFER', (SELECT reference_date - 4 FROM demo_context), (SELECT reference_date + 10 FROM demo_context), NULL, 'Receita contratada com recebimento futuro.', 'Venda da produção'),
+        ('Venda complementar programada', 76540.00, 'INCOME', 'PENDING', 'BOLETO', (SELECT reference_date - 3 FROM demo_context), (SELECT reference_date + 3 FROM demo_context), NULL, 'Receita prevista para lote complementar.', 'Venda de lote complementar')
 ) AS crisis(
     description, amount, transaction_type, transaction_status, payment_method,
     transaction_date, due_date, paid_at, notes, category_name
@@ -732,7 +737,10 @@ INSERT INTO financial_transactions (
 SELECT
     'Manutenção da infraestrutura da fazenda',
     3180.00 + (ROW_NUMBER() OVER (ORDER BY farm_seed.farm_key) * 470.00),
-    'EXPENSE', 'PAID', 'PIX', DATE '2026-08-05', DATE '2026-08-04', DATE '2026-08-06',
+    'EXPENSE', 'PAID', 'PIX',
+    (SELECT reference_date - 70 FROM demo_context),
+    (SELECT reference_date - 71 FROM demo_context),
+    (SELECT reference_date - 69 FROM demo_context),
     'Despesa geral da propriedade sem vínculo a uma safra específica.',
     farm_seed.farm_id, category.category_id, NULL,
     CASE WHEN farm_seed.farm_key = 'vale' THEN collaborator.user_id ELSE producer.user_id END,
@@ -751,13 +759,17 @@ DECLARE
     future_paid_count INTEGER;
     planned_movement_count INTEGER;
     mismatched_category_count INTEGER;
+    canceled_count INTEGER;
+    due_today_count INTEGER;
+    next_7_days_count INTEGER;
 BEGIN
     SELECT COUNT(*) INTO farm_count FROM farms;
 
     SELECT COUNT(*) INTO future_paid_count
     FROM financial_transactions
     WHERE status = 'PAID'
-      AND (transaction_date > DATE '2026-09-08' OR paid_at > DATE '2026-09-08');
+      AND (transaction_date > (SELECT reference_date FROM demo_context)
+           OR paid_at > (SELECT reference_date FROM demo_context));
 
     SELECT COUNT(*) INTO planned_movement_count
     FROM financial_transactions transaction
@@ -770,14 +782,33 @@ BEGIN
     WHERE transaction.category_id IS NOT NULL
       AND (transaction.farm_id <> category.farm_id OR transaction.type::TEXT <> category.type::TEXT);
 
+    SELECT COUNT(*) INTO canceled_count
+    FROM financial_transactions
+    WHERE status = 'CANCELED';
+
+    SELECT COUNT(*) INTO due_today_count
+    FROM financial_transactions
+    WHERE status = 'PENDING'
+      AND due_date = (SELECT reference_date FROM demo_context);
+
+    SELECT COUNT(*) INTO next_7_days_count
+    FROM financial_transactions
+    WHERE status = 'PENDING'
+      AND due_date > (SELECT reference_date FROM demo_context)
+      AND due_date <= (SELECT reference_date + 7 FROM demo_context);
+
     IF farm_count <> 5
         OR future_paid_count <> 0
         OR planned_movement_count <> 0
-        OR mismatched_category_count <> 0 THEN
+        OR mismatched_category_count <> 0
+        OR canceled_count = 0
+        OR due_today_count = 0
+        OR next_7_days_count = 0 THEN
         RAISE EXCEPTION
-            'Seed validation failed: farms=%, future_paid=%, planned_movements=%, mismatched_categories=%',
+            'Seed validation failed: farms=%, future_paid=%, planned_movements=%, mismatched_categories=%, canceled=%, due_today=%, next_7_days=%',
             farm_count,
-            future_paid_count, planned_movement_count, mismatched_category_count;
+            future_paid_count, planned_movement_count, mismatched_category_count,
+            canceled_count, due_today_count, next_7_days_count;
     END IF;
 END $$;
 
@@ -802,7 +833,23 @@ SELECT 'transactions', COUNT(*)::TEXT FROM financial_transactions
 UNION ALL
 SELECT 'commitments_open', COUNT(*)::TEXT FROM financial_transactions WHERE status IN ('PENDING', 'OVERDUE')
 UNION ALL
-SELECT 'future_paid_transactions', COUNT(*)::TEXT FROM financial_transactions WHERE status = 'PAID' AND (transaction_date > DATE '2026-09-08' OR paid_at > DATE '2026-09-08')
+SELECT 'canceled_transactions', COUNT(*)::TEXT FROM financial_transactions WHERE status = 'CANCELED'
+UNION ALL
+SELECT 'due_today_open', COUNT(*)::TEXT
+FROM financial_transactions
+WHERE status = 'PENDING' AND due_date = (SELECT reference_date FROM demo_context)
+UNION ALL
+SELECT 'next_7_days_open', COUNT(*)::TEXT
+FROM financial_transactions
+WHERE status = 'PENDING'
+  AND due_date > (SELECT reference_date FROM demo_context)
+  AND due_date <= (SELECT reference_date + 7 FROM demo_context)
+UNION ALL
+SELECT 'future_paid_transactions', COUNT(*)::TEXT
+FROM financial_transactions
+WHERE status = 'PAID'
+  AND (transaction_date > (SELECT reference_date FROM demo_context)
+       OR paid_at > (SELECT reference_date FROM demo_context))
 UNION ALL
 SELECT 'planned_harvest_movements', COUNT(*)::TEXT
 FROM financial_transactions transaction JOIN harvest_seasons season ON season.id = transaction.harvest_season_id
@@ -866,19 +913,23 @@ FROM horizon_historical_results
 UNION ALL
 SELECT 'horizonte_overdue_payables_2026', COUNT(*) || ' / ' || TO_CHAR(COALESCE(SUM(transaction.amount), 0), 'FM999G999G999D00')
 FROM financial_transactions transaction JOIN horizonte ON horizonte.id = transaction.farm_id
-WHERE transaction.type = 'EXPENSE' AND transaction.status = 'OVERDUE' AND transaction.due_date < DATE '2026-09-08'
+WHERE transaction.type = 'EXPENSE' AND transaction.status = 'OVERDUE'
+  AND transaction.due_date < (SELECT reference_date FROM demo_context)
 UNION ALL
 SELECT 'horizonte_overdue_receivables_2026', COUNT(*) || ' / ' || TO_CHAR(COALESCE(SUM(transaction.amount), 0), 'FM999G999G999D00')
 FROM financial_transactions transaction JOIN horizonte ON horizonte.id = transaction.farm_id
-WHERE transaction.type = 'INCOME' AND transaction.status = 'OVERDUE' AND transaction.due_date < DATE '2026-09-08'
+WHERE transaction.type = 'INCOME' AND transaction.status = 'OVERDUE'
+  AND transaction.due_date < (SELECT reference_date FROM demo_context)
 UNION ALL
 SELECT 'horizonte_future_payables', COUNT(*) || ' / ' || TO_CHAR(COALESCE(SUM(transaction.amount), 0), 'FM999G999G999D00')
 FROM financial_transactions transaction JOIN horizonte ON horizonte.id = transaction.farm_id
-WHERE transaction.type = 'EXPENSE' AND transaction.status = 'PENDING' AND transaction.due_date > DATE '2026-09-08'
+WHERE transaction.type = 'EXPENSE' AND transaction.status = 'PENDING'
+  AND transaction.due_date > (SELECT reference_date FROM demo_context)
 UNION ALL
 SELECT 'horizonte_future_receivables', COUNT(*) || ' / ' || TO_CHAR(COALESCE(SUM(transaction.amount), 0), 'FM999G999G999D00')
 FROM financial_transactions transaction JOIN horizonte ON horizonte.id = transaction.farm_id
-WHERE transaction.type = 'INCOME' AND transaction.status = 'PENDING' AND transaction.due_date > DATE '2026-09-08'
+WHERE transaction.type = 'INCOME' AND transaction.status = 'PENDING'
+  AND transaction.due_date > (SELECT reference_date FROM demo_context)
 UNION ALL
 SELECT 'horizonte_2026_planned_cost_revenue', TO_CHAR(planned_cost, 'FM999G999G999D00') || ' / ' || TO_CHAR(planned_revenue, 'FM999G999G999D00') FROM horizon_2026_plan
 UNION ALL

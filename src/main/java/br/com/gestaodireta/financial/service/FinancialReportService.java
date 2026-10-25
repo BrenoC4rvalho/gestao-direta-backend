@@ -635,7 +635,10 @@ public class FinancialReportService {
                                 enrichHarvest(
                                         harvest,
                                         harvestsById.get(harvest.harvestSeasonId()),
-                                        budgetItemsByHarvest.get(harvest.harvestSeasonId()),
+                                        harvest.harvestSeasonId() == null
+                                                ? null
+                                                : budgetItemsByHarvest.get(
+                                                        harvest.harvestSeasonId()),
                                         totalIncome))
                 .toList();
     }
