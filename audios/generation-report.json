@@ -1,0 +1,507 @@
+{
+  "count": 50,
+  "format": "ogg",
+  "codec": "opus",
+  "files": [
+    {
+      "id": "AUDIO_001",
+      "audioFile": "AUDIO_001.ogg",
+      "durationSeconds": 3.524,
+      "sizeBytes": 32854,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "4470ab376059dd8e2d438c04162b129b54441bb2673d83fe6477047206f2b3da"
+    },
+    {
+      "id": "AUDIO_002",
+      "audioFile": "AUDIO_002.ogg",
+      "durationSeconds": 2.758,
+      "sizeBytes": 25256,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "37f6ac0f23871cedac3546a2abc21ab46fdd91b3887f204919c02a8aac572a3e"
+    },
+    {
+      "id": "AUDIO_003",
+      "audioFile": "AUDIO_003.ogg",
+      "durationSeconds": 3.095,
+      "sizeBytes": 28060,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "9a1eb0a1cbd09ea8ffe1bdebdc255a25a33bff900e063f06b8273cf55ba6bea7"
+    },
+    {
+      "id": "AUDIO_004",
+      "audioFile": "AUDIO_004.ogg",
+      "durationSeconds": 3.199,
+      "sizeBytes": 28581,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "d4008621a49844fd0676489fe9f50bb5c4554c85f003318c0a859610b04087cd"
+    },
+    {
+      "id": "AUDIO_005",
+      "audioFile": "AUDIO_005.ogg",
+      "durationSeconds": 4.0,
+      "sizeBytes": 35642,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "39ccdfb84a47935564aaac00fbf6e430eb5abaa7fcc7b7854a8dbdf25c23e930"
+    },
+    {
+      "id": "AUDIO_006",
+      "audioFile": "AUDIO_006.ogg",
+      "durationSeconds": 3.675,
+      "sizeBytes": 32284,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "2b93f018a0ad17536d4a0e7bdd1822b5262668811184bd3a759d539131a69947"
+    },
+    {
+      "id": "AUDIO_007",
+      "audioFile": "AUDIO_007.ogg",
+      "durationSeconds": 4.488,
+      "sizeBytes": 39042,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "345e0b75e6f6b854ff238b9c3806008f904fbec70fec29f0a1458b7d02308522"
+    },
+    {
+      "id": "AUDIO_008",
+      "audioFile": "AUDIO_008.ogg",
+      "durationSeconds": 3.501,
+      "sizeBytes": 31617,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "ad5e7dd9ef5afaa4026423bdeebd7b45fa0d59817f5d77da3b8de1bc0b7b468e"
+    },
+    {
+      "id": "AUDIO_009",
+      "audioFile": "AUDIO_009.ogg",
+      "durationSeconds": 3.083,
+      "sizeBytes": 27326,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "657ac87b203658dd55ec98f54bca90a68afe6090633e4f546389a3f7f2298475"
+    },
+    {
+      "id": "AUDIO_010",
+      "audioFile": "AUDIO_010.ogg",
+      "durationSeconds": 3.548,
+      "sizeBytes": 32535,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "9e79bbb894950736dd67f7675f713afd23bf751d7b442ff6a012f97b5cec441a"
+    },
+    {
+      "id": "AUDIO_011",
+      "audioFile": "AUDIO_011.ogg",
+      "durationSeconds": 2.909,
+      "sizeBytes": 26546,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "86831a2e04135f069eea648ba1073637eac1ee8f65e9db60e2e7cb70aff09243"
+    },
+    {
+      "id": "AUDIO_012",
+      "audioFile": "AUDIO_012.ogg",
+      "durationSeconds": 3.06,
+      "sizeBytes": 27904,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "e855a039230b44071aaee31824b16a77ddbfef3c5579cc6bb46fd47c384c1e39"
+    },
+    {
+      "id": "AUDIO_013",
+      "audioFile": "AUDIO_013.ogg",
+      "durationSeconds": 3.478,
+      "sizeBytes": 31035,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "d42ca59fffcc03fa84f725487c1d4cf52758adaa9ebfb4a84612f099af1e7fdd"
+    },
+    {
+      "id": "AUDIO_014",
+      "audioFile": "AUDIO_014.ogg",
+      "durationSeconds": 3.617,
+      "sizeBytes": 33005,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "766b491892f89683e49c9d1b56f8c57b62944deed6c1f7312f1f90d1e3b983f3"
+    },
+    {
+      "id": "AUDIO_015",
+      "audioFile": "AUDIO_015.ogg",
+      "durationSeconds": 3.536,
+      "sizeBytes": 31283,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "5a357ab955596f49aede22c3dcde7a67b03f591f6efbfb70ecbcbdb42ca86bfb"
+    },
+    {
+      "id": "AUDIO_016",
+      "audioFile": "AUDIO_016.ogg",
+      "durationSeconds": 4.256,
+      "sizeBytes": 38781,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "5454bfd80a021146fc531bafa8923b2daa446a462d09808dbe683c25e9c5fd52"
+    },
+    {
+      "id": "AUDIO_017",
+      "audioFile": "AUDIO_017.ogg",
+      "durationSeconds": 3.536,
+      "sizeBytes": 31686,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "ebfa6244193ce0e32ad1bb5cced2b6c80c5deafcd108e588d4fa3de3c89ce37e"
+    },
+    {
+      "id": "AUDIO_018",
+      "audioFile": "AUDIO_018.ogg",
+      "durationSeconds": 3.675,
+      "sizeBytes": 33150,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "780942a6ad2242e7cf1e300d838f9d252ac9c58da22d17801484ee771bf97b68"
+    },
+    {
+      "id": "AUDIO_019",
+      "audioFile": "AUDIO_019.ogg",
+      "durationSeconds": 5.811,
+      "sizeBytes": 50438,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "4cf2548b3e953e2b72e26bbf015b5f366f973b7d347d55090b9449a471974cbd"
+    },
+    {
+      "id": "AUDIO_020",
+      "audioFile": "AUDIO_020.ogg",
+      "durationSeconds": 5.138,
+      "sizeBytes": 44515,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "549e6bf48c21f05c1b693b088ea30c31033e5141c5440de85f7a5318c5809282"
+    },
+    {
+      "id": "AUDIO_021",
+      "audioFile": "AUDIO_021.ogg",
+      "durationSeconds": 2.34,
+      "sizeBytes": 21609,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "02846b434ca81153ce1d018188a8a2f6b44b4f3d510949e8230ac86162328ce1"
+    },
+    {
+      "id": "AUDIO_022",
+      "audioFile": "AUDIO_022.ogg",
+      "durationSeconds": 3.78,
+      "sizeBytes": 34096,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "5c4c10ffecc895179958540c0aa91704cd94cfac0196e241b48bc4b506c810cd"
+    },
+    {
+      "id": "AUDIO_023",
+      "audioFile": "AUDIO_023.ogg",
+      "durationSeconds": 2.781,
+      "sizeBytes": 26074,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "b4765f36411aaf4c5670c82a8068dda1f8d45c343b7e9dcbdfb7a770aa8849a7"
+    },
+    {
+      "id": "AUDIO_024",
+      "audioFile": "AUDIO_024.ogg",
+      "durationSeconds": 4.651,
+      "sizeBytes": 40897,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "40b2e6de5328353a75c209a72cbf766c6c6504c7fec1ad32dceb6c2c68ddf210"
+    },
+    {
+      "id": "AUDIO_025",
+      "audioFile": "AUDIO_025.ogg",
+      "durationSeconds": 5.382,
+      "sizeBytes": 45480,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "6ae59d3c8e8bb37cbfadb326187ffb50150e616adf6ad9f00d0f4145a035d325"
+    },
+    {
+      "id": "AUDIO_026",
+      "audioFile": "AUDIO_026.ogg",
+      "durationSeconds": 4.534,
+      "sizeBytes": 39491,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "b6906fc0c294384675732c133deea88672d689986dc34e1d27621cab4204677d"
+    },
+    {
+      "id": "AUDIO_027",
+      "audioFile": "AUDIO_027.ogg",
+      "durationSeconds": 3.548,
+      "sizeBytes": 32110,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "774e12e4f726a52098593181e80b2dbae09f84d53dbec189705313f55dcb7718"
+    },
+    {
+      "id": "AUDIO_028",
+      "audioFile": "AUDIO_028.ogg",
+      "durationSeconds": 3.106,
+      "sizeBytes": 28025,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "41c685fc98aabe8fa7456b55df76df7a3ea88da14692be44e97d8c5c5480bb6f"
+    },
+    {
+      "id": "AUDIO_029",
+      "audioFile": "AUDIO_029.ogg",
+      "durationSeconds": 3.849,
+      "sizeBytes": 34585,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "3abfc297afe0d05f5c7e6af713087a874b5d934e62a1520981dce0fa158fc3b5"
+    },
+    {
+      "id": "AUDIO_030",
+      "audioFile": "AUDIO_030.ogg",
+      "durationSeconds": 3.118,
+      "sizeBytes": 28149,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "d2cf5d966eba2689763885b117b2665faa1ce078e2a909bfd9012335821368ae"
+    },
+    {
+      "id": "AUDIO_031",
+      "audioFile": "AUDIO_031.ogg",
+      "durationSeconds": 2.479,
+      "sizeBytes": 22358,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "11c4d46fd2fc7445acaac76dd906fb0ce94f41f6002f3091180c5579ed949d15"
+    },
+    {
+      "id": "AUDIO_032",
+      "audioFile": "AUDIO_032.ogg",
+      "durationSeconds": 3.408,
+      "sizeBytes": 31135,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "2794e077be572fa5d7b03ba77b25b98c8777714e14f010c03cb3a2278d88d75f"
+    },
+    {
+      "id": "AUDIO_033",
+      "audioFile": "AUDIO_033.ogg",
+      "durationSeconds": 3.339,
+      "sizeBytes": 29538,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "91a26ce8f2e449f432c3739a64480f25ebed496b23ca8021015c3afaba8e59be"
+    },
+    {
+      "id": "AUDIO_034",
+      "audioFile": "AUDIO_034.ogg",
+      "durationSeconds": 3.164,
+      "sizeBytes": 28254,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "027824aaaa7b4e619423474c03c467e790b1716746bf0ddc4983cfebf4ae7fbf"
+    },
+    {
+      "id": "AUDIO_035",
+      "audioFile": "AUDIO_035.ogg",
+      "durationSeconds": 2.979,
+      "sizeBytes": 26829,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "2ba2013cdff582ed0643363219eb8b0803f48d5db1c2585324da7d4ff9db3a63"
+    },
+    {
+      "id": "AUDIO_036",
+      "audioFile": "AUDIO_036.ogg",
+      "durationSeconds": 5.312,
+      "sizeBytes": 46362,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "893738cde9b2b015f283e0773c7ad433e7617519ad1c3cbf48b755a4df36eaf6"
+    },
+    {
+      "id": "AUDIO_037",
+      "audioFile": "AUDIO_037.ogg",
+      "durationSeconds": 4.151,
+      "sizeBytes": 37871,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "bcc12d04df43fbfc25df2487ae3f6ccc32521471feab0838883c360b00b08664"
+    },
+    {
+      "id": "AUDIO_038",
+      "audioFile": "AUDIO_038.ogg",
+      "durationSeconds": 3.78,
+      "sizeBytes": 34651,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "97b6cb642681fff78e2c4b60cb0d9f315046e7932a7d4b71f081ffb99b36783b"
+    },
+    {
+      "id": "AUDIO_039",
+      "audioFile": "AUDIO_039.ogg",
+      "durationSeconds": 3.826,
+      "sizeBytes": 32507,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "0fe82c01e6fe1f7dd59e5c5bec4794261062f0cd85971e2185f3cab98df768bf"
+    },
+    {
+      "id": "AUDIO_040",
+      "audioFile": "AUDIO_040.ogg",
+      "durationSeconds": 4.929,
+      "sizeBytes": 43187,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "a140de1a2fe2e00e7974fc5a9da1b19c0b721429c5bfefa0caae5b2a903d5f01"
+    },
+    {
+      "id": "AUDIO_041",
+      "audioFile": "AUDIO_041.ogg",
+      "durationSeconds": 3.606,
+      "sizeBytes": 32188,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "6af9c07869c487c0147793d374de9d6937d3ed71001dd36e9a0df3346aaba63e"
+    },
+    {
+      "id": "AUDIO_042",
+      "audioFile": "AUDIO_042.ogg",
+      "durationSeconds": 3.478,
+      "sizeBytes": 30575,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "93e0ed8c698a9fef7f085519e23ba1666ae5061f1ba5882b727c2a279c71cd41"
+    },
+    {
+      "id": "AUDIO_043",
+      "audioFile": "AUDIO_043.ogg",
+      "durationSeconds": 4.999,
+      "sizeBytes": 43560,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "c2646e2b7844f5580215f4270169bbd18e3daed0da1bd43536b28725af98efa3"
+    },
+    {
+      "id": "AUDIO_044",
+      "audioFile": "AUDIO_044.ogg",
+      "durationSeconds": 4.918,
+      "sizeBytes": 43465,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "a46e659c083adedbd42e319a90dd7ee4647bc72fda376aafc4f5a8b1012213e6"
+    },
+    {
+      "id": "AUDIO_045",
+      "audioFile": "AUDIO_045.ogg",
+      "durationSeconds": 4.395,
+      "sizeBytes": 38554,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "a92ec20c70bc7c1ecf484c05c622801a22915c6c0cb197b005082b2d75601ab3"
+    },
+    {
+      "id": "AUDIO_046",
+      "audioFile": "AUDIO_046.ogg",
+      "durationSeconds": 8.284,
+      "sizeBytes": 71744,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "71c6442c787f47c8ef1531cac272528c8105db87b483080e15e8d42f09c4f381"
+    },
+    {
+      "id": "AUDIO_047",
+      "audioFile": "AUDIO_047.ogg",
+      "durationSeconds": 4.116,
+      "sizeBytes": 36273,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "98a402c3253f4b7c29875e3b9c720e5b2f2ffcc52ef6c09ed637b2d1a558d4da"
+    },
+    {
+      "id": "AUDIO_048",
+      "audioFile": "AUDIO_048.ogg",
+      "durationSeconds": 3.861,
+      "sizeBytes": 34448,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "d982810bc2a6f68bb3da47b03d7009c2833b0c9d89514beef284634921e79ade"
+    },
+    {
+      "id": "AUDIO_049",
+      "audioFile": "AUDIO_049.ogg",
+      "durationSeconds": 7.019,
+      "sizeBytes": 60926,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "9e26c23ba959014336b46d5f2ef55526f5ca22e61dda372b9834cd4d80c1fd06"
+    },
+    {
+      "id": "AUDIO_050",
+      "audioFile": "AUDIO_050.ogg",
+      "durationSeconds": 6.531,
+      "sizeBytes": 58070,
+      "codec": "opus",
+      "sampleRateHz": 48000,
+      "channels": 1,
+      "sha256": "fe56e430ab812156946134f168cddf3363ab6a5d36458002fcce30bc991828ec"
+    }
+  ]
+}

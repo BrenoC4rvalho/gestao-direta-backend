@@ -452,24 +452,55 @@ Para gerar o artefato e executar a suíte de testes:
 
 ### Benchmark de áudio por IA
 
-O benchmark usa os fixtures OGG/Opus em `audios/audio`, o transcritor real e a
-mesma extração e validação financeira do fluxo produtivo. Não chama Telegram e
-não persiste pendências ou movimentações. Gere os fixtures uma vez, localmente,
-com Piper e ffmpeg (`python audios/generate_dataset.py`), então execute:
+O benchmark usa exatamente 50 fixtures OGG/Opus em `audios/audio`, o transcritor
+real e a mesma extração e validação financeira do fluxo produtivo. Não chama
+Telegram e não persiste pendências ou movimentações. O manifesto está em
+`audios/cases.json`, o ground truth em `audios/ground-truth.json` e o gerador em
+`audios/scripts/generate_audio.py`.
+
+Gere ou valide os fixtures com Piper, PyAV e ffmpeg conforme
+`audios/README.md`:
+
+```bash
+python audios/scripts/generate_audio.py
+python audios/scripts/validate_audio.py
+```
+
+O modo live exige confirmação explícita para impedir chamadas externas
+acidentais. Um subconjunto pode ser executado assim:
 
 ```bash
 ./mvnw test -Pai-audio-benchmark \
   -Dai.audio.benchmark.provider=ollama \
-  -Dai.audio.benchmark.limit=5
+  -Dai.audio.benchmark.limit=5 \
+  -Dai.audio.benchmark.allow-external=true
 ```
 
-Use `gemini` ou `both` para a extração. O provider/modelo de transcrição é
-registrado separadamente. `-Dai.audio.benchmark.resume=true` reaproveita os IDs já
-gravados em `target/ai-audio-benchmark/results.jsonl`. Os relatórios incluem
-WER, CER, acerto de valor transcrito, extração e resultado ponta a ponta.
+Use `gemini`, `ollama` ou `both` para a extração. O provider/modelo de
+transcrição é registrado separadamente. `-Dai.audio.benchmark.resume=true`
+reaproveita os casos já gravados em `target/ai-audio-benchmark/results.jsonl`.
+Os relatórios incluem WER, CER, acerto de valor transcrito, campos extraídos,
+alucinações, falhas técnicas, latências média/mediana/P95/P99 e resultados por
+grupo.
 
-O dataset TTS sintético é apropriado para repetibilidade e regressão, mas não
-representa sotaques, ruído, hesitações, celular ou fala rural real.
+Se uma execução anterior falhar somente durante a geração do relatório, é
+possível reconstruí-lo sem chamadas externas:
+
+```bash
+./mvnw test -Dtest=AiFinancialAudioBenchmarkIT \
+  -Dai.audio.benchmark.rebuild=true
+```
+
+Resultados incompatíveis ou duplicados não são ignorados silenciosamente. Eles
+são registrados em `target/ai-audio-benchmark/rejected-results.json`, enquanto
+`results.json` contém somente os resultados atuais válidos e deduplicados.
+
+Para executar todos os 50 casos, use `-Dai.audio.benchmark.limit=50` com o
+mesmo `allow-external=true`, somente depois de conferir o provider, modelo,
+credenciais e custo/quantidade de chamadas.
+
+O dataset TTS é apropriado para repetibilidade e regressão, mas não representa
+sotaques, ruído, hesitações, celular ou fala rural espontânea.
 
 Para gerar o pacote da aplicação:
 
