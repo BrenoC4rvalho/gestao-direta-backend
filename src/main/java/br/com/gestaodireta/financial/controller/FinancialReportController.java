@@ -84,6 +84,34 @@ public class FinancialReportController {
                 .body(file.content());
     }
 
+    @GetMapping("/export/xlsx")
+    @PreAuthorize("@financialAccess.canViewFinancialDataOrMissingFarm(#farmId)")
+    public ResponseEntity<byte[]> exportXlsx(
+            @RequestParam Long farmId,
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate,
+            @RequestParam FinancialReportBasis basis,
+            @RequestParam(required = false) List<Long> harvestSeasonIds,
+            @RequestParam(required = false) List<Long> categoryIds,
+            @RequestParam(defaultValue = "MONTHLY") FinancialReportGranularity granularity) {
+        FinancialReportExportFile file =
+                financialReportExportService.exportXlsx(
+                        new FinancialReportFilter(
+                                farmId,
+                                startDate,
+                                endDate,
+                                basis,
+                                harvestSeasonIds,
+                                categoryIds,
+                                granularity));
+        return ResponseEntity.ok()
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + file.filename() + "\"")
+                .header(HttpHeaders.CONTENT_TYPE, file.contentType())
+                .body(file.content());
+    }
+
     @GetMapping("/transactions")
     @PreAuthorize("@financialAccess.canViewFinancialDataOrMissingFarm(#farmId)")
     public PageResponse<FinancialReportTransactionResponse> findTransactions(

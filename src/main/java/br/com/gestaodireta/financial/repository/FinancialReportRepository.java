@@ -689,6 +689,39 @@ public class FinancialReportRepository {
                 content, page, size, totalElements, totalPages, page == 0, page + 1 >= totalPages);
     }
 
+    public List<FinancialReportTransactionResponse> findAllTransactions(
+            FinancialReportFilter filter) {
+        String sql =
+                FILTERED_TRANSACTIONS
+                        + """
+                          select id, description, type, amount, status, transaction_date, due_date, paid_at,
+                                 reference_date, category_id, category_name, harvest_season_id, harvest_season_name
+                          from filtered_transactions
+                          where reference_date between :startDate and :endDate
+                          order by reference_date asc, id asc
+                          """;
+        return jdbcTemplate.query(sql, parameters(filter), this::mapTransaction);
+    }
+
+    private FinancialReportTransactionResponse mapTransaction(
+            java.sql.ResultSet resultSet, int rowNum) throws java.sql.SQLException {
+        return new FinancialReportTransactionResponse(
+                resultSet.getLong("id"),
+                resultSet.getString("description"),
+                TransactionType.valueOf(resultSet.getString("type")),
+                decimal(resultSet.getBigDecimal("amount")),
+                br.com.gestaodireta.financial.enumeration.PaymentStatus.valueOf(
+                        resultSet.getString("status")),
+                localDate(resultSet.getDate("transaction_date")),
+                localDate(resultSet.getDate("due_date")),
+                localDate(resultSet.getDate("paid_at")),
+                localDate(resultSet.getDate("reference_date")),
+                nullableLong(resultSet, "category_id"),
+                resultSet.getString("category_name"),
+                nullableLong(resultSet, "harvest_season_id"),
+                resultSet.getString("harvest_season_name"));
+    }
+
     private FinancialCategorySummaryGroupResponse categoryGroup(
             TransactionType type, List<CategoryAmount> categoryAmounts) {
         CategoryAmount first = categoryAmounts.isEmpty() ? null : categoryAmounts.getFirst();
