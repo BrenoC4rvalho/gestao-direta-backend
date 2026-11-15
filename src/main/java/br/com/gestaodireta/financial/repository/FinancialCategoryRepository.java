@@ -15,6 +15,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface FinancialCategoryRepository extends JpaRepository<FinancialCategory, Long> {
 
+    Optional<FinancialCategory> findByFarmIdAndTypeAndNameIgnoreCase(
+            Long farmId, TransactionType type, String name);
+
     @Query(
             """
             select category

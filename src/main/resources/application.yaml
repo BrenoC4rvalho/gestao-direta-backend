@@ -61,6 +61,9 @@ server:
   forward-headers-strategy: framework
 
 app:
+  demo-seed:
+    enabled: ${APP_DEMO_SEED_ENABLED:false}
+    user-email: ${APP_DEMO_SEED_USER_EMAIL:demo@gestaodireta.local}
   transcription:
     provider: ${APP_TRANSCRIPTION_PROVIDER:gemini}
     whisper:
