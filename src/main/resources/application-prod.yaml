@@ -1,0 +1,32 @@
+spring:
+  docker:
+    compose:
+      enabled: false
+  jpa:
+    show-sql: false
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+info:
+  app:
+    version: 1.0.0
+
+app:
+  cookie:
+    secure: true
+  telegram:
+    audio-debug:
+      save-enabled: false
+  ai:
+    audio-transcription:
+      debug-response: false
