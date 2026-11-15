@@ -3,7 +3,7 @@ WORKDIR /workspace
 COPY pom.xml .
 RUN mvn -B -ntp dependency:go-offline
 COPY src ./src
-RUN mvn -B -ntp -DskipTests package && test -f target/api-1.0.0.jar && unzip -p target/api-1.0.0.jar META-INF/MANIFEST.MF | grep -q 'Main-Class: org.springframework.boot.loader.launch.JarLauncher'
+RUN mvn -B -ntp -DskipTests package && test -f target/api-1.0.0.jar && jar xf target/api-1.0.0.jar META-INF/MANIFEST.MF && grep -q 'Main-Class: org.springframework.boot.loader.launch.JarLauncher' META-INF/MANIFEST.MF
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
