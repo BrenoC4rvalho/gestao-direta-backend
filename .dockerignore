@@ -1,0 +1,15 @@
+.git
+.github
+.idea
+.vscode
+.env
+.env.*
+!.env.example
+target
+**/target
+services
+compose.yaml
+compose.prod.yaml
+README.md
+telegram-audio-debug
+audios

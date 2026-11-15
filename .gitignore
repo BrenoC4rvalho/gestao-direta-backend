@@ -42,3 +42,5 @@ services/transcription-whisper/.venv/
 services/transcription-whisper/.pytest_cache/
 services/transcription-whisper/.ruff_cache/
 services/transcription-whisper/**/__pycache__/
+
+!.env.prod.example
