@@ -18,14 +18,10 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - database
-      - proxy
-    healthcheck:
-      test: ["CMD", "java", "-version"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
+      database:
+      proxy:
+        aliases:
+          - gestao-direta-api
 
   postgres:
     image: postgres:16-alpine
