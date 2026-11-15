@@ -21,6 +21,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface FinancialTransactionRepository extends JpaRepository<FinancialTransaction, Long> {
 
+    List<FinancialTransaction> findByFarmIdAndNotesStartingWith(Long farmId, String notesPrefix);
+
     String FILTERED_TRANSACTIONS_PREDICATE =
             """
             where transaction.farm.id = :farmId
