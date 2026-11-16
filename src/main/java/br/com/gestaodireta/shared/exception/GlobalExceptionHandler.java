@@ -4,7 +4,9 @@ import br.com.gestaodireta.ai.service.AiModelNotAvailableException;
 import br.com.gestaodireta.ai.service.AiParsingException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -28,7 +30,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ErrorResponse> handleConflictException(
             ConflictException exception, HttpServletRequest request) {
-        return buildResponse(HttpStatus.CONFLICT, exception.getMessage(), request, List.of());
+        return buildResponse(
+                HttpStatus.CONFLICT,
+                exception.getMessage(),
+                request,
+                List.of(),
+                exception.getFieldErrors());
     }
 
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
@@ -68,7 +75,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ValidationException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(
             ValidationException exception, HttpServletRequest request) {
-        return buildResponse(HttpStatus.BAD_REQUEST, exception.getMessage(), request, List.of());
+        return buildResponse(
+                HttpStatus.BAD_REQUEST,
+                exception.getMessage(),
+                request,
+                List.of(),
+                exception.getFieldErrors());
     }
 
     @ExceptionHandler(AiParsingException.class)
@@ -112,8 +124,14 @@ public class GlobalExceptionHandler {
                 exception.getBindingResult().getFieldErrors().stream()
                         .map(this::formatFieldError)
                         .toList();
+        Map<String, String> fieldErrors = new LinkedHashMap<>();
+        exception
+                .getBindingResult()
+                .getFieldErrors()
+                .forEach(error -> fieldErrors.put(error.getField(), friendlyFieldMessage(error)));
 
-        return buildResponse(HttpStatus.BAD_REQUEST, "Validation failed", request, details);
+        return buildResponse(
+                HttpStatus.BAD_REQUEST, "Validation failed", request, details, fieldErrors);
     }
 
     @ExceptionHandler(Exception.class)
@@ -128,6 +146,15 @@ public class GlobalExceptionHandler {
 
     private ResponseEntity<ErrorResponse> buildResponse(
             HttpStatus status, String message, HttpServletRequest request, List<String> details) {
+        return buildResponse(status, message, request, details, Map.of());
+    }
+
+    private ResponseEntity<ErrorResponse> buildResponse(
+            HttpStatus status,
+            String message,
+            HttpServletRequest request,
+            List<String> details,
+            Map<String, String> fieldErrors) {
         ErrorResponse response =
                 new ErrorResponse(
                         LocalDateTime.now(),
@@ -135,12 +162,28 @@ public class GlobalExceptionHandler {
                         status.getReasonPhrase(),
                         message,
                         request.getRequestURI(),
-                        details);
+                        details,
+                        fieldErrors);
 
         return ResponseEntity.status(status).body(response);
     }
 
     private String formatFieldError(FieldError fieldError) {
         return fieldError.getField() + ": " + fieldError.getDefaultMessage();
+    }
+
+    private String friendlyFieldMessage(FieldError error) {
+        return switch (error.getField()) {
+            case "name" -> "Informe o nome do usuário.";
+            case "email" ->
+                    "Email".equals(error.getCode())
+                            ? "Informe um e-mail válido."
+                            : "Informe o e-mail.";
+            case "password", "newPassword" ->
+                    "A senha ainda não atende a todos os requisitos de segurança.";
+            case "phoneNumber" -> "Informe um telefone com DDD válido.";
+            case "userType" -> "Selecione o tipo de usuário.";
+            default -> error.getDefaultMessage();
+        };
     }
 }

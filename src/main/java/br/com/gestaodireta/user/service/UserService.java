@@ -1,6 +1,7 @@
 package br.com.gestaodireta.user.service;
 
 import br.com.gestaodireta.shared.exception.BusinessException;
+import br.com.gestaodireta.shared.exception.ConflictException;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
 import br.com.gestaodireta.shared.exception.ValidationException;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
@@ -13,6 +14,7 @@ import br.com.gestaodireta.user.dto.UserResponse;
 import br.com.gestaodireta.user.dto.UserStatusUpdateRequest;
 import br.com.gestaodireta.user.dto.UserTypeUpdateRequest;
 import br.com.gestaodireta.user.dto.UserUpdateRequest;
+import br.com.gestaodireta.user.config.PasswordPolicy;
 import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.entity.UserContact;
 import br.com.gestaodireta.user.enumeration.PhoneVerificationStatus;
@@ -36,8 +38,7 @@ public class UserService {
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
 
-    private static final Pattern PASSWORD_PATTERN =
-            Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,}$");
+    private static final Pattern PASSWORD_PATTERN = Pattern.compile(PasswordPolicy.REGEX);
 
     private final UserRepository userRepository;
 
@@ -64,13 +65,23 @@ public class UserService {
 
     @Transactional
     public UserResponse create(UserCreateRequest request) {
-        if (userRepository.existsByEmail(request.email())) {
-            throw new BusinessException("Email is already in use");
+        String email = normalizeEmail(request.email());
+        if (userRepository.findByEmailIgnoreCase(email).isPresent()) {
+            throw new ConflictException(
+                    "Email is already in use",
+                    java.util.Map.of("email", "Este e-mail já está cadastrado."));
+        }
+
+        String phone = userContactService.normalize(request.phoneNumber());
+        if (userContactRepository.existsByPhoneNumber(phone)) {
+            throw new ConflictException(
+                    "Phone number is already in use",
+                    java.util.Map.of("phoneNumber", "Este telefone já está cadastrado."));
         }
 
         User user = new User();
         user.setName(request.name());
-        user.setEmail(request.email());
+        user.setEmail(email);
         user.setPassword(passwordEncoder.encode(request.password()));
         user.setDocument(request.document());
         user.setUserType(request.userType());
@@ -79,7 +90,7 @@ public class UserService {
         User savedUser = userRepository.save(user);
         UserContact contact = new UserContact();
         contact.setUser(savedUser);
-        contact.setPhoneNumber(userContactService.normalize(request.phoneNumber()));
+        contact.setPhoneNumber(phone);
         contact.setPhoneVerificationStatus(PhoneVerificationStatus.PENDING);
         contact.setPreferredChannel(PreferredMessagingChannel.NONE);
         contact.setStatus(UserContactStatus.PENDING);
