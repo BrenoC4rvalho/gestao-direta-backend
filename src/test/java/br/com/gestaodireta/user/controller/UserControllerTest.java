@@ -206,7 +206,24 @@ class UserControllerTest extends PostgresIntegrationTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.details").isArray());
+                .andExpect(jsonPath("$.details").isArray())
+                .andExpect(jsonPath("$.fieldErrors.password").value("A senha ainda não atende a todos os requisitos de segurança."));
+    }
+
+    @Test
+    void shouldRejectInvalidPhoneWithFieldError() throws Exception {
+        String body = userBody("Maria Silva", "invalid-phone@example.com", UserType.USER)
+                .replace("+5524" + String.format("%08d", Math.floorMod("invalid-phone@example.com".hashCode(), 100_000_000)), "243333444");
+
+        mockMvc.perform(
+                        post("/api/users")
+                                .contextPath(CONTEXT_PATH)
+                                .with(user("1").roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.phoneNumber").value("Informe um telefone com DDD válido."));
     }
 
     @Test
@@ -222,8 +239,9 @@ class UserControllerTest extends PostgresIntegrationTest {
                                 .content(
                                         userBody(
                                                 "Maria Souza", "maria@example.com", UserType.USER)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Email is already in use"));
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Email is already in use"))
+                .andExpect(jsonPath("$.fieldErrors.email").value("Este e-mail já está cadastrado."));
     }
 
     @Test

@@ -1,5 +1,6 @@
 package br.com.gestaodireta.user.dto;
 
+import br.com.gestaodireta.user.config.PasswordPolicy;
 import br.com.gestaodireta.user.enumeration.UserType;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -12,7 +13,7 @@ public record UserCreateRequest(
         @NotBlank @Email @Size(max = 160) String email,
         @NotBlank
                 @Pattern(
-                        regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,}$",
+                        regexp = PasswordPolicy.REGEX,
                         message =
                                 "must have at least 8 characters, including uppercase, lowercase,"
                                         + " number and special character")

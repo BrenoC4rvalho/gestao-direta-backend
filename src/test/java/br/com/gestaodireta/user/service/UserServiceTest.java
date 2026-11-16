@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import br.com.gestaodireta.shared.exception.BusinessException;
+import br.com.gestaodireta.shared.exception.ConflictException;
 import br.com.gestaodireta.shared.exception.ResourceNotFoundException;
 import br.com.gestaodireta.shared.exception.ValidationException;
 import br.com.gestaodireta.shared.pagination.PaginationParams;
@@ -96,7 +97,7 @@ class UserServiceTest extends PostgresIntegrationTest {
                         UserType.USER);
 
         assertThatThrownBy(() -> userService.create(duplicatedRequest))
-                .isInstanceOf(BusinessException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessage("Email is already in use");
     }
 

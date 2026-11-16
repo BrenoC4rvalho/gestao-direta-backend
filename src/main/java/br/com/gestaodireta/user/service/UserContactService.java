@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UserContactService {
-    private static final Pattern PHONE = Pattern.compile("^\\+[1-9]\\d{7,14}$");
+    private static final Pattern PHONE = Pattern.compile("^\\+55\\d{10,11}$");
     private final UserRepository users;
     private final UserContactRepository contacts;
     private final MessagingAccountRepository accounts;
@@ -55,7 +55,9 @@ public class UserContactService {
     public String normalize(String value) {
         String normalized = value == null ? "" : value.replaceAll("[\\s()\\-]", "");
         if (!PHONE.matcher(normalized).matches())
-            throw new ValidationException("Phone number must be in international format");
+            throw new ValidationException(
+                    "Phone number must be a valid Brazilian number",
+                    java.util.Map.of("phoneNumber", "Informe um telefone com DDD válido."));
         return normalized;
     }
 
