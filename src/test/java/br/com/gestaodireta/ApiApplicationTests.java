@@ -2,6 +2,7 @@ package br.com.gestaodireta;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.zaxxer.hikari.HikariDataSource;
 import br.com.gestaodireta.user.entity.User;
 import br.com.gestaodireta.user.enumeration.UserStatus;
 import br.com.gestaodireta.user.enumeration.UserType;
@@ -32,6 +33,8 @@ class ApiApplicationTests {
 
     @Autowired private PasswordEncoder passwordEncoder;
 
+    @Autowired private HikariDataSource dataSource;
+
     @DynamicPropertySource
     static void postgresProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
@@ -52,5 +55,15 @@ class ApiApplicationTests {
         assertThat(admin.getStatus()).isEqualTo(UserStatus.ACTIVE);
         assertThat(admin.getCreatedAt()).isNotNull();
         assertThat(admin.getUpdatedAt()).isNull();
+    }
+
+    @Test
+    void configuresHikariWithApplicationDefaults() {
+        assertThat(dataSource.getPoolName()).isEqualTo("GestaoDiretaPool");
+        assertThat(dataSource.getMinimumIdle()).isEqualTo(2);
+        assertThat(dataSource.getMaximumPoolSize()).isEqualTo(10);
+        assertThat(dataSource.getConnectionTimeout()).isEqualTo(30000L);
+        assertThat(dataSource.getIdleTimeout()).isEqualTo(600000L);
+        assertThat(dataSource.getMaxLifetime()).isEqualTo(1800000L);
     }
 }
